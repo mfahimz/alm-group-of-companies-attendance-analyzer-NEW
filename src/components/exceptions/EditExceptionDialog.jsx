@@ -42,6 +42,21 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
     const queryClient = useQueryClient();
 
+    /**
+     * Clears only the four shift override time fields (new_am_start, new_am_end,
+     * new_pm_start, new_pm_end) in the formData state to empty strings.
+     * The section remains visible since the type stays SHIFT_OVERRIDE.
+     */
+    const clearShiftOverride = () => {
+        setFormData(prev => ({
+            ...prev,
+            new_am_start: '',
+            new_am_end: '',
+            new_pm_start: '',
+            new_pm_end: ''
+        }));
+    };
+
     useEffect(() => {
         if (exception && project) {
             // Calculate default salary_leave_days if not set
@@ -273,7 +288,19 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
                     {needsShiftOverride && (
                         <div className="space-y-4 border-t pt-4">
-                            <Label className="block">Override Shift Times</Label>
+                            <div className="flex items-center justify-between">
+                                <Label className="block">Override Shift Times</Label>
+                                {/* Clear Shift Override Button: Resets the four time input fields to empty strings */}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearShiftOverride}
+                                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                    Clear Shift Override
+                                </Button>
+                            </div>
                             <div className="grid grid-cols-4 gap-4">
                                 <div>
                                     <Label className="text-xs">AM Start</Label>

@@ -101,6 +101,31 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
         });
     };
     
+    /**
+     * Resets the shift time fields in the form data to their original values
+     * passed via the shift prop. Handles both single and double shift modes.
+     */
+    const handleReset = () => {
+        if (!shift) return;
+        
+        if (formData.is_single_shift) {
+            setFormData(prev => ({
+                ...prev,
+                am_start: shift.am_start || '',
+                pm_end: shift.pm_end || ''
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                am_start: shift.am_start || '',
+                am_end: shift.am_end || '',
+                pm_start: shift.pm_start || '',
+                pm_end: shift.pm_end || ''
+            }));
+        }
+        toast.info('Shift times reset to original values');
+    };
+
     const toggleDay = (day) => {
         setFormData(prev => {
             const newArray = prev.applicable_days_array.includes(day)
@@ -194,6 +219,19 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             </div>
                         </div>
                     )}
+
+                    {/* Reset to Original: Restores the shift times from the database records */}
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleReset}
+                            className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-7"
+                        >
+                            Reset to Original
+                        </Button>
+                    </div>
                     <div>
                         <Label>Applicable Days *</Label>
                         {project?.company === 'Naser Mohsin Auto Parts' ? (

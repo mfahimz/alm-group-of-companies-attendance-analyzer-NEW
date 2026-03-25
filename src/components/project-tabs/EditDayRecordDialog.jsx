@@ -585,6 +585,24 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         };
     };
 
+    /**
+     * Clears only the four shift override time fields (am_start, am_end,
+     * pm_start, pm_end) inside formData.shiftOverride to empty strings.
+     * The section toggle/visibility remains unchanged.
+     */
+    const clearShiftOverrideTimes = () => {
+        setFormData(prev => ({
+            ...prev,
+            shiftOverride: {
+                ...prev.shiftOverride,
+                am_start: '',
+                am_end: '',
+                pm_start: '',
+                pm_end: ''
+            }
+        }));
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!dayRecord || !analysisResult) return;
@@ -779,6 +797,18 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                 </label>
                                 <p className="text-xs text-slate-500">Late/Early calculations will use these times</p>
                             </div>
+                            {/* Clear Shift Override Button: Resets the four time input fields to empty strings */}
+                            {formData.shiftOverride.enabled && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearShiftOverrideTimes}
+                                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                    Clear Shift Override
+                                </Button>
+                            )}
                         </div>
 
                         {formData.shiftOverride.enabled && (

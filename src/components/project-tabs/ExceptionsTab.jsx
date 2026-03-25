@@ -692,6 +692,21 @@ export default function ExceptionsTab({ project }) {
         working_day_override: '',
         salary_leave_days: ''
     });
+
+    /**
+     * Clears only the four shift override time fields (new_am_start, new_am_end,
+     * new_pm_start, new_pm_end) in the formData state to empty strings.
+     * The section toggle/visibility remains unchanged.
+     */
+    const clearShiftOverride = () => {
+        setFormData(prev => ({
+            ...prev,
+            new_am_start: '',
+            new_am_end: '',
+            new_pm_start: '',
+            new_pm_end: ''
+        }));
+    };
     const [filter, setFilter] = useState({ 
         search: '', 
         type: 'all',
@@ -1883,7 +1898,19 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
 
                             {needsShiftOverride && (
                                 <div className="space-y-4">
-                                    <Label className="block">Override Shift Times</Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label className="block">Override Shift Times</Label>
+                                        {/* Clear Shift Override Button: Resets the four time input fields to empty strings */}
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={clearShiftOverride}
+                                            className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                            Clear Shift Override
+                                        </Button>
+                                    </div>
                                     <div className="grid grid-cols-4 gap-4">
                                         <div>
                                             <Label className="text-xs">AM Start</Label>
