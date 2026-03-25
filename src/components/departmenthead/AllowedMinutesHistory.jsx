@@ -25,15 +25,23 @@ export default function AllowedMinutesHistory({ projectId, deptHeadVerification 
         enabled: !!projectId && !!deptHeadVerification?.verified
     });
 
-    const getEmployeeName = async (attendanceId) => {
-        try {
-            const employees = await base44.entities.Employee.filter({
-                attendance_id: parseInt(attendanceId)
+    // Fetch employees to map attendance_id -> name
+    const { data: employees = [] } = useQuery({
+        queryKey: ['deptEmployeesForHistory', deptHeadVerification?.assignment?.company],
+        queryFn: async () => {
+            if (!deptHeadVerification?.assignment?.company) return [];
+            return await base44.entities.Employee.filter({
+                company: deptHeadVerification.assignment.company,
+                active: true
             });
-            return employees[0]?.name || `ID: ${attendanceId}`;
-        } catch {
-            return `ID: ${attendanceId}`;
-        }
+        },
+        enabled: !!deptHeadVerification?.assignment?.company,
+        staleTime: 5 * 60 * 1000
+    });
+
+    const getEmployeeName = (attendanceId) => {
+        const emp = employees.find(e => String(e.attendance_id) === String(attendanceId));
+        return emp?.name || `ID: ${attendanceId}`;
     };
 
     if (isLoading) {
@@ -61,7 +69,7 @@ export default function AllowedMinutesHistory({ projectId, deptHeadVerification 
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Attendance ID</TableHead>
+                                <TableHead>Employee</TableHead>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Reason</TableHead>
@@ -71,7 +79,7 @@ export default function AllowedMinutesHistory({ projectId, deptHeadVerification 
                         <TableBody>
                             {allowedExceptions.map(exc => (
                                 <TableRow key={exc.id}>
-                                    <TableCell className="font-medium">{exc.attendance_id}</TableCell>
+                                    <TableCell className="font-medium">{getEmployeeName(exc.attendance_id)}</TableCell>
                                     <TableCell>{format(parseISO(exc.date_from), 'dd MMM yyyy')}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="text-xs">
