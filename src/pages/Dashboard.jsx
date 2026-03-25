@@ -21,7 +21,7 @@ export default function Dashboard() {
     React.useEffect(() => {
         if (currentUser) {
             const userRole = currentUser.extended_role || currentUser.role || 'user';
-            if (userRole === 'department_head') {
+            if (userRole === 'department_head' || userRole === 'assistant_gm') {
                 window.location.replace('/DepartmentHeadDashboard');
             }
         }

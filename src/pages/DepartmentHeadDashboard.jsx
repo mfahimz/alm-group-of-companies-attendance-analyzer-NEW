@@ -32,7 +32,7 @@ export default function DepartmentHeadDashboard() {
 
     // SECURITY: Verify department head assignment via backend
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isDepartmentHead = userRole === 'department_head';
+    const isDepartmentHead = userRole === 'department_head' || userRole === 'assistant_gm';
     const isCEO = userRole === 'ceo';
     const isAdmin = userRole === 'admin';
     const isHRManager = userRole === 'hr_manager';
@@ -42,7 +42,7 @@ export default function DepartmentHeadDashboard() {
 
     // CEO/HR Manager can access if they have hrms_id (linked to dept head record)
     const hasDeptHeadLink = (isCEO || isHRManager) && !!currentUser?.hrms_id;
-    const canVerifyDeptHead = isDepartmentHead || hasDeptHeadLink || isAdminOrCEO;
+    const canVerifyDeptHead = isDepartmentHead || hasDeptHeadLink || isAdminOrCEO;  // assistant_gm included via isDepartmentHead
 
     const { data: deptHeadVerification, isLoading: verificationLoading } = useQuery({
         queryKey: ['deptHeadVerification', canVerifyDeptHead, currentUser?.email],

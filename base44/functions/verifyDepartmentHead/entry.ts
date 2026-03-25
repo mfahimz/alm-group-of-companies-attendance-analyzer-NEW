@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Check if user has department_head, ceo, or hr_manager role (CEO/HR Manager can optionally have dept head link)
-        if (userRole !== 'department_head' && userRole !== 'ceo' && userRole !== 'hr_manager') {
+        // Check if user has department_head, assistant_gm, ceo, or hr_manager role
+        if (userRole !== 'department_head' && userRole !== 'assistant_gm' && userRole !== 'ceo' && userRole !== 'hr_manager') {
             return Response.json({
                 error: 'Access denied: Not a department head',
                 verified: false
