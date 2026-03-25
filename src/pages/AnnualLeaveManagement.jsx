@@ -24,6 +24,8 @@ export default function AnnualLeaveManagement() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterProject, setFilterProject] = useState('all'); // State for project-based range filtering
+    const [filterDateFrom, setFilterDateFrom] = useState(''); // State for manual from-date range filter
+    const [filterDateTo, setFilterDateTo] = useState(''); // State for manual to-date range filter
 
     const [unmatchedSearchTerm, setUnmatchedSearchTerm] = useState(''); // Search term for manual employee matching in import
     const [activeUnmatchedIdx, setActiveUnmatchedIdx] = useState(null); // Tracks which row is currently being manually matched
@@ -175,9 +177,16 @@ export default function AnnualLeaveManagement() {
                 matchesProject = leaveStart <= projEnd && leaveEnd >= projStart;
             }
 
-            return matchesSearch && matchesStatus && matchesProject;
+            // MANUAL DATE RANGE FILTERING LOGIC:
+            // Records are shown if leave.date_from falls within the manual date selection.
+            // When only From is set, show >= From. When only To is set, show <= To.
+            let matchesDateRange = true;
+            if (filterDateFrom && leave.date_from < filterDateFrom) matchesDateRange = false;
+            if (filterDateTo && leave.date_from > filterDateTo) matchesDateRange = false;
+
+            return matchesSearch && matchesStatus && matchesProject && matchesDateRange;
         });
-    }, [leaves, searchTerm, filterStatus, filterProject, projects]);
+    }, [leaves, searchTerm, filterStatus, filterProject, projects, filterDateFrom, filterDateTo]);
 
     const calculateDays = (from, to) => {
         if (!from || !to) return 0;
@@ -682,6 +691,37 @@ export default function AnnualLeaveManagement() {
                                 size="sm" 
                                 onClick={() => setFilterProject('all')}
                                 className="text-slate-500 hover:text-red-600 h-9"
+                            >
+                                <X className="w-4 h-4 mr-1" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Manual Date Range Filter: Allows precise filtering of records by From and To dates */}
+                    <div className="flex items-center gap-2">
+                        <Input
+                            type="date"
+                            value={filterDateFrom}
+                            onChange={(e) => setFilterDateFrom(e.target.value)}
+                            className="w-40 h-9"
+                        />
+                        <span className="text-slate-400 text-sm">to</span>
+                        <Input
+                            type="date"
+                            value={filterDateTo}
+                            onChange={(e) => setFilterDateTo(e.target.value)}
+                            className="w-40 h-9"
+                        />
+                        {(filterDateFrom || filterDateTo) && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setFilterDateFrom('');
+                                    setFilterDateTo('');
+                                }}
+                                className="text-slate-500 hover:text-red-600 h-9 px-2"
                             >
                                 <X className="w-4 h-4 mr-1" />
                                 Clear

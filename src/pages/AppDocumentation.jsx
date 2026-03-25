@@ -1233,6 +1233,11 @@ export default function AppDocumentation() {
                                                     <strong>Update:</strong> The import preview now supports manual employee searching for unmatched rows, and the main leave table includes a project-based date range filter.
                                                 </p>
                                             </div>
+                                            <div className="bg-slate-50 border border-slate-200 rounded p-2 mt-2">
+                                                <p className="text-[10px] text-slate-600">
+                                                    <strong>Update:</strong> The annual leave table now features a manual From and To date filter for precise record selection. This allows filtering by actual leave dates independently of the project filter.
+                                                </p>
+                                            </div>
                                             <div className="bg-slate-50 rounded-lg p-3 text-[10px] text-slate-500 italic">
                                                 <strong>Al Maraghi Motors Exception:</strong> Leaves starting in the project but ending after it are fully included to ensure seamless payroll salary enrollment.
                                             </div>
