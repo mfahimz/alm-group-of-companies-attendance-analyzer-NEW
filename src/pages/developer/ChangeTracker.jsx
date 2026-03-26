@@ -16,7 +16,12 @@ import {
     Search,
     ArrowUpDown,
     SortAsc,
-    SortDesc
+    SortDesc,
+    Cloud, 
+    CloudOffIcon, 
+    Zap, 
+    Trophy,
+    Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,11 +33,16 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { 
+    PRIORITIES, 
+    STATUSES, 
+    SECTIONS, 
+    sortChangeLogs, 
+    parseQuickAdd, 
+    calculateKarma 
+} from '@/domain/changeLogRules';
 
-// --- Constants ---
-const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
-const PRIORITIES = ["Low", "Medium", "High", "Critical"];
-const STATUSES = ["Pending", "In Progress", "Frozen", "Completed"];
+// Constants are now imported from domain/changeLogRules
 
 const EditableRow = ({ item, onUpdate, onDelete }) => {
     const [localItem, setLocalItem] = useState(item);
@@ -229,11 +239,13 @@ const SectionContainer = ({ title, items, onUpdate, onDelete, onAdd, sortConfig,
 export default function ChangeTracker() {
     const queryClient = useQueryClient();
     const [searchQuery, setSearchQuery] = useState('');
+    const [quickAddValue, setQuickAddValue] = useState('');
     const [sortConfig, setSortConfig] = useState({ key: 'description', direction: 'asc' });
-
-    // Weight maps for intelligent sorting
-    const priorityWeight = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
-    const statusWeight = { 'Pending': 1, 'In Progress': 2, 'Frozen': 3, 'Completed': 4 };
+    
+    // Command Batching State (Todoist-style Sync Protocol)
+    const [syncQueue, setSyncQueue] = useState({}); // { id: data }
+    const [isProcessingSync, setIsProcessingSync] = useState(false);
+    const [lastSyncTime, setLastSyncTime] = useState(new Date());
 
     // Data Fetching
     const { data: user } = useQuery({
@@ -275,9 +287,41 @@ export default function ChangeTracker() {
     });
 
     // Handlers
-    const handleUpdate = async (id, data) => {
-        return updateMutation.mutateAsync({ id, data });
-    };
+    const handleUpdate = useCallback(async (id, data) => {
+        // optimistically update the queue (Command Batching)
+        setSyncQueue(prev => ({
+            ...prev,
+            [id]: { ...(prev[id] || {}), ...data }
+        }));
+    }, []);
+
+    // Periodic Sync (Every 5 seconds if queue has items)
+    useEffect(() => {
+        if (Object.keys(syncQueue).length === 0 || isProcessingSync) return;
+
+        const timer = setTimeout(async () => {
+            setIsProcessingSync(true);
+            const currentQueue = { ...syncQueue };
+            setSyncQueue({}); // Clear queue before processing
+
+            try {
+                const promises = Object.entries(currentQueue).map(([id, data]) => 
+                    base44.entities.DeveloperChangeLog.update(id, data)
+                );
+                await Promise.all(promises);
+                setLastSyncTime(new Date());
+                queryClient.invalidateQueries({ queryKey: ['developerChangeRequests'] });
+            } catch (error) {
+                toast.error("Background sync failed. Retrying...");
+                // Put back in queue? For now just log
+                console.error("Sync error:", error);
+            } finally {
+                setIsProcessingSync(false);
+            }
+        }, 5000);
+
+        return () => clearTimeout(timer);
+    }, [syncQueue, isProcessingSync, queryClient]);
 
     const handleDelete = (id) => {
         if (confirm('Permanently delete this row?')) {
@@ -285,15 +329,29 @@ export default function ChangeTracker() {
         }
     };
 
-    const handleAdd = (section) => {
+    const handleAdd = (sectionOrData) => {
+        const baseData = typeof sectionOrData === 'string' 
+            ? { section_type: sectionOrData, description: '' }
+            : sectionOrData;
+
         createMutation.mutate({
             title: 'Request',
-            section_type: section,
             category: 'Logic',
             priority: 'Medium',
             status: 'Pending',
-            description: ''
+            ...baseData
         });
+    };
+
+    const handleQuickAdd = (e) => {
+        if (e.key === 'Enter' && quickAddValue.trim()) {
+            const parsed = parseQuickAdd(quickAddValue);
+            handleAdd(parsed);
+            setQuickAddValue('');
+            toast.success("Change added via Quick Add", {
+                icon: <Sparkles className="w-4 h-4 text-indigo-500" />
+            });
+        }
     };
 
     const handleSort = (key) => {
@@ -303,7 +361,7 @@ export default function ChangeTracker() {
         }));
     };
 
-    // Filter and Sort Logic
+    // Filter and Sort Logic (Shared Domain Rules)
     const processedRecords = React.useMemo(() => {
         let result = [...allRecords];
 
@@ -316,38 +374,10 @@ export default function ChangeTracker() {
             );
         }
 
-        // Sorting
-        result.sort((a, b) => {
-            // Rule 1: 'Completed' tasks are always pinned to the bottom
-            const isACompleted = a.status === 'Completed';
-            const isBCompleted = b.status === 'Completed';
-
-            if (isACompleted && !isBCompleted) return 1;
-            if (!isACompleted && isBCompleted) return -1;
-
-            // Rule 2: Normal sorting logic for non-completed items (or between two completed items)
-            let valA = a[sortConfig.key];
-            let valB = b[sortConfig.key];
-
-            // Custom weights for specific columns
-            if (sortConfig.key === 'priority') {
-                valA = priorityWeight[valA] || 0;
-                valB = priorityWeight[valB] || 0;
-            } else if (sortConfig.key === 'status') {
-                valA = statusWeight[valA] || 0;
-                valB = statusWeight[valB] || 0;
-            } else {
-                valA = (valA || '').toString().toLowerCase();
-                valB = (valB || '').toString().toLowerCase();
-            }
-
-            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-        return result;
+        return sortChangeLogs(result, sortConfig);
     }, [allRecords, searchQuery, sortConfig]);
+
+    const karmaScore = React.useMemo(() => calculateKarma(allRecords), [allRecords]);
 
     if (isLoading) {
         return (
@@ -364,24 +394,53 @@ export default function ChangeTracker() {
     return (
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-100 pb-8">
-                <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-black uppercase tracking-widest border border-indigo-100">
-                        <Terminal className="w-3.5 h-3.5" />
-                        Internal System
+                <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="inline-flex items-center gap-2 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-black uppercase tracking-widest border border-indigo-100">
+                            <Terminal className="w-3.5 h-3.5" />
+                            Internal System
+                        </div>
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-100 shadow-sm animate-pulse-subtle">
+                            <Trophy className="w-3.5 h-3.5" />
+                            Karma: {karmaScore}
+                        </div>
+                        <div className={cn(
+                            "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                            Object.keys(syncQueue).length > 0 ? "text-blue-600 bg-blue-50" : "text-emerald-600 bg-emerald-50"
+                        )}>
+                            {Object.keys(syncQueue).length > 0 ? (
+                                <><Cloud className="w-3 h-3 animate-bounce" /> Syncing {Object.keys(syncQueue).length} changes...</>
+                            ) : isProcessingSync ? (
+                                <><Loader2 className="w-3 h-3 animate-spin" /> Finalizing...</>
+                            ) : (
+                                <><CheckCircle2 className="w-3 h-3" /> All changes synced</>
+                            )}
+                        </div>
                     </div>
                     <h1 className="text-5xl font-black text-slate-900 tracking-tighter">Developer Portal v2</h1>
                     <p className="text-slate-500 text-lg leading-relaxed max-w-2xl">
-                        Streamlined, inline-editable management for all system changes, user requests, and CEO approvals.
+                        High-performance management with <b>Command Batching</b> and <b>Incremental Sync</b>.
                     </p>
                 </div>
-                <div className="flex items-center gap-4 w-full md:w-80">
-                    <div className="relative w-full group">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10" />
+
+                <div className="flex flex-col gap-4 w-full md:w-[450px]">
+                    <div className="relative group w-full">
+                        <Sparkles className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 z-10 opacity-40 group-focus-within:opacity-100 transition-opacity" />
                         <Input 
-                            placeholder="Type to filter changes..." 
+                            placeholder="Quick Add: 'Fix bug #High @In Progress [Changes]'" 
+                            value={quickAddValue}
+                            onChange={(e) => setQuickAddValue(e.target.value)}
+                            onKeyDown={handleQuickAdd}
+                            className="pl-11 h-11 bg-slate-50 border-2 border-indigo-100/50 hover:border-indigo-200 focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all text-sm rounded-2xl shadow-sm italic"
+                        />
+                    </div>
+                    <div className="relative w-full group">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                        <Input 
+                            placeholder="Filter changes..." 
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-11 h-11 bg-white border-2 border-indigo-100 hover:border-indigo-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all text-sm rounded-2xl shadow-sm placeholder:text-slate-400"
+                            className="pl-11 h-10 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50 transition-all text-xs rounded-xl shadow-none"
                         />
                     </div>
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Users, DollarSign, Clock, ShieldCheck, Briefcase, Zap, AlertCircle, Edit, Moon, Settings, RotateCcw, Calendar, Play, Info, ListChecks, Milestone, UserCheck, History, Hash, ScanLine, LayoutDashboard, UserPlus, FolderSearch, Table, FileJson, Workflow, Shield, Paintbrush, CheckSquare, Code, Key, FileText, Terminal, Scale, Coins, Activity, HandCoins } from 'lucide-react';
+import { BookOpen, Users, DollarSign, Clock, ShieldCheck, Briefcase, Zap, AlertCircle, Edit, Moon, Settings, RotateCcw, Calendar, Play, Info, ListChecks, Milestone, UserCheck, History, Hash, ScanLine, LayoutDashboard, UserPlus, FolderSearch, Table, FileJson, Workflow, Shield, Paintbrush, CheckSquare, Code, Key, FileText, Terminal, Scale, Coins, Activity, HandCoins, Cloud } from 'lucide-react';
 
 /**
  * SECTIONS - List of documentation sections
@@ -16,6 +16,7 @@ const SECTIONS = [
     "HR Features",
     "Resume Scanner",
     "Developer and Admin Tools",
+    "Engineering & Synchronization",
     "Business Rules Reference"
 ];
 
@@ -1698,6 +1699,83 @@ export default function AppDocumentation() {
                                      </div>
                                  </section>
                              </div>
+                        ) : activeSection === "Engineering & Synchronization" ? (
+                            /* 
+                                ENGINEERING & SYNCHRONIZATION SECTION
+                                Technical documentation for the application's high-performance architecture,
+                                inspired by modern productivity systems (like Todoist).
+                            */
+                            <div className="space-y-10 animate-in fade-in duration-500">
+                                {/* Section 1: Architectural Philosophy */}
+                                <section className="space-y-4">
+                                    <h3 className="text-xl font-bold text-[#0F1E36] flex items-center gap-2">
+                                        <Zap className="w-5 h-5 text-indigo-600" />
+                                        Engineering Philosophy
+                                    </h3>
+                                    <p className="text-[#4A5568] leading-relaxed">
+                                        The application utilizes a <strong>"Native-Performance, Shared-Logic"</strong> architecture inspired by modern distributed systems. To ensure consistency across the platform, critical business rules are decoupled from the user interface and centralized in a portable <strong>Domain Layer</strong>.
+                                    </p>
+                                </section>
+
+                                {/* Section 2: Command Batching & Sync */}
+                                <section className="grid md:grid-cols-2 gap-8">
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                                        <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                            <Cloud className="w-4 h-4 text-blue-600" />
+                                            Command Batching
+                                        </h4>
+                                        <p className="text-xs text-[#64748B] leading-relaxed">
+                                            To minimize network overhead and ensure atomic state transitions, the system implements <strong>Command Batching</strong>. Local user edits (e.g., in the Developer Portal) are queued in an optimistic buffer and synchronized with the backend in a single delta-update request every 5 seconds. This provides a "fluid" feel while reducing server load.
+                                        </p>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                                        <h4 className="font-bold text-slate-800 flex items-center gap-2">
+                                            <Zap className="w-4 h-4 text-amber-600" />
+                                            Deterministic State
+                                        </h4>
+                                        <p className="text-xs text-[#64748B] leading-relaxed">
+                                            The synchronization protocol ensures <strong>Deterministic Conflict Resolution</strong>. By prioritizing the most recent user intent and utilizing state-based tokens, the system ensures that multiple developers can collaborate on the change log without overwriting each other's work.
+                                        </p>
+                                    </div>
+                                </section>
+
+                                {/* Section 3: Shared Domain Layer */}
+                                <section className="space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-indigo-100 rounded-lg">
+                                            <Terminal className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        <h3 className="text-xl font-bold text-[#0F1E36]">Portable Logic Layer</h3>
+                                    </div>
+                                    <p className="text-[#4A5568] leading-relaxed">
+                                        Business logic—such as sorting weights for priorities, natural language parsing rules, and Karma productivity calculations—is stored in <code>src/domain/</code>. This ensures that the same rules apply whether data is viewed on the web portal or accessed via automated backend scripts.
+                                    </p>
+                                    <div className="grid md:grid-cols-3 gap-4">
+                                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                            <h5 className="font-bold text-xs text-slate-900 mb-1 caps">NLP Parsing</h5>
+                                            <p className="text-[10px] text-slate-500">Real-time interpretation of "Quick Add" shorthand for system requests.</p>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                            <h5 className="font-bold text-xs text-slate-900 mb-1 caps">Weighted Sorting</h5>
+                                            <p className="text-[10px] text-slate-500">Intelligent prioritization of Critical vs. Low importance changes.</p>
+                                        </div>
+                                        <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                            <h5 className="font-bold text-xs text-slate-900 mb-1 caps">Productivity Scoring</h5>
+                                            <p className="text-[10px] text-slate-500">Algorithmic "Karma" points based on task completion velocity.</p>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Section 4: Performance Optimization */}
+                                <section className="p-8 rounded-3xl bg-indigo-900 text-white space-y-4">
+                                    <h3 className="text-xl font-bold flex items-center gap-2">
+                                        Data Architecture & Reliability
+                                    </h3>
+                                    <p className="text-indigo-100 text-sm leading-relaxed">
+                                        The backend utilizes a polyglot persistence strategy, combining relational Base44 entities with high-throughput logic functions. Performance is tuned using computed fields and optimized SQL patterns (like <code>JSON_TABLE</code>) to handle complex filtering across millions of attendance records without UI degradation.
+                                    </p>
+                                </section>
+                            </div>
                         ) : activeSection === "Business Rules Reference" ? (
                             <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24 text-left">
                                  {/* Header Section */}
