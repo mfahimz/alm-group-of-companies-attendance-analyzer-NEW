@@ -290,17 +290,83 @@ export default function PunchUploadTab({ project }) {
               total: punchRecords.length 
             });
 
-            const batchSize = 10;
-            for (let i = 0; i < punchRecords.length; i += batchSize) {
-              const batch = punchRecords.slice(i, i + batchSize);
-              await base44.entities.Punch.bulkCreate(batch);
-              await new Promise(r => setTimeout(r, 300));
-              const uploaded = Math.min(i + batchSize, punchRecords.length);
-              setUploadProgress({ 
-                  phase: `Uploading batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(punchRecords.length / batchSize)}...`, 
-                  current: uploaded, 
-                  total: punchRecords.length 
-              });
+            // Track all created punch IDs for rollback on failure
+            const createdPunchIds = [];
+            const batchSize = 25;
+            const BASE_DELAY = 150;
+            const MAX_RETRIES = 3;
+
+            try {
+                for (let i = 0; i < punchRecords.length; i += batchSize) {
+                    const batch = punchRecords.slice(i, i + batchSize);
+                    let retries = 0;
+                    let success = false;
+
+                    while (!success && retries <= MAX_RETRIES) {
+                        try {
+                            const created = await base44.entities.Punch.bulkCreate(batch);
+                            // Track IDs for potential rollback
+                            if (Array.isArray(created)) {
+                                createdPunchIds.push(...created.map(r => r.id));
+                            }
+                            success = true;
+                        } catch (batchError) {
+                            const isRateLimit = batchError?.status === 429 || 
+                                batchError?.message?.toLowerCase()?.includes('rate limit') ||
+                                batchError?.message?.toLowerCase()?.includes('too many');
+                            
+                            if (isRateLimit && retries < MAX_RETRIES) {
+                                retries++;
+                                const backoff = Math.min(1000 * Math.pow(2, retries), 8000);
+                                setUploadProgress(prev => ({
+                                    ...prev,
+                                    phase: `Rate limit hit — retrying in ${Math.round(backoff/1000)}s (attempt ${retries}/${MAX_RETRIES})...`
+                                }));
+                                await new Promise(r => setTimeout(r, backoff));
+                            } else {
+                                // Non-rate-limit error or retries exhausted — trigger rollback
+                                throw batchError;
+                            }
+                        }
+                    }
+
+                    const uploaded = Math.min(i + batchSize, punchRecords.length);
+                    const batchNum = Math.floor(i / batchSize) + 1;
+                    const totalBatches = Math.ceil(punchRecords.length / batchSize);
+                    setUploadProgress({ 
+                        phase: `Uploading batch ${batchNum}/${totalBatches}...`, 
+                        current: uploaded, 
+                        total: punchRecords.length 
+                    });
+                    await new Promise(r => setTimeout(r, BASE_DELAY));
+                }
+            } catch (uploadError) {
+                // === ROLLBACK: Delete all successfully created punches ===
+                if (createdPunchIds.length > 0) {
+                    setUploadProgress({
+                        phase: `Upload failed — rolling back ${createdPunchIds.length} records...`,
+                        current: 0,
+                        total: createdPunchIds.length
+                    });
+                    const rollbackBatchSize = 25;
+                    for (let i = 0; i < createdPunchIds.length; i += rollbackBatchSize) {
+                        const rollbackBatch = createdPunchIds.slice(i, i + rollbackBatchSize);
+                        for (const id of rollbackBatch) {
+                            try {
+                                await base44.entities.Punch.delete(id);
+                            } catch (delErr) {
+                                console.error('Rollback delete failed for', id, delErr);
+                            }
+                        }
+                        await new Promise(r => setTimeout(r, 300));
+                        setUploadProgress(prev => ({
+                            ...prev,
+                            current: Math.min(i + rollbackBatchSize, createdPunchIds.length)
+                        }));
+                    }
+                }
+                // Re-throw so onError handler runs
+                throw uploadError;
             }
         },
         onSuccess: () => {
@@ -312,7 +378,12 @@ export default function PunchUploadTab({ project }) {
             setShowPreviewDialog(false);
         },
         onError: (error) => {
-            toast.error('Failed to upload punches: ' + (error.message || 'Unknown error'));
+            queryClient.invalidateQueries(['punches', project.id]);
+            const isRateLimit = error?.status === 429 || error?.message?.toLowerCase()?.includes('rate limit');
+            const msg = isRateLimit 
+                ? 'Rate limit exceeded. All uploaded records have been rolled back. Try again in a minute.'
+                : 'Failed to upload punches: ' + (error.message || 'Unknown error') + '. All uploaded records have been rolled back.';
+            toast.error(msg, { duration: 8000 });
             setUploadProgress(null);
         }
     });
