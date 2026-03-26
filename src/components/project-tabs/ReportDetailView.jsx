@@ -1427,28 +1427,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const nextDateStr = nextDayObj.toISOString().split('T')[0];
                 
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId)); // FIX 2/3: Prepare punch set for previous-day midnight carry-forward exclusion.
-                // FIX 2: Build previous-day context so we can detect if the prior shift ended near midnight.
-                const prevDayObj = new Date(currentDay); // FIX 2: Start from current day and step back one day for previous-shift lookup.
-                prevDayObj.setDate(prevDayObj.getDate() - 1); // FIX 2: Move to previous calendar day.
-                const prevDateStr = prevDayObj.toISOString().split('T')[0]; // FIX 2: Compute previous date key for date-specific shift lookup.
-                let prevShiftEndsNearMidnight = false; // FIX 2: Track whether previous day shift likely carries punches past midnight.
-                let prevShift = employeeShifts.find(s => s.date === prevDateStr); // FIX 2: Prefer exact previous-day assigned shift first.
-                if (!prevShift) { // FIX 1: If exact previous-day shift is missing, resolve the template using normalized Friday logic.
-                    const prevDayOfWeek = prevDayObj.getDay(); // FIX 1: Determine previous day weekday for template selection.
-                    prevShift = employeeShifts.find(s => (prevDayOfWeek === 5 ? localIsFridayShift(s) : !localIsFridayShift(s)) && !s.date); // FIX 1: Reuse helper for reliable previous-day template matching.
-                    if (!prevShift && prevDayOfWeek === 5) prevShift = employeeShifts.find(s => !s.date); // FIX 1: Preserve Friday template fallback consistency.
-                }
-                if (prevShift) { // FIX 2: Only evaluate end-time midnight behavior when a previous shift exists.
-                    const pEnd = localParseTime(prevShift.pm_end) || localParseTime(prevShift.am_end); // FIX 2: Use shift end marker to detect near-midnight carry-forward.
-                    if (pEnd) { // FIX 2: Guard against missing/invalid end times.
-                        const h = pEnd.getHours(); // FIX 2: Evaluate end hour for near-midnight classification.
-                        if (h === 23 || h === 0 || h === 1) prevShiftEndsNearMidnight = true; // FIX 2: Bidirectional midnight exclusion trigger for 23:00/00:00/01:00 end hours.
-                    }
-                }
-                let currentDayPunches = empPunches.filter(p => p.punch_date === dateStr); // FIX 2/3: Start with current-day punches before carry-forward exclusion.
-                if (prevShiftEndsNearMidnight || !prevShift) { // FIX 2/3: Exclude 00:00-02:00 punches both when prior shift ends near midnight and when prior shift is missing.
-                    currentDayPunches = currentDayPunches.filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw'])); // FIX 2/3: Remove likely previous-day carry-forward punches from current-day matching.
-                }
+                // Unconditionally exclude all current day punches in the midnight buffer (00:00-02:00) 
+                // as carry-forward punches from the previous night, regardless of previous shift timing.
+                let currentDayPunches = empPunches.filter(p => p.punch_date === dateStr)
+                    .filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw']));
+
                 const combined = [
                     ...currentDayPunches, // FIX 2/3: Use carry-forward-filtered current-day punches to prevent false unbound flags.
                     ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw']))
