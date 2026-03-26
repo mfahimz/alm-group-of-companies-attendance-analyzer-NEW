@@ -1432,9 +1432,22 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 let currentDayPunches = empPunches.filter(p => p.punch_date === dateStr)
                     .filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw']));
 
+                // BUG 2 FIX: Identify if today's shift ends near midnight to determine if we should look for crossover punches
+                const tEnd = localParseTime(shift.pm_end) || localParseTime(shift.am_end); // Extract the end time from the current shift
+                let todayShiftEndsNearMidnight = false; // Initialize the night shift flag
+                if (tEnd) {
+                    const h = tEnd.getHours(); // Get the hour from the shift end time
+                    // Identify shifts ending at 11 PM, Midnight, or 1 AM as night shifts that requires tomorrow's buffer punches
+                    if (h === 23 || h === 0 || h === 1) todayShiftEndsNearMidnight = true;
+                }
+
+                // Combine current day punches with tomorrow's buffer only for shifts ending near midnight to avoid false unbound flags
                 const combined = [
-                    ...currentDayPunches, // FIX 2/3: Use carry-forward-filtered current-day punches to prevent false unbound flags.
-                    ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw']))
+                    ...currentDayPunches, // Include current day punches (already filtered for previous-day carry-forwards)
+                    ...(todayShiftEndsNearMidnight 
+                        ? empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw']))
+                        : []
+                    ) // Conditionally include tomorrow's buffer punches based on the night shift detection boolean
                 ];
 
                 if (combined.length === 0) continue;
