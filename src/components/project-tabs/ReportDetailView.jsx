@@ -1401,16 +1401,31 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             // FIX 1: Reuse the same normalized Friday-shift helper so template lookup handles boolean/string/number values consistently.
             const localIsFridayShift = (shiftRow) => shiftRow?.is_friday_shift === true || shiftRow?.is_friday_shift === 'true' || shiftRow?.is_friday_shift === 1 || shiftRow?.is_friday_shift === '1';
 
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const currentDay = new Date(d);
-                const dateStr = currentDay.toISOString().split('T')[0];
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                    const currentDay = new Date(d);
+                    const dateStr = currentDay.toISOString().split('T')[0];
 
-                const hasException = employeeExceptions.some(ex => {
-                    const exFrom = new Date(ex.date_from);
-                    const exTo = new Date(ex.date_to);
-                    return currentDay >= exFrom && currentDay <= exTo;
-                });
-                if (hasException) continue;
+                    // FIX 1: Skip Weekly Off Days
+                    // Weekly off days are not processed for unbound punch detection to prevent false flags on rest days.
+                    let weeklyOffDay = null;
+                    const dayNameToNumberMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                    if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                        weeklyOffDay = dayNameToNumberMap[project.weekly_off_override];
+                    } else if (employee?.weekly_off) {
+                        weeklyOffDay = dayNameToNumberMap[employee.weekly_off];
+                    }
+                    if (weeklyOffDay !== null && currentDay.getDay() === weeklyOffDay) {
+                        continue;
+                    }
+
+                    // FIX 2: Skip Exceptions (e.g., MANUAL_ABSENT, FULL_SKIP)
+                    // Skip days covered by manual exceptions as they represent administratively resolved attendance.
+                    const hasException = employeeExceptions.some(ex => {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return currentDay >= exFrom && currentDay <= exTo;
+                    });
+                    if (hasException) continue;
 
                 let shift = employeeShifts.find(s => s.date === dateStr);
                 if (!shift) {
@@ -1450,13 +1465,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     ) // Conditionally include tomorrow's buffer punches based on the night shift detection boolean
                 ];
 
+                // FIX 2 (Part 2): Skip days with no punches after midnight buffer exclusion
                 if (combined.length === 0) continue;
 
                 const filtered = localFilterMultiplePunches(combined);
                 const matches = localMatchPunches(filtered, shift, nextDateStr);
                 
                 const noMatches = matches.filter(m => m.matchedTo === null);
-                if (noMatches.length > 0) {
+                
+                // FIX 3: Majority Unbound Flagging Rule
+                // A day is only flagged if more than half of its punches cannot bind to any shift points.
+                // This reduces false positives from single late/early departure punches.
+                if (noMatches.length > combined.length / 2) {
                     // Calculate maxDeviation for severity coloring (Change 2)
                     const pmEndTime = localParseTime(shift.pm_end);
                     const shiftPointsDetailed = [

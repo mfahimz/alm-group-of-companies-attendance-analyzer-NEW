@@ -731,7 +731,7 @@ export default function AppDocumentation() {
                                         NO MATCH Status
                                     </h3>
                                     <p className="text-red-700 text-sm leading-relaxed">
-                                        A <strong>NO MATCH</strong> occurs when a recorded punch cannot be associated with any shift boundary within the maximum 180-minute window. In such cases, the engine marks the day as <strong>Critical Abnormal</strong> and excludes the punch from late/early calculations to prevent data corruption. Supervisors must manually resolve these days using the Daily Breakdown dialog.
+                                        A <strong>NO MATCH</strong> occurs when a recorded punch cannot be associated with any shift boundary within the maximum 180-minute window. In such cases, the engine marks the day as <strong>Critical Abnormal</strong> and excludes the punch from late/early calculations to prevent data corruption. Supervisors must manually resolve these days using the Daily Breakdown dialog. <em>Note: Detection now automatically skips weekly off, LOP, and absent days, and only flags records where more than half of the daily punches are unbound.</em>
                                     </p>
                                 </section>
                             </div>
