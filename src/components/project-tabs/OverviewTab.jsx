@@ -175,10 +175,15 @@ export default function OverviewTab({ project }) {
         mutationFn: async () => {
             const newProject = await base44.entities.Project.create({
                 name: `${project.name} (Copy)`,
+                company: project.company, // Explicitly copy company // Fix: Ensure company is copied during duplication
                 date_from: project.date_from,
                 date_to: project.date_to,
                 department: project.department,
-                status: 'draft'
+                status: 'draft',
+                use_carried_grace_minutes: project.use_carried_grace_minutes || false, // Explicitly copy grace settings // Fix: Copy grace settings
+                use_gift_minutes: project.use_gift_minutes || false, // Explicitly copy gift settings // Fix: Copy gift settings matching grace
+                shift_blocks_count: project.shift_blocks_count || 2, // Explicitly copy shift blocks // Fix: Copy shift configuration
+                custom_employee_ids: project.custom_employee_ids || '' // Explicitly copy employee scope // Fix: Copy employee scope
             });
             return newProject;
         },
@@ -247,7 +252,11 @@ export default function OverviewTab({ project }) {
     };
 
     const updateProjectMutation = useMutation({
-        mutationFn: (data) => base44.entities.Project.update(project.id, data),
+        mutationFn: (data) => base44.entities.Project.update(project.id, {
+            ...data, // Pass all fields from editData // Comment: Ensure all form fields are sent
+            use_gift_minutes: !!data.use_gift_minutes, // Explicitly ensure use_gift_minutes is sent as a boolean // Fix: Explicitly include use_gift_minutes in the update payload
+            use_carried_grace_minutes: !!data.use_carried_grace_minutes // Explicitly ensure use_carried_grace_minutes is sent as a boolean // Fix: Explicitly include use_carried_grace_minutes to match gift minutes
+        }),
         onSuccess: () => {
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['projects']);
