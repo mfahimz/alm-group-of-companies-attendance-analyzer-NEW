@@ -2,8 +2,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Eye, Edit } from 'lucide-react';
 import InlineEditableCell from './InlineEditableCell';
-import RamadanGiftCellWidget from './RamadanGiftCell';
+import GiftMinutesCellWidget from './GiftMinutesCell';
 import DeductibleCell from './DeductibleCell';
+import StatusBadge from './StatusBadge';
 
 export default function ReportTableRow({
     result,
@@ -12,12 +13,14 @@ export default function ReportTableRow({
     isDepartmentHead,
     project,
     reportRun,
-    showRamadanGiftColumn,
+    showGiftMinutesColumn,
     onToggleVerification,
     onEditGrace,
     onShowBreakdown,
     onUpdateManualOverride,
-    onSaveRamadanGift
+    onSaveGiftMinutes,
+    // Change 2 - Receive role-based permission for gift minutes editing
+    canEditGiftMinutes
 }) {
     return (
         <tr className="border-b transition-colors hover:bg-muted/50">
@@ -134,11 +137,16 @@ export default function ReportTableRow({
                     </div>
                 </td>
             )}
-            {showRamadanGiftColumn && (() => {
-                const canEdit = !reportRun.is_final && project.status !== 'closed';
-                if (!canEdit) return <td className="p-2 align-middle"><span className="font-medium text-amber-700">{Math.max(0, result.ramadan_gift_minutes || 0)}</span></td>;
-                return <td className="p-2 align-middle"><RamadanGiftCellWidget result={result} onSave={onSaveRamadanGift} isEditable={true} /></td>;
-            })()}
+            {showGiftMinutesColumn && (
+                <td className="px-6 py-4 whitespace-nowrap">
+                    <GiftMinutesCellWidget
+                        result={result}
+                        onSave={onSaveGiftMinutes}
+                        // Change 2 - Only allow editing if user has the correct role (Admin/CEO/HRM) AND report is not final/closed
+                        isEditable={canEditGiftMinutes && !reportRun.is_final && project.status !== 'closed'}
+                    />
+                </td>
+            )}
             <td className="p-2 align-middle">
                 <DeductibleCell
                     result={result}

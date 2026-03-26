@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Table components used by DailyBreakdownDialog (extracted)
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, ScanLine } from 'lucide-react';
+import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, ScanLine, Zap } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import InlineEditableCell from './InlineEditableCell';
-import RamadanGiftCellWidget from './RamadanGiftCell';
+import GiftMinutesCellWidget from './GiftMinutesCell';
 import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from './ReportDetailDialogs';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
 import DeductibleCell from './DeductibleCell';
@@ -47,7 +47,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         currentEmployee: '',
         status: 'Processing...'
     });
-    const [ramadanGiftOverrides, setRamadanGiftOverrides] = useState({});
+    const [giftMinutesOverrides, setGiftMinutesOverrides] = useState({});
     
     // NEW DETECTION PANEL STATE
     const [showDetectionPanel, setShowDetectionPanel] = useState(false);
@@ -77,7 +77,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
     const isHRManager = userRole === 'hr_manager';
-    const canEditRamadanGift = isAdmin || isCEO || isHRManager;
+    const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
@@ -189,15 +189,38 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         );
     }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
 
-    // Source of truth for UI display/editing: AnalysisResult.ramadan_gift_minutes per row
+    /**
+     * Change 1 & 4 - Gift Minutes Automated Calculation and Reactive Logic
+     * Rule: if deductible minutes < 30, gift minutes = full deductible minutes amount.
+     * if deductible minutes >= 30, gift minutes = 15.
+     * Only auto-seeds when DB value is 0. Reactive to results changes.
+     */
     React.useEffect(() => {
+        // Change 4: Clear all overrides if the feature is disabled for the project
+        if (!project?.use_gift_minutes) {
+            setGiftMinutesOverrides({});
+            return;
+        }
+
         if (!results || results.length === 0) return;
+        
         const seeded = {};
         results.forEach(r => {
-            seeded[r.id] = Math.max(0, Number(r.ramadan_gift_minutes ?? 0));
+            const dbGift = Math.max(0, Number(r.ramadan_gift_minutes ?? 0));
+            const rawDeductible = Math.max(0, r.manual_deductible_minutes ?? r.deductible_minutes ?? 0);
+            
+            // The logic: if DB value is 0, we apply the auto-seeding rule.
+            // This is naturally reactive (Change 4) because this useEffect runs whenever 'results' (incl. deductible) changes.
+            if (dbGift === 0) {
+                const calculatedGift = rawDeductible < 30 ? rawDeductible : 15;
+                seeded[r.id] = (rawDeductible > 0) ? calculatedGift : 0;
+            } else {
+                // Change 1 constraint: If DB value is already set (non-zero), we keep it as is.
+                seeded[r.id] = dbGift;
+            }
         });
-        setRamadanGiftOverrides(seeded);
-    }, [results]);
+        setGiftMinutesOverrides(seeded);
+    }, [results, project?.use_gift_minutes]);
 
     // Fetch punches and shifts for daily breakdown (needed even for closed projects)
     const { data: punches = [] } = useQuery({
@@ -871,19 +894,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         };
     };
 
-    const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
-    const hasRamadanSchedule = React.useMemo(() => {
-        if (!reportRun?.date_from || !reportRun?.date_to) return false;
-        const projectStart = new Date(reportRun.date_from);
-        const projectEnd = new Date(reportRun.date_to);
-
-        return ramadanSchedules.some(schedule => {
-            const start = new Date(schedule.ramadan_start_date);
-            const end = new Date(schedule.ramadan_end_date);
-            return start <= projectEnd && end >= projectStart;
-        });
-    }, [ramadanSchedules, reportRun?.date_from, reportRun?.date_to]);
-    const showRamadanGiftColumn = isAlMaraghiMotors && hasRamadanSchedule && (isAdmin || isCEO || isHRManager);
+    const hasAnyGiftMinutes = results.some(r => (r.ramadan_gift_minutes || 0) > 0);
+    /**
+     * Change 3 - Gift Minutes Visibility
+     * Ensuring the column is visible to all users when project setting is active
+     * or if there's any data, while edit permissions remain role-restricted.
+     */
+    const showGiftMinutesColumn = (project?.use_gift_minutes || hasAnyGiftMinutes);
 
     // For FINALIZED reports: use stored AnalysisResult values (immutable).
     // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
@@ -956,6 +973,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const graceMinutes = result.grace_minutes ?? 15;
             const dynamicDeductible = Math.max(0, Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout) - graceMinutes);
 
+            const giftMins = giftMinutesOverrides[result.id] || 0;
+
             return {
                 ...result, name: employee?.name || 'Unknown', working_days: workingDays,
                 present_days: result.manual_present_days ?? presentDays, full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
@@ -963,12 +982,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
                 approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
-                ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
-                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - Math.max(0, result.ramadan_gift_minutes || 0)),
+                ramadan_gift_minutes: giftMins,
+                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - giftMins),
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project, ramadanGiftOverrides]);
+    }, [results, employees, punches, shifts, exceptions, reportRun, project, giftMinutesOverrides]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
@@ -2043,7 +2062,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return;
             }
 
-            const includeRamadanGiftInExport = showRamadanGiftColumn;
+            const includeGiftMinutesInExport = showGiftMinutesColumn;
 
             // Build headers matching the visible table columns - using Hours instead of Minutes
             const headers = [
@@ -2061,7 +2080,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 ...(project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
                 'Other (Hours)',
                 'Grace (Hours)',
-                ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
+                ...(includeGiftMinutesInExport ? ['Gift Minutes (min)'] : []),
                 'Deductible (Hours)',
                 'Notes'
             ];
@@ -2098,8 +2117,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     minutesToHours(Math.max(0, grace))
                 );
 
-                if (includeRamadanGiftInExport) {
-                    baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
+                if (includeGiftMinutesInExport) {
+                    baseRow.push(giftMinutesOverrides[r.id] || 0);
                 }
 
                 baseRow.push(
@@ -2214,25 +2233,47 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    // Save only ramadan_gift_minutes. deductible_minutes (raw) stays untouched.
-    // The deductible column computes: max(0, deductible_minutes - ramadan_gift_minutes) at render time.
-    const saveRamadanGift = async (row, value) => {
-        const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
-        const newValue = Math.max(0, Number(value || 0));
-
-        // Optimistic update: patch the cached results immediately so UI updates without waiting for DB round-trip
-        queryClient.setQueryData(['results', reportRun.id], (old) => {
-            if (!Array.isArray(old)) return old;
-            return old.map(r => r.id === row.id ? { ...r, ramadan_gift_minutes: newValue } : r);
+    /**
+     * Change 2 - Calculate Gift Minutes Logic
+     * Applies the rule: deductible < 30 ? full amount : 15 mins to every employee.
+     * This updates the UI overrides state immediately.
+     */
+    const handleCalculateAllGiftMinutes = () => {
+        const updated = { ...giftMinutesOverrides };
+        results.forEach(r => {
+            const rawDeductible = Math.max(0, r.manual_deductible_minutes ?? r.deductible_minutes ?? 0);
+            const calculated = rawDeductible < 30 ? rawDeductible : 15;
+            updated[r.id] = (rawDeductible > 0) ? calculated : 0;
         });
+        setGiftMinutesOverrides(updated);
+        toast.info('Gift minutes recalculated for all employees (unsaved)');
+    };
 
+    // Save only Gift Minutes. deductible_minutes (raw) stays untouched.
+    // The deductible column computes: max(0, deductible_minutes - giftMinutes) at render time.
+    const onSaveGiftMinutes = async (row, newValue) => {
+        const oldValue = giftMinutesOverrides[row.id] || 0;
+        
+        // Optimistic UI update
+        setGiftMinutesOverrides(old => ({ ...old, [row.id]: newValue }));
+        
+        // Perform DB update
         await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
-
-        if (oldValue !== newValue) {
-            base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, project_id: project.id, company: project.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(() => { });
-        }
-
-        toast.success('Ramadan gift saved');
+        
+        // Audit log
+        try {
+            base44.functions.invoke('logAudit', { 
+                action_type: 'update', 
+                entity_name: 'AnalysisResult', 
+                entity_id: row.id, 
+                project_id: project.id, 
+                company: project.company, 
+                context: `GIFT_MINUTES old=${oldValue} new=${newValue}`, 
+                changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) 
+            }).catch(() => { });
+        } catch(e) {}
+        
+        toast.success('Gift minutes saved');
     };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
@@ -2414,6 +2455,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <CheckCircle className="w-4 h-4 mr-2" />
                             Verify All Clean
                         </Button>
+                        {/* 
+                            Change 2 - Calculate Gift Minutes Button
+                            Triggers bulk calculation based on deductible minutes rule.
+                        */}
+                        {project?.use_gift_minutes && (
+                            <Button
+                                onClick={handleCalculateAllGiftMinutes}
+                                variant="outline"
+                                size="sm"
+                                className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold"
+                            >
+                                <Zap className="w-4 h-4 mr-2" />
+                                Calculate Gift Minutes
+                            </Button>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -2874,8 +2930,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         Other Minutes
                                     </SortableTableHead>
                                     {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>}
-                                    {showRamadanGiftColumn && (
-                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Ramadan Gift (min)</th>
+                                    {showGiftMinutesColumn && (
+                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Gift Minutes (min)</th>
                                     )}
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Deductible</th>
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Notes</th>
@@ -2890,14 +2946,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         isAdmin={isAdmin}
                                         isSupervisor={isSupervisor}
                                         isDepartmentHead={isDepartmentHead}
+                                        // Change 1 - Passing role-based edit permission for gift minutes (Admin/CEO/HR)
+                                        canEditGiftMinutes={canEditGiftMinutes} 
                                         project={project}
                                         reportRun={reportRun}
-                                        showRamadanGiftColumn={showRamadanGiftColumn}
+                                        showGiftMinutesColumn={showGiftMinutesColumn}
                                         onToggleVerification={toggleVerification}
                                         onEditGrace={setEditingGraceMinutes}
                                         onShowBreakdown={showDailyBreakdown}
                                         onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
-                                        onSaveRamadanGift={saveRamadanGift}
+                                        onSaveGiftMinutes={onSaveGiftMinutes}
                                     />
                                 ))}
                             </tbody>

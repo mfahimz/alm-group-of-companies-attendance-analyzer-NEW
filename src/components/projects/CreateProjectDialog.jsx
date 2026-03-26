@@ -28,6 +28,7 @@ export default function CreateProjectDialog({ open, onClose }) {
         date_to: '',
         custom_employee_ids: '',
         use_carried_grace_minutes: false,
+        use_gift_minutes: false,
         weekly_off_override: '',
         salary_calculation_days: 30
     });
@@ -310,6 +311,17 @@ export default function CreateProjectDialog({ open, onClose }) {
                         />
                         <Label htmlFor="use_grace" className="font-normal">
                             Use carried forward grace minutes from employee master
+                        </Label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="use_gift" 
+                            checked={formData.use_gift_minutes}
+                            onCheckedChange={(checked) => setFormData({ ...formData, use_gift_minutes: checked })}
+                        />
+                        <Label htmlFor="use_gift" className="font-normal">
+                            Enable Gift Minutes
                         </Label>
                     </div>
 

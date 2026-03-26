@@ -39,6 +39,7 @@ export default function OverviewTab({ project }) {
         date_to: project.date_to,
         custom_employee_ids: project.custom_employee_ids || '',
         use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+        use_gift_minutes: project.use_gift_minutes || false,
         shift_blocks_count: project.shift_blocks_count || 2
     });
 
@@ -347,6 +348,7 @@ export default function OverviewTab({ project }) {
                                        date_to: project.date_to,
                                        custom_employee_ids: project.custom_employee_ids || '',
                                        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+                                       use_gift_minutes: project.use_gift_minutes || false,
                                        shift_blocks_count: project.shift_blocks_count || 2
                                     });
                                     setShowEditDialog(true);
@@ -597,6 +599,16 @@ export default function OverviewTab({ project }) {
                             />
                             <Label htmlFor="use_grace" className="font-normal">
                                 Use carried forward grace minutes
+                            </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox 
+                                id="use_gift" 
+                                checked={editData.use_gift_minutes}
+                                onCheckedChange={(checked) => setEditData({ ...editData, use_gift_minutes: checked })}
+                            />
+                            <Label htmlFor="use_gift" className="font-normal">
+                                Enable Gift Minutes
                             </Label>
                         </div>
                         <div>
