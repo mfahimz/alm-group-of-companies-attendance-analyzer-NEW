@@ -190,13 +190,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
 
     /**
-     * Change 1 & 4 - Gift Minutes Automated Calculation and Reactive Logic
-     * Rule: if deductible minutes < 30, gift minutes = full deductible minutes amount.
-     * if deductible minutes >= 30, gift minutes = 15.
-     * Only auto-seeds when DB value is 0. Reactive to results changes.
+     * Change 1 & 4 - Gift Minutes Reactive Logic
+     * This effect synchronizes the giftMinutesOverrides state with values from the database.
+     * Change 4: Clear all overrides if the feature is disabled for the project.
+     * Change 1: Auto-seeding was removed. We only read existing values from 'results'.
+     * Calculation now ONLY happens when the user clicks the "Calculate Gift Minutes" button.
      */
     React.useEffect(() => {
-        // Change 4: Clear all overrides if the feature is disabled for the project
         if (!project?.use_gift_minutes) {
             setGiftMinutesOverrides({});
             return;
@@ -204,22 +204,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
         if (!results || results.length === 0) return;
         
-        const seeded = {};
+        const overrides = {};
         results.forEach(r => {
-            const dbGift = Math.max(0, Number(r.ramadan_gift_minutes ?? 0));
-            const rawDeductible = Math.max(0, r.manual_deductible_minutes ?? r.deductible_minutes ?? 0);
-            
-            // The logic: if DB value is 0, we apply the auto-seeding rule.
-            // This is naturally reactive (Change 4) because this useEffect runs whenever 'results' (incl. deductible) changes.
-            if (dbGift === 0) {
-                const calculatedGift = rawDeductible < 30 ? rawDeductible : 15;
-                seeded[r.id] = (rawDeductible > 0) ? calculatedGift : 0;
-            } else {
-                // Change 1 constraint: If DB value is already set (non-zero), we keep it as is.
-                seeded[r.id] = dbGift;
-            }
+            // Read existing DB values from results and set them as-is.
+            // If the DB value is zero it should stay zero. No auto-calculation here.
+            overrides[r.id] = Math.max(0, Number(r.ramadan_gift_minutes ?? 0));
         });
-        setGiftMinutesOverrides(seeded);
+        setGiftMinutesOverrides(overrides);
     }, [results, project?.use_gift_minutes]);
 
     // Fetch punches and shifts for daily breakdown (needed even for closed projects)
@@ -2251,14 +2242,58 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     // Save only Gift Minutes. deductible_minutes (raw) stays untouched.
     // The deductible column computes: max(0, deductible_minutes - giftMinutes) at render time.
+    /**
+     * Change 3 - Save Gift Minutes & Create/Update GIFT_MINUTES Exception
+     * Saves the value to AnalysisResult and synchronizes a GIFT_MINUTES exception record.
+     */
     const onSaveGiftMinutes = async (row, newValue) => {
         const oldValue = giftMinutesOverrides[row.id] || 0;
         
         // Optimistic UI update
         setGiftMinutesOverrides(old => ({ ...old, [row.id]: newValue }));
         
-        // Perform DB update
+        // Perform AnalysisResult update
         await base44.entities.AnalysisResult.update(row.id, { ramadan_gift_minutes: newValue });
+        
+        // Change 3: Synchronize GIFT_MINUTES exception record
+        try {
+            const attendanceIdStr = String(row.attendance_id);
+            // Search for existing GIFT_MINUTES exception for this employee in this report period
+            const existing = await base44.entities.Exception.filter({
+                type: 'GIFT_MINUTES',
+                attendance_id: attendanceIdStr,
+                project_id: project.id,
+                date_from: reportRun.date_from,
+                date_to: reportRun.date_to
+            });
+
+            if (newValue > 0) {
+                const exceptionData = {
+                    type: 'GIFT_MINUTES',
+                    attendance_id: attendanceIdStr,
+                    project_id: project.id,
+                    date_from: reportRun.date_from,
+                    date_to: reportRun.date_to,
+                    allowed_minutes: newValue,
+                    use_in_analysis: true,
+                    details: 'Automatically generated from Gift Minutes calculation'
+                };
+
+                if (existing.length > 0) {
+                    await base44.entities.Exception.update(existing[0].id, { allowed_minutes: newValue });
+                } else {
+                    await base44.entities.Exception.create(exceptionData);
+                }
+            } else if (existing.length > 0) {
+                // Delete existing record if gift minutes set to zero
+                await base44.entities.Exception.delete(existing[0].id);
+            }
+            
+            // Invalidate exceptions to refresh related UI elements
+            queryClient.invalidateQueries(['exceptions', project.id]);
+        } catch (err) {
+            console.error('Failed to sync GIFT_MINUTES exception:', err);
+        }
         
         // Audit log
         try {
@@ -2273,7 +2308,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }).catch(() => { });
         } catch(e) {}
         
-        toast.success('Gift minutes saved');
+        toast.success('Gift minutes saved and synced with exceptions');
     };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
@@ -2459,17 +2494,40 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             Change 2 - Calculate Gift Minutes Button
                             Triggers bulk calculation based on deductible minutes rule.
                         */}
-                        {project?.use_gift_minutes && (
-                            <Button
-                                onClick={handleCalculateAllGiftMinutes}
-                                variant="outline"
-                                size="sm"
-                                className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold"
-                            >
-                                <Zap className="w-4 h-4 mr-2" />
-                                Calculate Gift Minutes
-                            </Button>
-                        )}
+                        {/* 
+                            Change 2 - Calculate Gift Minutes Button Gate Logic
+                            Button is gated by project settings and report date overlap.
+                        */}
+                        {project?.use_gift_minutes && (() => {
+                            const hasGiftDates = project.gift_minutes_date_from && project.gift_minutes_date_to;
+                            const overlaps = hasGiftDates && 
+                                             reportRun.date_from <= project.gift_minutes_date_to && 
+                                             reportRun.date_to >= project.gift_minutes_date_from;
+                            const isLocked = reportRun.is_final || project.status === 'closed';
+                            const isDisabled = !overlaps || isLocked;
+                            
+                            const tooltipTitle = !hasGiftDates 
+                                ? "Set gift minutes date range in project settings first" 
+                                : !overlaps 
+                                ? "Report period does not overlap with gift minutes date range" 
+                                : isLocked 
+                                ? "Cannot calculate for finalized reports" 
+                                : "Apply gift minutes rule to all employees (Calculation logic: < 30 mins = full, >= 30 mins = 15 mins capped)";
+
+                            return (
+                                <Button
+                                    onClick={handleCalculateAllGiftMinutes}
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={isDisabled}
+                                    title={tooltipTitle}
+                                    className={`border-indigo-200 text-indigo-600 font-bold ${isDisabled ? 'opacity-50' : 'hover:bg-indigo-50'}`}
+                                >
+                                    <Zap className="w-4 h-4 mr-2" />
+                                    Calculate Gift Minutes
+                                </Button>
+                            );
+                        })()}
                     </div>
                 </CardContent>
             </Card>

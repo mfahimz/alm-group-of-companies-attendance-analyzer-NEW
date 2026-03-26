@@ -1,0 +1,83 @@
+{
+    "name": "Exception",
+    "description": "Represents a specific adjustment or manual correction to an employee's attendance records for a given date range. Used for leave management, manual attendance corrections, and special pay components like Gift Minutes.",
+    "fields": {
+        "project_id": {
+            "type": "string",
+            "required": true,
+            "description": "Reference to the Project this exception belongs to."
+        },
+        "attendance_id": {
+            "type": "string",
+            "required": true,
+            "description": "Attendance ID of the employee. Use 'ALL' for company-wide exceptions."
+        },
+        "date_from": {
+            "type": "string",
+            "format": "date",
+            "required": true,
+            "description": "Start date of the exception period (inclusive)."
+        },
+        "date_to": {
+            "type": "string",
+            "format": "date",
+            "required": true,
+            "description": "End date of the exception period (inclusive)."
+        },
+        "type": {
+            "type": "string",
+            "required": true,
+            "description": "The category of exception (e.g., 'ANNUAL_LEAVE', 'SICK_LEAVE', 'SHIFT_OVERRIDE', 'GIFT_MINUTES', 'MANUAL_LATE')."
+        },
+        "details": {
+            "type": "string",
+            "required": false,
+            "description": "Human-readable explanation of the exception."
+        },
+        "allowed_minutes": {
+            "type": "number",
+            "default": 0,
+            "description": "Numeric value for minute-based exceptions (like Gift Minutes or allowed late minutes)."
+        },
+        "late_minutes": {
+            "type": "number",
+            "default": 0,
+            "description": "Explicit late minutes adjustment."
+        },
+        "early_checkout_minutes": {
+            "type": "number",
+            "default": 0,
+            "description": "Explicit early checkout minutes adjustment."
+        },
+        "other_minutes": {
+            "type": "number",
+            "default": 0,
+            "description": "Miscellaneous minute adjustments."
+        },
+        "use_in_analysis": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this exception should be factored into the attendance calculation engine."
+        },
+        "approval_status": {
+            "type": "string",
+            "default": "approved",
+            "enum": ["pending_dept_head", "approved", "rejected"],
+            "description": "Workflow status for the exception."
+        },
+        "created_from_report": {
+            "type": "boolean",
+            "default": false,
+            "description": "Flag indicating if the exception was generated from a report edit."
+        },
+        "report_run_id": {
+            "type": "string",
+            "default": null,
+            "description": "Link to the specific report run that generated this exception if applicable."
+        },
+        "new_am_start": { "type": "string", "default": null },
+        "new_am_end": { "type": "string", "default": null },
+        "new_pm_start": { "type": "string", "default": null },
+        "new_pm_end": { "type": "string", "default": null }
+    }
+}

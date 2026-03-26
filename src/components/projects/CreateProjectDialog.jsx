@@ -29,6 +29,8 @@ export default function CreateProjectDialog({ open, onClose }) {
         custom_employee_ids: '',
         use_carried_grace_minutes: false,
         use_gift_minutes: false,
+        gift_minutes_date_from: '', // Added: Gift minutes date range tracking
+        gift_minutes_date_to: '',   // Added: Gift minutes date range tracking
         weekly_off_override: '',
         salary_calculation_days: 30
     });
@@ -155,6 +157,12 @@ export default function CreateProjectDialog({ open, onClose }) {
         
         if (!formData.name || !formData.company || !formData.date_from || !formData.date_to) {
             toast.error('Please fill in all required fields');
+            return;
+        }
+
+        // Added: Validation for Gift Minutes date range
+        if (formData.use_gift_minutes && (!formData.gift_minutes_date_from || !formData.gift_minutes_date_to)) {
+            toast.error('Gift minutes date range is required when gift minutes is enabled');
             return;
         }
 
@@ -324,6 +332,37 @@ export default function CreateProjectDialog({ open, onClose }) {
                             Enable Gift Minutes
                         </Label>
                     </div>
+
+                    {/* Added: Gift Minutes Date Range inputs */}
+                    {formData.use_gift_minutes && (
+                        <div className="grid grid-cols-2 gap-4 pl-6 border-l-2 border-indigo-100">
+                            <div>
+                                <Label htmlFor="gift_from" className="text-xs">Gift Minutes From *</Label>
+                                <Input
+                                    id="gift_from"
+                                    type="date"
+                                    value={formData.gift_minutes_date_from}
+                                    onChange={(e) => setFormData({ ...formData, gift_minutes_date_from: e.target.value })}
+                                    className="h-8 text-xs"
+                                    min={formData.date_from}
+                                    max={formData.date_to}
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="gift_to" className="text-xs">Gift Minutes To *</Label>
+                                <Input
+                                    id="gift_to"
+                                    type="date"
+                                    value={formData.gift_minutes_date_to}
+                                    onChange={(e) => setFormData({ ...formData, gift_minutes_date_to: e.target.value })}
+                                    className="h-8 text-xs"
+                                    min={formData.gift_minutes_date_from || formData.date_from}
+                                    max={formData.date_to}
+                                />
+                            </div>
+                        </div>
+                    )}
+
 
                     {formData.company === 'Naser Mohsin Auto Parts' && (
                         <div>

@@ -966,7 +966,9 @@ export default function AppDocumentation() {
                                             <p className="text-[11px] text-[#64748B] mb-2 text-[#64748B]">Special minutes credited to employees during Ramadan which directly reduce their <em>Deductible Minutes</em>.</p>
                                             <div className="bg-blue-50 border border-blue-100 rounded p-2 mt-2">
                                                 <p className="text-[10px] text-blue-700 leading-relaxed italic">
-                                                    <strong>Update:</strong> Gift Minutes are now calculated as full deductible minutes if under 30, otherwise capped at 15. The column is now visible to all users when enabled for the project.
+                                                    <strong>Update:</strong> Gift Minutes are now calculated with a manual trigger button gated by date range overlap. Saved gift minutes also synchronize a GIFT_MINUTES exception record for accurate attendance accounting.
+                                                    <br /><br />
+                                                    <strong>Project Settings:</strong> Gift Minutes now require a mandatory date range configuration within the project timeline. This range becomes read-only after the initial save to ensure consistency in attendance analysis.
                                                 </p>
                                             </div>
                                         </div>

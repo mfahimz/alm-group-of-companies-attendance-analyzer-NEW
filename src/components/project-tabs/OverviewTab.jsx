@@ -32,6 +32,8 @@ export default function OverviewTab({ project }) {
     const navigate = useNavigate();
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+    // Added: State to handle dismissible warning for first-time gift minutes date setting
+    const [showGiftDateWarning, setShowGiftDateWarning] = useState(true);
     const [editData, setEditData] = useState({
         name: project.name,
         company: project.company,
@@ -40,6 +42,9 @@ export default function OverviewTab({ project }) {
         custom_employee_ids: project.custom_employee_ids || '',
         use_carried_grace_minutes: project.use_carried_grace_minutes || false,
         use_gift_minutes: project.use_gift_minutes || false,
+        // Added: Gift minutes date range fields tracking
+        gift_minutes_date_from: project.gift_minutes_date_from || '',
+        gift_minutes_date_to: project.gift_minutes_date_to || '',
         shift_blocks_count: project.shift_blocks_count || 2
     });
 
@@ -278,6 +283,11 @@ export default function OverviewTab({ project }) {
             toast.error('Date range is required');
             return;
         }
+        // Added: Validation for Gift Minutes date range
+        if (editData.use_gift_minutes && (!editData.gift_minutes_date_from || !editData.gift_minutes_date_to)) {
+            toast.error('Gift minutes date range is required when gift minutes is enabled');
+            return;
+        }
         if (new Date(editData.date_from) > new Date(editData.date_to)) {
             toast.error('Start date must be before end date');
             return;
@@ -358,8 +368,12 @@ export default function OverviewTab({ project }) {
                                        custom_employee_ids: project.custom_employee_ids || '',
                                        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
                                        use_gift_minutes: project.use_gift_minutes || false,
+                                       // Added: Include gift minutes dates when opening edit dialog
+                                       gift_minutes_date_from: project.gift_minutes_date_from || '',
+                                       gift_minutes_date_to: project.gift_minutes_date_to || '',
                                        shift_blocks_count: project.shift_blocks_count || 2
                                     });
+                                    setShowGiftDateWarning(true); // Reset warning dismissal state
                                     setShowEditDialog(true);
                                 }}
                                 disabled={project.status === 'locked' || project.status === 'closed'}
@@ -615,11 +629,77 @@ export default function OverviewTab({ project }) {
                                 id="use_gift" 
                                 checked={editData.use_gift_minutes}
                                 onCheckedChange={(checked) => setEditData({ ...editData, use_gift_minutes: checked })}
+                                disabled={project.gift_minutes_date_from && project.gift_minutes_date_to}
                             />
                             <Label htmlFor="use_gift" className="font-normal">
                                 Enable Gift Minutes
                             </Label>
                         </div>
+
+                        {/* Added: Gift Minutes Date Range configuration with locking logic */}
+                        {editData.use_gift_minutes && (
+                            <div className="space-y-3 pl-6 border-l-2 border-indigo-100">
+                                {!(project.gift_minutes_date_from && project.gift_minutes_date_to) ? (
+                                    <>
+                                        {showGiftDateWarning && (
+                                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 relative">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setShowGiftDateWarning(false)}
+                                                    className="absolute top-2 right-2 text-amber-500 hover:text-amber-700"
+                                                >
+                                                    ×
+                                                </button>
+                                                <p className="text-xs text-amber-800 pr-4">
+                                                    Please confirm the gift minutes date range as it cannot be changed after saving.
+                                                </p>
+                                            </div>
+                                        )}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <Label className="text-xs">Gift Minutes From *</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={editData.gift_minutes_date_from}
+                                                    onChange={(e) => setEditData({ ...editData, gift_minutes_date_from: e.target.value })}
+                                                    className="h-8 text-xs"
+                                                    min={editData.date_from}
+                                                    max={editData.date_to}
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">Gift Minutes To *</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={editData.gift_minutes_date_to}
+                                                    onChange={(e) => setEditData({ ...editData, gift_minutes_date_to: e.target.value })}
+                                                    className="h-8 text-xs"
+                                                    min={editData.gift_minutes_date_from || editData.date_from}
+                                                    max={editData.date_to}
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 font-medium">GIFT MINUTES FROM</p>
+                                                <p className="text-sm font-medium text-slate-900">{new Date(project.gift_minutes_date_from).toLocaleDateString('en-GB')}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 font-medium">GIFT MINUTES TO</p>
+                                                <p className="text-sm font-medium text-slate-900">{new Date(project.gift_minutes_date_to).toLocaleDateString('en-GB')}</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 mt-2 italic flex items-center gap-1">
+                                            <Lock className="w-3 h-3" />
+                                            Gift minutes date range is locked and cannot be changed.
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         <div>
                             <Label>Number of Shift Blocks *</Label>
                             <Select
