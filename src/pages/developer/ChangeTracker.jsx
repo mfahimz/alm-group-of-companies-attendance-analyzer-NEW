@@ -398,6 +398,13 @@ export default function ChangeTracker() {
         });
     };
 
+    const handleSort = (key) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
     const handleQuickAdd = (e) => {
         if (e.key === 'Enter' && quickAddValue.trim()) {
             handleAdd(parseQuickAdd(quickAddValue));
