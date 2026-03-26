@@ -1330,108 +1330,140 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
      * Flagged if at least one punch for a day cannot be bound to any shift point.
      * This identifies missing shift configurations or inconsistent punch patterns.
      */
+    /**
+     * exact copy of matchPunchesToShiftPointsWithMidnight from DailyBreakdownDialog.jsx
+     * for consistent unbound punch detection in the audit panel.
+     */
+    const localMatchPunchesToShiftPointsWithMidnight = (dayPunches, shift, nextDateStr) => {
+        if (!shift || dayPunches.length === 0) return [];
+
+        const punchesWithTime = dayPunches.map(p => {
+            const time = parseTime(p.timestamp_raw);
+            if (!time) return null;
+            // If punch is from next day (midnight crossover), add 24h
+            const isNextDay = nextDateStr && p.punch_date === nextDateStr;
+            const adjustedTime = isNextDay ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
+            return { ...p, time: adjustedTime, _originalTime: time, _isNextDayPunch: isNextDay };
+        }).filter(p => p).sort((a, b) => a.time - b.time);
+
+        if (punchesWithTime.length === 0) return [];
+
+        // Adjust PM_END if it's midnight (00:00)
+        const pmEndTime = parseTime(shift.pm_end);
+        let adjustedPmEnd = pmEndTime;
+        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+        }
+
+        const shiftPoints = [
+            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
+            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
+            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
+            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
+        ].filter(sp => sp.time);
+
+        const matches = [];
+        const usedShiftPoints = new Set();
+
+        for (const punch of punchesWithTime) {
+            let closestMatch = null;
+            let minDistance = Infinity;
+            let isExtendedMatch = false;
+            let isFarExtendedMatch = false;
+
+            // Try 60 min window
+            for (const sp of shiftPoints) {
+                if (usedShiftPoints.has(sp.type)) continue;
+                const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
+                if (distance <= 60 && distance < minDistance) {
+                    minDistance = distance; closestMatch = sp;
+                }
+            }
+            // Try 120 min window
+            if (!closestMatch) {
+                for (const sp of shiftPoints) {
+                    if (usedShiftPoints.has(sp.type)) continue;
+                    const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
+                    if (distance <= 120 && distance < minDistance) {
+                        minDistance = distance; closestMatch = sp; isExtendedMatch = true;
+                    }
+                }
+            }
+            // Try 180 min window
+            if (!closestMatch) {
+                for (const sp of shiftPoints) {
+                    if (usedShiftPoints.has(sp.type)) continue;
+                    const distance = Math.abs(punch.time - sp.time) / (1000 * 60);
+                    if (distance <= 180 && distance < minDistance) {
+                        minDistance = distance; closestMatch = sp; isFarExtendedMatch = true;
+                    }
+                }
+            }
+
+            if (closestMatch) {
+                matches.push({ punch, matchedTo: closestMatch.type, shiftTime: closestMatch.time, distance: minDistance, isExtendedMatch, isFarExtendedMatch });
+                usedShiftPoints.add(closestMatch.type);
+            } else {
+                matches.push({ punch, matchedTo: null, shiftTime: null, distance: null, isExtendedMatch: false, isFarExtendedMatch: false });
+            }
+        }
+
+        return matches;
+    };
+
+    /**
+     * Detection Logic Tab 2: No Match
+     * Implementation copied verbatim from DailyBreakdownDialog.jsx logic to ensure parity.
+     * Flagged if more than 50% of punches for a day cannot be bound to any shift point.
+     */
     const noMatchDetections = React.useMemo(() => {
         const flagged = [];
         if (!reportRun?.date_to) return flagged;
-
-        const localFilterMultiplePunches = (punchList) => {
-            if (punchList.length <= 1) return punchList;
-            const withTime = punchList.map(p => ({ ...p, time: localParseTime(p.timestamp_raw) })).filter(p => p.time);
-            const deduped = [];
-            for (const current of withTime) {
-                if (!deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10)) {
-                    deduped.push(current);
-                }
-            }
-            return deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
-        };
-
-        const localMatchPunches = (dayPunches, shift, nextDateStr) => {
-            if (!shift || dayPunches.length === 0) return [];
-            const punchesWithTime = dayPunches.map(p => {
-                const time = localParseTime(p.timestamp_raw);
-                if (!time) return null;
-                const adjustedTime = (nextDateStr && p.punch_date === nextDateStr) ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-                return { ...p, time: adjustedTime };
-            }).filter(Boolean).sort((a, b) => a.time.getTime() - b.time.getTime());
-
-            const pmEndTime = localParseTime(shift.pm_end);
-            const shiftPoints = [
-                { type: 'AM_START', time: localParseTime(shift.am_start) },
-                { type: 'AM_END', time: localParseTime(shift.am_end) },
-                { type: 'PM_START', time: localParseTime(shift.pm_start) },
-                { type: 'PM_END', time: (pmEndTime && pmEndTime.getHours() === 0 ? new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000) : pmEndTime) }
-            ].filter(sp => sp.time);
-
-            const matches = [];
-            const usedPoints = new Set();
-            for (const punch of punchesWithTime) {
-                let closest = null, minD = Infinity;
-                for (const sp of shiftPoints) {
-                    if (usedPoints.has(sp.type)) continue;
-                    const d = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
-                    if (d <= 180 && d < minD) { minD = d; closest = sp; }
-                }
-                if (closest) {
-                    matches.push({ punch, matchedTo: closest.type });
-                    usedPoints.add(closest.type);
-                } else {
-                    matches.push({ punch, matchedTo: null });
-                }
-            }
-            return matches;
-        };
 
         const startDate = new Date(reportRun.date_from);
         const endDate = new Date(reportRun.date_to);
 
         results.forEach(result => {
-            const employeeAttendanceId = result.attendance_id;
-            
-            /* BUG 1 FIX: Resolve employee name from already loaded employees list
-               Ensures group headers show correct name instead of ID number. */
-            const employee = employees.find(e => String(e.attendance_id) === String(employeeAttendanceId));
-            const displayName = employee?.name || String(employeeAttendanceId);
+            const employeeAttendanceId = String(result.attendance_id);
+            const employee = employees.find(e => String(e.attendance_id) === employeeAttendanceId);
+            const displayName = employee?.name || employeeAttendanceId;
 
-            const employeeShifts = shifts.filter(s => String(s.attendance_id) === String(employeeAttendanceId));
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === employeeAttendanceId);
             const employeeExceptions = exceptions.filter(e => 
-                (e.attendance_id === 'ALL' || String(e.attendance_id) === String(employeeAttendanceId)) &&
+                (e.attendance_id === 'ALL' || String(e.attendance_id) === employeeAttendanceId) &&
                 e.use_in_analysis !== false
             );
-            // FIX 1: Reuse the same normalized Friday-shift helper so template lookup handles boolean/string/number values consistently.
+            const empPunches = punches.filter(p => String(p.attendance_id) === employeeAttendanceId);
+
             const localIsFridayShift = (shiftRow) => shiftRow?.is_friday_shift === true || shiftRow?.is_friday_shift === 'true' || shiftRow?.is_friday_shift === 1 || shiftRow?.is_friday_shift === '1';
 
-                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                    const currentDay = new Date(d);
-                    const dateStr = currentDay.toISOString().split('T')[0];
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDay = new Date(d);
+                const dateStr = currentDay.toISOString().split('T')[0];
 
-                    // Monthly report analysis: weekly off days are always skipped to prevent false detections
-                    let weeklyOffDay = null; // Declare weeklyOffDay
-                    const dayNameToNumberMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-                    if (project.weekly_off_override && project.weekly_off_override !== 'None') {
-                        weeklyOffDay = dayNameToNumberMap[project.weekly_off_override]; // Override if defined at project level
-                    } else if (employee?.weekly_off) {
-                        weeklyOffDay = dayNameToNumberMap[employee.weekly_off]; // Fallback to employee level
-                    }
-                    if (weeklyOffDay !== null && currentDay.getDay() === weeklyOffDay) {
-                        continue; // Skip if it matches the weekly off day
-                    }
+                // 1. Skip weekly off days (Consistency with salary/main report logic)
+                let weeklyOffDay = null;
+                const dayNameToNumberMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumberMap[project.weekly_off_override];
+                } else if (employee?.weekly_off) {
+                    weeklyOffDay = dayNameToNumberMap[employee.weekly_off];
+                }
+                if (weeklyOffDay !== null && currentDay.getDay() === weeklyOffDay) continue;
 
-                    // FIX 2: Skip Exceptions (e.g., MANUAL_ABSENT, FULL_SKIP)
-                    // Skip days covered by manual exceptions as they represent administratively resolved attendance.
-                    const hasException = employeeExceptions.some(ex => {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return currentDay >= exFrom && currentDay <= exTo;
-                    });
-                    if (hasException) continue;
+                // 2. Skip MANUAL_ABSENT or FULL_SKIP exceptions as they represent resolved status
+                const hasExclEx = employeeExceptions.some(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return currentDay >= exFrom && currentDay <= exTo && ['MANUAL_ABSENT', 'FULL_SKIP'].includes(ex.type);
+                });
+                if (hasExclEx) continue;
 
+                // 3. Resolve shift for the specific date
                 let shift = employeeShifts.find(s => s.date === dateStr);
                 if (!shift) {
                     const dayOfWeek = currentDay.getDay();
-                    // FIX 1: Use normalized Friday matching to avoid raw truthiness bugs when `is_friday_shift` is a string.
                     shift = employeeShifts.find(s => (dayOfWeek === 5 ? localIsFridayShift(s) : !localIsFridayShift(s)) && !s.date);
-                    // FIX 1: Keep Friday fallback behavior aligned with the sibling detection block when no Friday template is explicitly flagged.
                     if (!shift && dayOfWeek === 5) shift = employeeShifts.find(s => !s.date);
                 }
                 if (!shift) continue;
@@ -1439,109 +1471,88 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const nextDayObj = new Date(currentDay);
                 nextDayObj.setDate(nextDayObj.getDate() + 1);
                 const nextDateStr = nextDayObj.toISOString().split('T')[0];
+
+                // 4. Build punch list (using same crossover and buffer logic as auditDailyBreakdownData)
+                const currentDayPunches = empPunches.filter(p => p.punch_date === dateStr);
+                const nextDayBufferPunches = empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw));
+                const dayPunchesRaw = [...currentDayPunches, ...nextDayBufferPunches];
                 
-                const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId)); // FIX 2/3: Prepare punch set for previous-day midnight carry-forward exclusion.
-                // Unconditionally exclude all current day punches in the midnight buffer (00:00-02:00) 
-                // as carry-forward punches from the previous night, regardless of previous shift timing.
-                let currentDayPunches = empPunches.filter(p => p.punch_date === dateStr)
-                    .filter(p => !localIsWithinMidnightBuffer(p['timestamp_raw']));
+                // Consistency check: Apply central deduplication logic
+                const dayPunches = filterMultiplePunches(dayPunchesRaw, shift);
+                if (dayPunches.length === 0) continue;
 
-                // BUG 2 FIX: Identify if today's shift ends near midnight to determine if we should look for crossover punches
-                const tEnd = localParseTime(shift.pm_end) || localParseTime(shift.am_end); // Extract the end time from the current shift
-                let todayShiftEndsNearMidnight = false; // Initialize the night shift flag
-                if (tEnd) {
-                    const h = tEnd.getHours(); // Get the hour from the shift end time
-                    // Identify shifts ending at 11 PM, Midnight, or 1 AM as night shifts that requires tomorrow's buffer punches
-                    if (h === 23 || h === 0 || h === 1) todayShiftEndsNearMidnight = true;
-                }
-
-                // Combine current day punches with tomorrow's buffer only for shifts ending near midnight to avoid false unbound flags
-                const combined = [
-                    ...currentDayPunches, // Include current day punches (already filtered for previous-day carry-forwards)
-                    ...(todayShiftEndsNearMidnight 
-                        ? empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p['timestamp_raw']))
-                        : []
-                    ) // Conditionally include tomorrow's buffer punches based on the night shift detection boolean
-                ];
-
-                // FIX 2 (Part 2): Skip days with no punches after midnight buffer exclusion
-                if (combined.length === 0) continue;
-
-                const filtered = localFilterMultiplePunches(combined);
-                const matches = localMatchPunches(filtered, shift, nextDateStr);
-                
+                // 5. Call localMatchPunchesToShiftPointsWithMidnight for exact binding check
+                const matches = localMatchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr);
                 const noMatches = matches.filter(m => m.matchedTo === null);
-                
-                // MAJORITY UNBOUND RULE: A day is only flagged if more than half of its actual punches cannot bind to any shift points.
-                // This prevents false positives from single noise punches or slight boundary crossovers.
-                if (noMatches.length > matches.length / 2) { // Majority check using total matches as denominator
-                    // Calculate maxDeviation for severity coloring (Change 2)
-                    const pmEndTime = localParseTime(shift.pm_end);
+
+                // 6. Majority Unbound Rule: A day is flagged if more than 50% of recorded punches fail to bind.
+                if (noMatches.length > matches.length / 2) {
+                    // Pre-calculate shift points for deviation metrics
+                    const pmEndTimeRaw = parseTime(shift.pm_end);
+                    const adjustedPmEnd = (pmEndTimeRaw && pmEndTimeRaw.getHours() === 0 && pmEndTimeRaw.getMinutes() === 0) 
+                        ? new Date(pmEndTimeRaw.getTime() + 24 * 60 * 60 * 1000) 
+                        : pmEndTimeRaw;
                     const shiftPointsDetailed = [
-                        { label: 'AM Start', time: localParseTime(shift.am_start) },
-                        { label: 'AM End', time: localParseTime(shift.am_end) },
-                        { label: 'PM Start', time: localParseTime(shift.pm_start) },
-                        { label: 'PM End', time: (pmEndTime && pmEndTime.getHours() === 0 ? new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000) : pmEndTime) }
+                        { label: 'AM Start', time: parseTime(shift.am_start) },
+                        { label: 'AM End', time: parseTime(shift.am_end) },
+                        { label: 'PM Start', time: parseTime(shift.pm_start) },
+                        { label: 'PM End', time: adjustedPmEnd }
                     ].filter(sp => sp.time);
 
                     let maxDeviation = 0;
-                    noMatches.forEach(m => {
+                    noMatches.forEach(unbound => {
                         let minPDiff = Infinity;
-                        const pt = localParseTime(m.punch.timestamp_raw);
+                        const pt = parseTime(unbound.punch.timestamp_raw);
                         if (!pt) return;
-                        const punchTime = (nextDateStr && m.punch.punch_date === nextDateStr) ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
+                        const punchTime = (nextDateStr && unbound.punch.punch_date === nextDateStr) ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
                         
                         shiftPointsDetailed.forEach(sp => {
                             const diff = Math.abs(punchTime.getTime() - sp.time.getTime()) / (1000 * 60);
                             if (diff < minPDiff) minPDiff = diff;
                         });
-                        if (minPDiff > maxDeviation) maxDeviation = minPDiff;
+                        if (minPDiff !== Infinity && minPDiff > maxDeviation) maxDeviation = minPDiff;
                     });
 
+                    // For the detection object format requested (Change 3)
                     flagged.push({
                         id: result.id,
                         attendance_id: employeeAttendanceId,
-                        name: displayName, // BUG 1 FIX: Use resolved display name
+                        name: displayName,
                         date: dateStr,
                         displayDate: currentDay.toLocaleDateString(),
-                        noMatchPunches: matches.map(m => {
-                            let nearestShiftPoint = null;
+                        noMatchPunches: noMatches.map(m => {
+                            let nearestPoint = null;
                             let minutesAway = null;
-                            
-                            // Enrich unbound punches with nearest shift point info
-                            if (!m.matchedTo) {
-                                const pt = localParseTime(m.punch.timestamp_raw);
-                                if (pt) {
-                                    const punchTime = (nextDateStr && m.punch.punch_date === nextDateStr) ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
-                                    let minD = Infinity;
-                                    shiftPointsDetailed.forEach(sp => {
-                                        const diff = Math.abs(punchTime.getTime() - sp.time.getTime()) / (1000 * 60);
-                                        if (diff < minD) {
-                                            minD = diff;
-                                            nearestShiftPoint = sp.label;
-                                            minutesAway = Math.round(diff);
-                                        }
-                                    });
-                                }
+                            const pt = parseTime(m.punch.timestamp_raw);
+                            if (pt) {
+                                const punchTime = (nextDateStr && m.punch.punch_date === nextDateStr) ? new Date(pt.getTime() + 24 * 60 * 60 * 1000) : pt;
+                                let minD = Infinity;
+                                shiftPointsDetailed.forEach(sp => {
+                                    const diff = Math.abs(punchTime.getTime() - sp.time.getTime()) / (1000 * 60);
+                                    if (diff < minD) {
+                                        minD = diff;
+                                        nearestPoint = sp.label;
+                                        minutesAway = Math.round(diff);
+                                    }
+                                });
                             }
-                            
                             return { 
                                 raw: m.punch.timestamp_raw, 
-                                matched: !!m.matchedTo, 
+                                matched: false, 
                                 isPrev: localIsWithinMidnightBuffer(m.punch.timestamp_raw),
-                                nearestShiftPoint,
+                                nearestShiftPoint: nearestPoint,
                                 minutesAway
                             };
-                        }), // Updated for Change 4 & Unbound Enrichment
+                        }),
                         rawResult: result,
-                        maxDeviation: Math.round(maxDeviation) // Added for Change 2
+                        maxDeviation: Math.round(maxDeviation)
                     });
                 }
             }
         });
 
         return flagged;
-    }, [results, punches, shifts, exceptions, reportRun, localIsWithinMidnightBuffer, localParseTime]);
+    }, [results, punches, shifts, exceptions, reportRun, employees, project, localIsWithinMidnightBuffer, filterMultiplePunches, parseTime]);
 
     const updateVerificationMutation = useMutation({
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
