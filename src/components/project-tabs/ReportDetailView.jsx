@@ -192,6 +192,28 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
     const MIDNIGHT_BUFFER_MINUTES = 120;
 
+    // Persist dismissed record keys from database exceptions of type DISMISSED_MISMATCH
+    React.useEffect(() => {
+        const mismatchKeys = new Set();
+        const noMatchKeys = new Set();
+        
+        // Filter for DISMISSED_MISMATCH exceptions for the current project
+        exceptions.forEach(ex => {
+            if (ex.type === 'DISMISSED_MISMATCH' && String(ex.project_id) === String(project.id)) {
+                // Key format matches the UI: attendance_id-date
+                const key = String(ex.attendance_id) + '-' + ex.date_from;
+                if (ex.notes === 'mismatch') {
+                    mismatchKeys.add(key);
+                } else if (ex.notes === 'no_match') {
+                    noMatchKeys.add(key);
+                }
+            }
+        });
+
+        setDismissedMismatchKeys(mismatchKeys);
+        setDismissedNoMatchKeys(noMatchKeys);
+    }, [exceptions, project.id]);
+
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
         if (/AM|PM/i.test(timeStr)) return timeStr;
@@ -2013,13 +2035,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'mismatch' ? 'border-amber-500 text-amber-600 bg-amber-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setActiveDetectionTab('mismatch')}
                             >
-                                Shift Mismatch Detections ({shiftMismatchDetections.filter(d => !dismissedMismatchKeys.has(d.attendance_id + '-' + d.date)).length}) {/* Filtered count to exclude dismissed mismatch records */}
+                                Shift Mismatch Detections ({shiftMismatchDetections.filter(d => !dismissedMismatchKeys.has(String(d.attendance_id) + '-' + d.date)).length}) {/* Filtered count to exclude dismissed mismatch records with consistent key format */}
                             </button>
                             <button 
                                 className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'no-match' ? 'border-rose-500 text-rose-600 bg-rose-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setActiveDetectionTab('no-match')}
                             >
-                                No Match Detections ({noMatchDetections.filter(d => !dismissedNoMatchKeys.has(d.attendance_id + '-' + d.date)).length}) {/* Filtered count to exclude dismissed no-match records */}
+                                No Match Detections ({noMatchDetections.filter(d => !dismissedNoMatchKeys.has(String(d.attendance_id) + '-' + d.date)).length}) {/* Filtered count to exclude dismissed no-match records with consistent key format */}
                             </button>
                         </div>
                         
@@ -2046,7 +2068,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         // Group and count flagged days per employee from the filtered detection array (excluding dismissed records)
                                         const counts = {};
                                         shiftMismatchDetections
-                                            .filter(d => !dismissedMismatchKeys.has(d.attendance_id + '-' + d.date)) // Filter out records that are in the dismissed keys set
+                                            .filter(d => !dismissedMismatchKeys.has(String(d.attendance_id) + '-' + d.date)) // Filter out records that are in the dismissed keys set with consistent key format
                                             .forEach(d => {
                                             const aid = String(d.attendance_id);
                                             if (!counts[aid]) {
@@ -2099,7 +2121,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     // Group by employee for Change 3
                                                     const groups = {};
                                                     shiftMismatchDetections.forEach(d => {
-                                                        const key = d.attendance_id + '-' + d.date;
+                                                        const key = String(d.attendance_id) + '-' + d.date; // Use consistent String format for key
                                                         const isDismissed = dismissedMismatchKeys.has(key);
                                                         if (isDismissed && !showDismissed) return;
                                                         
@@ -2162,18 +2184,47 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                             </td>
                                                                             <td className="py-3 text-right pr-2">
                                                                                 <div className="flex gap-1 justify-end">
-                                                                                    {/* Dismiss Toggle Button (Change 1) */}
+                                                                                    {/* Dismiss / Undo Dismiss Button with Persistence */}
                                                                                     <Button 
                                                                                         size="xs" 
                                                                                         variant="ghost" 
                                                                                         className="h-7 text-[10px] text-slate-400 hover:text-slate-600"
-                                                                                        onClick={() => {
-                                                                                            const next = new Set(dismissedMismatchKeys);
+                                                                                        onClick={async () => {
+                                                                                            if (d.isDismissed) {
+                                                                                                // Find and delete the existing DISMISSED_MISMATCH exception
+                                                                                                const existingEx = exceptions.find(ex => 
+                                                                                                    ex.type === 'DISMISSED_MISMATCH' && 
+                                                                                                    String(ex.attendance_id) === String(d.attendance_id) && 
+                                                                                                    ex.date_from === d.date &&
+                                                                                                    ex.notes === 'mismatch'
+                                                                                                );
+                                                                                                if (existingEx) {
+                                                                                                    await base44.entities.Exception.delete(existingEx.id);
+                                                                                                    toast.success("Dismissed record restored");
+                                                                                                }
+                                                                                            } else {
+                                                                                                // Create a new DISMISSED_MISMATCH exception for persistence
+                                                                                                await base44.entities.Exception.create({
+                                                                                                    type: 'DISMISSED_MISMATCH',
+                                                                                                    attendance_id: d.attendance_id,
+                                                                                                    project_id: project.id,
+                                                                                                    date_from: d.date,
+                                                                                                    date_to: d.date,
+                                                                                                    notes: 'mismatch'
+                                                                                                });
+                                                                                                toast.success("Record dismissed");
+                                                                                            }
+
+                                                                                            // Invalidate queries to refresh the UI
+                                                                                            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+                                                                                            
+                                                                                            // Update local state immediately for better UX
+                                                                                            const next = new Set([...dismissedMismatchKeys]);
                                                                                             if (d.isDismissed) next.delete(d.key); else next.add(d.key);
                                                                                             setDismissedMismatchKeys(next);
                                                                                         }}
                                                                                     >
-                                                                                        {d.isDismissed ? 'Restore' : 'Dismiss'}
+                                                                                        {d.isDismissed ? 'Undo Dismiss' : 'Dismiss'}
                                                                                     </Button>
                                                                                     <Button 
                                                                                         size="sm" 
@@ -2215,7 +2266,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         // Group and count flagged days per employee from the filtered detection array (excluding dismissed records)
                                         const counts = {};
                                         noMatchDetections
-                                            .filter(d => !dismissedNoMatchKeys.has(d.attendance_id + '-' + d.date)) // Filter out records that are in the dismissed keys set
+                                            .filter(d => !dismissedNoMatchKeys.has(String(d.attendance_id) + '-' + d.date)) // Filter out records that are in the dismissed keys set with consistent key format
                                             .forEach(d => {
                                             const aid = String(d.attendance_id);
                                             if (!counts[aid]) {
@@ -2267,7 +2318,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                     // Group by employee for Change 3
                                                     const groups = {};
                                                     noMatchDetections.forEach(d => {
-                                                        const key = d.attendance_id + '-' + d.date;
+                                                        const key = String(d.attendance_id) + '-' + d.date; // Use consistent String format for key
                                                         const isDismissed = dismissedNoMatchKeys.has(key);
                                                         if (isDismissed && !showDismissed) return;
                                                         
@@ -2331,18 +2382,47 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                             </td>
                                                                             <td className="py-3 text-right pr-2">
                                                                                 <div className="flex gap-1 justify-end">
-                                                                                    {/* Dismiss Toggle Button (Change 1) */}
+                                                                                    {/* Dismiss / Undo Dismiss Button with Persistence */}
                                                                                     <Button 
                                                                                         size="xs" 
                                                                                         variant="ghost" 
                                                                                         className="h-7 text-[10px] text-slate-400 hover:text-slate-600"
-                                                                                        onClick={() => {
-                                                                                            const next = new Set(dismissedNoMatchKeys);
+                                                                                        onClick={async () => {
+                                                                                            if (d.isDismissed) {
+                                                                                                // Find and delete the existing DISMISSED_MISMATCH exception
+                                                                                                const existingEx = exceptions.find(ex => 
+                                                                                                    ex.type === 'DISMISSED_MISMATCH' && 
+                                                                                                    String(ex.attendance_id) === String(d.attendance_id) && 
+                                                                                                    ex.date_from === d.date &&
+                                                                                                    ex.notes === 'no_match'
+                                                                                                );
+                                                                                                if (existingEx) {
+                                                                                                    await base44.entities.Exception.delete(existingEx.id);
+                                                                                                    toast.success("Dismissed record restored");
+                                                                                                }
+                                                                                            } else {
+                                                                                                // Create a new DISMISSED_MISMATCH exception for persistence
+                                                                                                await base44.entities.Exception.create({
+                                                                                                    type: 'DISMISSED_MISMATCH',
+                                                                                                    attendance_id: d.attendance_id,
+                                                                                                    project_id: project.id,
+                                                                                                    date_from: d.date,
+                                                                                                    date_to: d.date,
+                                                                                                    notes: 'no_match'
+                                                                                                });
+                                                                                                toast.success("Record dismissed");
+                                                                                            }
+
+                                                                                            // Invalidate queries to refresh the UI
+                                                                                            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+                                                                                            
+                                                                                            // Update local state immediately for better UX
+                                                                                            const next = new Set([...dismissedNoMatchKeys]);
                                                                                             if (d.isDismissed) next.delete(d.key); else next.add(d.key);
                                                                                             setDismissedNoMatchKeys(next);
                                                                                         }}
                                                                                     >
-                                                                                        {d.isDismissed ? 'Restore' : 'Dismiss'}
+                                                                                        {d.isDismissed ? 'Undo Dismiss' : 'Dismiss'}
                                                                                     </Button>
                                                                                     <Button 
                                                                                         size="sm" 
