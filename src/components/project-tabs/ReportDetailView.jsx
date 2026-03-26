@@ -1405,17 +1405,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     const currentDay = new Date(d);
                     const dateStr = currentDay.toISOString().split('T')[0];
 
-                    // FIX 1: Skip Weekly Off Days
-                    // Weekly off days are not processed for unbound punch detection to prevent false flags on rest days.
-                    let weeklyOffDay = null;
+                    // Monthly report analysis: weekly off days are always skipped to prevent false detections
+                    let weeklyOffDay = null; // Declare weeklyOffDay
                     const dayNameToNumberMap = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
                     if (project.weekly_off_override && project.weekly_off_override !== 'None') {
-                        weeklyOffDay = dayNameToNumberMap[project.weekly_off_override];
+                        weeklyOffDay = dayNameToNumberMap[project.weekly_off_override]; // Override if defined at project level
                     } else if (employee?.weekly_off) {
-                        weeklyOffDay = dayNameToNumberMap[employee.weekly_off];
+                        weeklyOffDay = dayNameToNumberMap[employee.weekly_off]; // Fallback to employee level
                     }
                     if (weeklyOffDay !== null && currentDay.getDay() === weeklyOffDay) {
-                        continue;
+                        continue; // Skip if it matches the weekly off day
                     }
 
                     // FIX 2: Skip Exceptions (e.g., MANUAL_ABSENT, FULL_SKIP)
@@ -1473,10 +1472,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 
                 const noMatches = matches.filter(m => m.matchedTo === null);
                 
-                // FIX 3: Majority Unbound Flagging Rule
-                // A day is only flagged if more than half of its punches cannot bind to any shift points.
-                // This reduces false positives from single late/early departure punches.
-                if (noMatches.length > combined.length / 2) {
+                // MAJORITY UNBOUND RULE: A day is only flagged if more than half of its actual punches cannot bind to any shift points.
+                // This prevents false positives from single noise punches or slight boundary crossovers.
+                if (noMatches.length > matches.length / 2) { // Majority check using total matches as denominator
                     // Calculate maxDeviation for severity coloring (Change 2)
                     const pmEndTime = localParseTime(shift.pm_end);
                     const shiftPointsDetailed = [
@@ -2350,10 +2348,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const nextDateStr = nextDayObj.toISOString().split('T')[0];
 
         // Filter and combine with midnight crossover support
-        const dayPunches = [
+        const combinedPunches = [
             ...empPunches.filter(p => p.punch_date === dateStr),
             ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
         ];
+
+        // Apply deduplication to match the main report table behavior for consistent UI across breakdown and edit dialogs
+        const dayPunches = filterMultiplePunches(combinedPunches);
 
         return {
             [attId]: {
@@ -2364,7 +2365,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
         };
-    }, [selectedEmployee, editingDay, punches, localParseTime, localIsWithinMidnightBuffer]);
+    }, [selectedEmployee, editingDay, punches, localParseTime, localIsWithinMidnightBuffer, filterMultiplePunches]);
 
     return (
         <div className="space-y-6">
