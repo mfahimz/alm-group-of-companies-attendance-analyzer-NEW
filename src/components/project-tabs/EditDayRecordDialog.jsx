@@ -94,6 +94,32 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         }
     };
 
+    /**
+     * FIX 2 - Helper function to format timestamp_raw consistently.
+     * Parses the string into a Date object and returns DD/MM/YYYY HH:MM AM/PM.
+     */
+    const formatPunchDisplay = (timestampRaw) => {
+        if (!timestampRaw) return '—';
+        try {
+            const date = new Date(timestampRaw);
+            if (isNaN(date.getTime())) return timestampRaw;
+
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+
+            let hours = date.getHours();
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            
+            return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+        } catch (e) {
+            return timestampRaw;
+        }
+    };
+
     const matchPunchesToShiftPoints = (dayPunches, shift) => {
         if (!shift || dayPunches.length === 0) return [];
         
@@ -183,16 +209,25 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             
             if (dayKey && breakdownDetails[dayKey]?.punches && Array.isArray(breakdownDetails[dayKey].punches)) {
                 const punchData = breakdownDetails[dayKey].punches;
-                // Check if punches are already objects or strings
+                
+                // FIX 1: Ensure all punches (objects or strings) are converted to objects and sorted
+                let processedPunches = [];
                 if (punchData.length > 0 && typeof punchData[0] === 'object') {
-                    return punchData;
+                    processedPunches = [...punchData];
                 } else if (punchData.length > 0 && typeof punchData[0] === 'string') {
-                    return punchData.map((punchStr, idx) => ({
+                    processedPunches = punchData.map((punchStr, idx) => ({
                         id: `${dayKey}-${idx}`,
                         timestamp_raw: punchStr,
                         punch_date: dayKey
                     }));
                 }
+
+                // Apply chronological sorting to the dailyBreakdownData path
+                return processedPunches.sort((a, b) => {
+                    const timeA = new Date(a.timestamp_raw).getTime();
+                    const timeB = new Date(b.timestamp_raw).getTime();
+                    return (isNaN(timeA) || isNaN(timeB)) ? 0 : timeA - timeB;
+                });
             }
         }
         
@@ -203,14 +238,14 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const dateMatch = p.punch_date === dateStrYMD || p.punch_date === dateStrDMY;
             return dateMatch;
         }).sort((a, b) => {
-            let timeA, timeB;
             try {
-                timeA = new Date(a.timestamp_raw);
-                timeB = new Date(b.timestamp_raw);
+                const timeA = new Date(a.timestamp_raw).getTime();
+                const timeB = new Date(b.timestamp_raw).getTime();
+                if (isNaN(timeA) || isNaN(timeB)) return 0;
+                return timeA - timeB;
             } catch {
                 return 0;
             }
-            return timeA - timeB;
         });
         
         return dayPunches;
@@ -359,15 +394,15 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const shiftTime = match.shiftTime;
 
             if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                if (punchTime > shiftTime) {
-                    const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
+                if (punchTime.getTime() > shiftTime.getTime()) {
+                    const minutes = Math.round((punchTime.getTime() - shiftTime.getTime()) / (1000 * 60));
                     calculatedLate += minutes;
                 }
             }
 
             if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                if (punchTime < shiftTime) {
-                    const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
+                if (punchTime.getTime() < shiftTime.getTime()) {
+                    const minutes = Math.round((shiftTime.getTime() - punchTime.getTime()) / (1000 * 60));
                     calculatedEarlyCheckout += minutes;
                 }
             }
@@ -708,11 +743,23 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             <p className="text-sm text-slate-500 italic">No punches recorded for this day</p>
                         ) : (
                             <div className="space-y-1">
-                                {dayPunches.map((punch, idx) => (
-                                    <div key={punch.id} className="text-sm text-slate-700">
-                                        {idx + 1}. {punch.timestamp_raw}
-                                    </div>
-                                ))}
+                                {dayPunches.map((punch, idx) => {
+                                    // FIX 3: Label next day midnight buffer punches
+                                    // Use dateStr comparison to identify carry-forward punches
+                                    const isNextDay = punch.punch_date && dayRecord.dateStr && punch.punch_date !== dayRecord.dateStr;
+
+                                    return (
+                                        <div key={punch.id} className="text-sm text-slate-700 flex items-center gap-2">
+                                            {/* FIX 2: Display formatted timestamp instead of raw string */}
+                                            <span>{idx + 1}. {formatPunchDisplay(punch.timestamp_raw)}</span>
+                                            {isNextDay && (
+                                                <span className="bg-slate-100 text-slate-500 px-1 py-0 rounded-[2px] text-[9px] font-bold leading-none uppercase">
+                                                    next day
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
