@@ -2342,6 +2342,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         //     return pt ? (pt.getHours() * 60 + pt.getMinutes() <= 120) : false;
         // };
 
+        const employeeShifts = shifts.filter(s => String(s.attendance_id) === attId);
+        const currentDay = new Date(dateStr);
+        const localIsFridayShift = (shiftRow) => shiftRow?.is_friday_shift === true || shiftRow?.is_friday_shift === 'true' || shiftRow?.is_friday_shift === 1 || shiftRow?.is_friday_shift === '1';
+
+        let shift = employeeShifts.find(s => s.date === dateStr);
+        if (!shift) {
+            const dayOfWeek = currentDay.getDay();
+            shift = employeeShifts.find(s => (dayOfWeek === 5 ? localIsFridayShift(s) : !localIsFridayShift(s)) && !s.date);
+            if (!shift && dayOfWeek === 5) shift = employeeShifts.find(s => !s.date);
+        }
+
         const empPunches = punches.filter(p => String(p.attendance_id) === attId);
         const nextDayObj = new Date(dateStr);
         nextDayObj.setDate(nextDayObj.getDate() + 1);
@@ -2353,8 +2364,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
         ];
 
-        // Apply deduplication to match the main report table behavior for consistent UI across breakdown and edit dialogs
-        const dayPunches = filterMultiplePunches(combinedPunches);
+        // Apply deduplication to match the main report table behavior for consistent UI across breakdown and edit dialogs - Pass resolved shift
+        const dayPunches = filterMultiplePunches(combinedPunches, shift);
 
         return {
             [attId]: {
@@ -2365,7 +2376,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
         };
-    }, [selectedEmployee, editingDay, punches, localParseTime, localIsWithinMidnightBuffer, filterMultiplePunches]);
+    }, [selectedEmployee, editingDay, punches, shifts, localParseTime, localIsWithinMidnightBuffer, filterMultiplePunches]);
 
     return (
         <div className="space-y-6">
