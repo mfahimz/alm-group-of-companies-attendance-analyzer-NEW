@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import InlineEditableCell from '../project-tabs/InlineEditableCell';
-import RamadanGiftCellWidget from '../project-tabs/RamadanGiftCell';
+import GiftMinutesCellWidget from '../project-tabs/GiftMinutesCell';
 import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from '../project-tabs/ReportDetailDialogs';
 import DailyBreakdownDialog from '../project-tabs/DailyBreakdownDialog';
 import DeductibleCell from '../project-tabs/DeductibleCell';
@@ -57,7 +57,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
         currentEmployee: '',
         status: 'Processing...'
     });
-    const [ramadanGiftOverrides, setRamadanGiftOverrides] = useState({});
+    const [giftMinutesOverrides, setGiftMinutesOverrides] = useState({});
     
     // NEW DETECTION PANEL STATE
     const [showDetectionPanel, setShowDetectionPanel] = useState(false);
@@ -79,7 +79,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
     const isHRManager = userRole === 'hr_manager';
-    const canEditRamadanGift = isAdmin || isCEO || isHRManager;
+    const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id, calendarPeriod.id],
@@ -200,7 +200,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
         results.forEach(r => {
             seeded[r.id] = Math.max(0, Number(r.ramadan_gift_minutes ?? 0));
         });
-        setRamadanGiftOverrides(seeded);
+        setGiftMinutesOverrides(seeded);
     }, [results]);
 
     // Fetch punches and shifts for daily breakdown (needed even for closed projects)
@@ -887,7 +887,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
             return start <= calendarPeriodEnd && end >= calendarPeriodStart; // Using calendarPeriodStart/End
         });
     }, [ramadanSchedules, reportRun?.date_from, reportRun?.date_to]);
-    const showRamadanGiftColumn = isAlMaraghiMotors && hasRamadanSchedule && (isAdmin || isCEO || isHRManager);
+    const showGiftMinutesColumn = calendarPeriod.use_gift_minutes || results.some(r => (r.ramadan_gift_minutes || 0) > 0);
 
     // For FINALIZED reports: use stored AnalysisResult values (immutable).
     // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
@@ -936,7 +936,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                     approved_minutes: approvedMin,
                     deductible_minutes: effectiveDeductible,
                     ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
-                    // effective = raw deductible (after grace) minus ramadan gift
+                    // effective = raw deductible (after grace) minus gift minutes
                     effective_deductible_minutes: Math.max(0, effectiveDeductible - Math.max(0, result.ramadan_gift_minutes || 0)),
                     grace_minutes: graceMin,
                     has_no_punches: hasNoPunches
@@ -1836,7 +1836,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                 return;
             }
 
-            const includeRamadanGiftInExport = showRamadanGiftColumn;
+            const includeGiftMinutesInExport = showGiftMinutesColumn;
 
             // Build headers matching the visible table columns - using Hours instead of Minutes
             const headers = [
@@ -1854,7 +1854,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                 ...(calendarPeriod.company !== 'Naser Mohsin Auto Parts' && calendarPeriod.company !== 'Al Maraghi Automotive' ? ['Approved (Hours)'] : []),
                 'Other (Hours)',
                 'Grace (Hours)',
-                ...(includeRamadanGiftInExport ? ['Ramadan Gift (min)'] : []),
+                ...(includeGiftMinutesInExport ? ['Gift Minutes (min)'] : []),
                 'Deductible (Hours)',
                 'Notes'
             ];
@@ -1891,7 +1891,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                     minutesToHours(Math.max(0, grace))
                 );
 
-                if (includeRamadanGiftInExport) {
+                if (includeGiftMinutesInExport) {
                     baseRow.push(Math.max(0, r.ramadan_gift_minutes || 0));
                 }
 
@@ -1960,7 +1960,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
 
     // Save only ramadan_gift_minutes. deductible_minutes (raw) stays untouched.
     // The deductible column computes: max(0, deductible_minutes - ramadan_gift_minutes) at render time.
-    const saveRamadanGift = async (row, value) => {
+    const onSaveGiftMinutes = async (row, value) => {
         const oldValue = Math.max(0, Number(row.ramadan_gift_minutes || 0));
         const newValue = Math.max(0, Number(value || 0));
 
@@ -1976,7 +1976,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
             base44.functions.invoke('logAudit', { action_type: 'update', entity_name: 'AnalysisResult', entity_id: row.id, calendar_period_id: calendarPeriod.id, company: calendarPeriod.company, context: `RAMADAN_GIFT old=${oldValue} new=${newValue}`, changes: JSON.stringify({ field: 'ramadan_gift_minutes', old_value: oldValue, new_value: newValue }) }).catch(() => { });
         }
 
-        toast.success('Ramadan gift saved');
+        toast.success('Gift minutes saved');
     };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
@@ -2342,8 +2342,8 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                                         Other Minutes
                                     </SortableTableHead>
                                     {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>}
-                                    {showRamadanGiftColumn && (
-                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Ramadan Gift (min)</th>
+                                    {showGiftMinutesColumn && (
+                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Gift Minutes (min)</th>
                                     )}
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Deductible</th>
                                     <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Notes</th>
