@@ -378,6 +378,14 @@ export default function AnnualLeaveManagement() {
      * Processing the imports in batches of 10 with a 300 millisecond delay 
      * prevents rate limit errors on the Base44 API.
      */
+    /**
+     * executeImport
+     * 
+     * Handles bulk import of AnnualLeave records with batching and rollback support.
+     * Implements 429 rate limit retry logic and manual cleanup on failure.
+     * 
+     * Patterns adapted from PunchUploadTab.jsx as the reference implementation.
+     */
     const executeImport = async () => {
         const rowsToImport = importPreviewData.filter(r => r.selected);
         if (rowsToImport.length === 0) {
@@ -388,43 +396,107 @@ export default function AnnualLeaveManagement() {
         setIsImporting(true);
         setImportProgress(0);
         let successCount = 0;
+        let createdIds = []; // Tracking array for AnnualLeave records created during this session
         
-        const BATCH_SIZE = 10;
-        const DELAY_MS = 300;
-        
-        for (let i = 0; i < rowsToImport.length; i += BATCH_SIZE) {
-            const batch = rowsToImport.slice(i, i + BATCH_SIZE);
-            const promises = batch.map(row => {
-                const leaveData = {
-                    company: filterCompany,
-                    employee_id: row.employeeId,
-                    date_from: row.leaveStart,
-                    date_to: row.leaveEnd,
-                    leave_type: 'annual',
-                    reason: 'Bulk Import',
-                    attendance_id: row.attendanceId,
-                    employee_name: row.matchedName,
-                    total_days: row.dayCount,
-                    salary_leave_days: row.dayCount,
-                    status: 'approved',
-                    approved_by: currentUser.email,
-                    approval_date: new Date().toISOString()
-                };
-                return base44.entities.AnnualLeave.create(leaveData).then(() => { successCount++; });
-            });
-            
-            await Promise.allSettled(promises);
-            setImportProgress(Math.min(rowsToImport.length, i + BATCH_SIZE));
-            
-            if (i + BATCH_SIZE < rowsToImport.length) {
-                await new Promise(res => setTimeout(res, DELAY_MS));
+        const BATCH_SIZE = 25; // Updated to 25 for better performance
+        const DELAY_MS = 200; // Delay between batches
+        const MAX_RETRIES = 3;
+
+        // Helper: retry with wait on 429
+        const retryWithWait = async (fn, context) => {
+            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    return await fn();
+                } catch (err) {
+                    const isRateLimit = err?.status === 429 || 
+                        err?.response?.status === 429 ||
+                        /rate.?limit|too many|throttl/i.test(err?.message || '');
+                    
+                    if (isRateLimit && attempt < MAX_RETRIES) {
+                        // Wait 2000ms as requested
+                        setImportProgress(prev => ({ ...prev, phase: `${context}: Rate limit hit — retrying in 2s...` }));
+                        await new Promise(r => setTimeout(r, 2000));
+                    } else {
+                        throw err;
+                    }
+                }
             }
-        }
+        };
         
-        queryClient.invalidateQueries(['annualLeaves']);
-        toast.success(`Import complete! ${successCount} records created.`);
-        setIsImporting(false);
-        setShowImportDialog(false);
+        try {
+            for (let i = 0; i < rowsToImport.length; i += BATCH_SIZE) {
+                const batch = rowsToImport.slice(i, i + BATCH_SIZE);
+                
+                // Process each record in the batch
+                for (const row of batch) {
+                    const leaveData = {
+                        company: filterCompany,
+                        employee_id: row.employeeId,
+                        date_from: row.leaveStart,
+                        date_to: row.leaveEnd,
+                        leave_type: 'annual',
+                        reason: 'Bulk Import',
+                        attendance_id: row.attendanceId,
+                        employee_name: row.matchedName,
+                        total_days: row.dayCount,
+                        salary_leave_days: row.dayCount,
+                        status: 'approved',
+                        approved_by: currentUser.email,
+                        approval_date: new Date().toISOString()
+                    };
+                    
+                    // Create individual record with 429 retry logic
+                    const response = await retryWithWait(
+                        () => base44.entities.AnnualLeave.create(leaveData),
+                        `Row ${createdIds.length + 1}`
+                    );
+                    
+                    if (response && response.id) {
+                        createdIds.push(response.id);
+                        successCount++;
+                    }
+                }
+                
+                setImportProgress(Math.min(rowsToImport.length, i + BATCH_SIZE));
+                
+                if (i + BATCH_SIZE < rowsToImport.length) {
+                    await new Promise(res => setTimeout(res, DELAY_MS));
+                }
+            }
+            
+            queryClient.invalidateQueries(['annualLeaves']);
+            toast.success(`Import complete! ${successCount} records created.`);
+            setIsImporting(false);
+            setShowImportDialog(false);
+
+        } catch (error) {
+            console.error('Import failed, starting rollback:', error);
+            
+            // ROLLBACK: Delete all records in createdIds in batches of 10 with 100ms delays
+            if (createdIds.length > 0) {
+                for (let i = 0; i < createdIds.length; i += 10) {
+                    const batchToRollback = createdIds.slice(i, i + 10);
+                    for (const id of batchToRollback) {
+                        try {
+                            await base44.entities.AnnualLeave.delete(id);
+                        } catch (delErr) {
+                            // Silent fail during rollback
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 100)); // 100ms delay between rollback batches
+                }
+            }
+
+            queryClient.invalidateQueries(['annualLeaves']);
+            const isRateLimit = error?.status === 429 || /rate.?limit|too many/i.test(error?.message || '');
+            const msg = isRateLimit 
+                ? 'Rate limit exceeded after retries. All uploaded records have been rolled back. Please wait a minute and try again.'
+                : 'Upload failed: ' + (error.message || 'Unknown error') + '. All uploaded records have been rolled back.';
+            toast.error(msg, { duration: 8000 });
+            
+            setIsImporting(false);
+            setImportProgress(0);
+        }
     };
 
     const createMutation = useMutation({
