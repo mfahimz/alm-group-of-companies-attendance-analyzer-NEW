@@ -1,0 +1,241 @@
+{
+  "name": "Exception",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Reference to project"
+    },
+    "calendar_period_id": {
+      "type": "string",
+      "description": "Reference to CalendarPeriod (used when operating under calendar-based payroll system)"
+    },
+    "attendance_id": {
+      "type": "string",
+      "description": "Employee attendance ID, or 'ALL' for public holidays or company-wide exceptions"
+    },
+    "date_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Exception start date"
+    },
+    "date_to": {
+      "type": "string",
+      "format": "date",
+      "description": "Exception end date"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "PUBLIC_HOLIDAY",
+        "SHIFT_OVERRIDE",
+        "MANUAL_PRESENT",
+        "MANUAL_ABSENT",
+        "MANUAL_HALF",
+        "MANUAL_LATE",
+        "MANUAL_EARLY_CHECKOUT",
+        "MANUAL_OTHER_MINUTES",
+        "SICK_LEAVE",
+        "ANNUAL_LEAVE",
+        "WEEKLY_OFF_OVERRIDE",
+        "ALLOWED_MINUTES",
+        "SKIP_PUNCH",
+        "DAY_SWAP",
+        "GIFT_MINUTES",
+        "CUSTOM",
+        "DISMISSED_MISMATCH"
+      ],
+      "description": "Exception type"
+    },
+    "punch_to_skip": {
+      "type": "string",
+      "enum": [
+        "AM_PUNCH_IN",
+        "PM_PUNCH_OUT"
+      ],
+      "description": "For SKIP_PUNCH type: which punch to skip from analysis (AM_PUNCH_IN or PM_PUNCH_OUT)"
+    },
+    "new_weekly_off": {
+      "type": "string",
+      "enum": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "description": "For DAY_SWAP type: the day that will become the new weekly off"
+    },
+    "working_day_override": {
+      "type": "string",
+      "enum": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "description": "For DAY_SWAP type: the day that will become a working day (usually the old weekly off)"
+    },
+    "custom_type_name": {
+      "type": "string",
+      "description": "User-defined custom exception type name (when type is CUSTOM)"
+    },
+    "is_custom_type": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this is a custom user-defined exception type that should NEVER be used in analysis"
+    },
+    "salary_leave_days": {
+      "type": "number",
+      "description": "Override days for salary calculation only (for ANNUAL_LEAVE type). Decimal support (e.g., 9.5). Does not affect attendance reports."
+    },
+    "new_am_start": {
+      "type": "string",
+      "description": "Override AM start time"
+    },
+    "new_am_end": {
+      "type": "string",
+      "description": "Override AM end time"
+    },
+    "new_pm_start": {
+      "type": "string",
+      "description": "Override PM start time"
+    },
+    "new_pm_end": {
+      "type": "string",
+      "description": "Override PM end time"
+    },
+    "late_minutes": {
+      "type": "number",
+      "description": "Manual late minutes"
+    },
+    "early_checkout_minutes": {
+      "type": "number",
+      "description": "Manual early checkout minutes"
+    },
+    "other_minutes": {
+      "type": "number",
+      "description": "Other manually added minutes (late/early) not captured by regular calculations"
+    },
+    "old_late_minutes": {
+      "type": "number",
+      "description": "Original late minutes before change"
+    },
+    "old_early_checkout_minutes": {
+      "type": "number",
+      "description": "Original early checkout minutes before change"
+    },
+    "old_other_minutes": {
+      "type": "number",
+      "description": "Original other minutes before change"
+    },
+    "allowed_minutes": {
+      "type": "number",
+      "description": "Minutes allowed for late/early due to natural calamities or personal reasons"
+    },
+    "allowed_minutes_type": {
+      "type": "string",
+      "enum": [
+        "late",
+        "early",
+        "both"
+      ],
+      "description": "Whether the allowed minutes apply to late arrival, early checkout, or both"
+    },
+    "approved_minutes": {
+      "type": "number",
+      "description": "Minutes approved by department head from quarterly other minutes allowance"
+    },
+    "off_day": {
+      "type": "string",
+      "enum": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "description": "New weekly off day for WEEKLY_OFF_OVERRIDE exception"
+    },
+    "include_friday": {
+      "type": "boolean",
+      "default": false,
+      "description": "For SHIFT_OVERRIDE: if true, applies to all days including Friday; if false, applies to all working days except Friday"
+    },
+    "details": {
+      "type": "string",
+      "description": "Exception notes or reason"
+    },
+    "created_from_report": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this exception was automatically created from a saved report"
+    },
+    "report_run_id": {
+      "type": "string",
+      "description": "Reference to the report run that created this exception"
+    },
+    "use_in_analysis": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to use this exception in future analysis runs"
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": [
+        "pending_dept_head",
+        "approved_dept_head",
+        "pending_hr",
+        "approved",
+        "rejected"
+      ],
+      "default": "approved",
+      "description": "Approval status flow: pending_dept_head -> approved_dept_head -> pending_hr -> approved"
+    },
+    "approved_by_dept_head": {
+      "type": "string",
+      "description": "Employee ID of department head who approved"
+    },
+    "dept_head_approval_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When department head approved"
+    },
+    "approved_by_hr": {
+      "type": "string",
+      "description": "Email of HR Manager who gave final approval"
+    },
+    "hr_approval_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When HR Manager approved"
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email of admin/supervisor who approved or rejected (legacy field)"
+    },
+    "approval_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the exception was approved or rejected (legacy field)"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Reason for rejection if status is rejected"
+    }
+  },
+  "required": [
+    "project_id",
+    "attendance_id",
+    "date_from",
+    "date_to",
+    "type"
+  ]
+}
