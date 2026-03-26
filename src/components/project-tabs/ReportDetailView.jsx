@@ -2013,13 +2013,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'mismatch' ? 'border-amber-500 text-amber-600 bg-amber-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setActiveDetectionTab('mismatch')}
                             >
-                                Shift Mismatch Detections ({shiftMismatchDetections.length})
+                                Shift Mismatch Detections ({shiftMismatchDetections.filter(d => !dismissedMismatchKeys.has(d.attendance_id + '-' + d.date)).length}) {/* Filtered count to exclude dismissed mismatch records */}
                             </button>
                             <button 
                                 className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'no-match' ? 'border-rose-500 text-rose-600 bg-rose-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setActiveDetectionTab('no-match')}
                             >
-                                No Match Detections ({noMatchDetections.length})
+                                No Match Detections ({noMatchDetections.filter(d => !dismissedNoMatchKeys.has(d.attendance_id + '-' + d.date)).length}) {/* Filtered count to exclude dismissed no-match records */}
                             </button>
                         </div>
                         
@@ -2043,9 +2043,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     {(() => {
                                         if (shiftMismatchDetections.length === 0) return null;
                                         
-                                        // Group and count flagged days per employee from the raw detection array
+                                        // Group and count flagged days per employee from the filtered detection array (excluding dismissed records)
                                         const counts = {};
-                                        shiftMismatchDetections.forEach(d => {
+                                        shiftMismatchDetections
+                                            .filter(d => !dismissedMismatchKeys.has(d.attendance_id + '-' + d.date)) // Filter out records that are in the dismissed keys set
+                                            .forEach(d => {
                                             const aid = String(d.attendance_id);
                                             if (!counts[aid]) {
                                                 counts[aid] = { name: d.name, count: 0 };
@@ -2210,9 +2212,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     {(() => {
                                         if (noMatchDetections.length === 0) return null;
                                         
-                                        // Group and count flagged days per employee from the raw detection array
+                                        // Group and count flagged days per employee from the filtered detection array (excluding dismissed records)
                                         const counts = {};
-                                        noMatchDetections.forEach(d => {
+                                        noMatchDetections
+                                            .filter(d => !dismissedNoMatchKeys.has(d.attendance_id + '-' + d.date)) // Filter out records that are in the dismissed keys set
+                                            .forEach(d => {
                                             const aid = String(d.attendance_id);
                                             if (!counts[aid]) {
                                                 counts[aid] = { name: d.name, count: 0 };
