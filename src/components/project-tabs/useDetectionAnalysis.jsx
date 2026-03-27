@@ -35,8 +35,10 @@ const localParseTime = (timeStr) => {
  */
 const localIsWithinMidnightBuffer = (tsR) => {
     if (!tsR || tsR === '—' || tsR === '-') return false;
-    const pt = localParseTime(tsR);
-    return pt ? (pt.getHours() * 60 + pt.getMinutes() <= 120) : false;
+    const pt = localParseTime(String(tsR));
+    if (!pt) return false;
+    const h = pt.getHours();
+    return h === 0 || h === 1 || h === 2;
 };
 
 /**
@@ -130,17 +132,19 @@ const resolveShift = (dateStr, currentDay, employeeShifts, employeeExceptions) =
  * Check if a shift ends near midnight (11 PM, 12 AM, or 1 AM)
  */
 const shiftEndsNearMidnight = (shift) => {
-    const tEnd = localParseTime(shift?.pm_end) || localParseTime(shift?.am_end);
+    if (!shift) return false;
+    const tEnd = localParseTime(shift.pm_end);
     if (!tEnd) return false;
     const h = tEnd.getHours();
-    return h === 23 || h === 0 || h === 1;
+    return h === 23 || h === 0 || h === 1 || h === 2;
 };
 
 /**
  * Check if a shift starts near midnight (11 PM, 12 AM, 1 AM, or 2 AM)
  */
 const localShiftStartsNearMidnight = (shift) => {
-    const tStart = localParseTime(shift?.am_start);
+    if (!shift) return false;
+    const tStart = localParseTime(shift.am_start) || localParseTime(shift.pm_start);
     if (!tStart) return false;
     const h = tStart.getHours();
     return h === 23 || h === 0 || h === 1 || h === 2;
