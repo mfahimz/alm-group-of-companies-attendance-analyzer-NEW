@@ -55,10 +55,32 @@ export default function AnomalyDetectionCard({ project }) {
                 const employee = employees.find(e => e.attendance_id === empId);
 
                 // Group by date
+                // Group by date with 180-minute (3:00 AM) universal rollback
                 const byDate = {};
                 empPunches.forEach(p => {
-                    if (!byDate[p.punch_date]) byDate[p.punch_date] = [];
-                    byDate[p.punch_date].push(p.timestamp_raw);
+                    let effectiveDate = p.punch_date;
+                    
+                    // Parse hour from timestamp_raw (Format: "YYYY-MM-DD HH:mm:ss")
+                    const timePart = p.timestamp_raw.split(' ')[1];
+                    if (timePart) {
+                        const [hourStr] = timePart.split(':');
+                        const hour = parseInt(hourStr, 10);
+                        
+                        // Universal 3:00 AM Rollback: If between 00:00 and 02:59, roll back to previous date
+                        if (hour >= 0 && hour < 3) {
+                            const dateObj = new Date(p.punch_date);
+                            dateObj.setDate(dateObj.getDate() - 1);
+                            
+                            // Safe date extraction (YYYY-MM-DD)
+                            const y = dateObj.getFullYear();
+                            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                            const d = String(dateObj.getDate()).padStart(2, '0');
+                            effectiveDate = `${y}-${m}-${d}`;
+                        }
+                    }
+                    
+                    if (!byDate[effectiveDate]) byDate[effectiveDate] = [];
+                    byDate[effectiveDate].push(p.timestamp_raw);
                 });
 
                 return {
