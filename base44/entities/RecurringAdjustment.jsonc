@@ -18,10 +18,6 @@
       "type": "number",
       "description": "Adjustment amount in AED"
     },
-    "label": {
-      "type": "string",
-      "description": "Optional custom label for the adjustment (e.g. Housing Allowance, Performance Bonus)"
-    },
     "description": {
       "type": "string",
       "description": "Reason or description for this recurring adjustment"
@@ -49,5 +45,31 @@
     "amount",
     "description",
     "start_date"
-  ]
+  ],
+  "rls": {
+    "admin": {
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true
+    },
+    "ceo": {
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true
+    },
+    "supervisor": {
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true
+    },
+    "hr_manager": {
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true
+    }
+  }
 }
