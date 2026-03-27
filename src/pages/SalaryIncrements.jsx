@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Plus, TrendingUp, Calendar, AlertTriangle, History, DollarSign } from 'lucide-react';
+import { Search, Plus, TrendingUp, Calendar, AlertTriangle, History } from 'lucide-react';
+import AEDIcon from '../components/ui/AEDIcon';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
@@ -274,9 +275,15 @@ export default function SalaryIncrements() {
         return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
     };
 
-    const formatCurrency = (amount) => {
-        return `AED ${Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const formatCurrencyValue = (amount) => {
+        return Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
+
+    const CurrencyDisplay = ({ amount, className = '' }) => (
+        <span className={`inline-flex items-center gap-1 ${className}`}>
+            <AEDIcon className="w-3.5 h-3.5" />{formatCurrencyValue(amount)}
+        </span>
+    );
 
     if (!canAccess) {
         return (
@@ -356,7 +363,7 @@ export default function SalaryIncrements() {
                             <CardContent className="p-4">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-green-100 rounded-lg">
-                                        <DollarSign className="w-5 h-5 text-green-600" />
+                                        <AEDIcon className="w-5 h-5" />
                                     </div>
                                     <div>
                                         <p className="text-2xl font-bold text-slate-900">{Object.keys(employeeIncrementSummary).length}</p>
@@ -456,10 +463,10 @@ export default function SalaryIncrements() {
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-slate-600">
-                                                            {formatCurrency(increment.previous_total_salary)}
+                                                            <CurrencyDisplay amount={increment.previous_total_salary} />
                                                         </TableCell>
                                                         <TableCell className="font-semibold text-green-700">
-                                                            {formatCurrency(increment.new_total_salary)}
+                                                            <CurrencyDisplay amount={increment.new_total_salary} />
                                                         </TableCell>
                                                         <TableCell>
                                                             <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -467,7 +474,7 @@ export default function SalaryIncrements() {
                                                                 change < 0 ? 'bg-red-100 text-red-800' : 
                                                                 'bg-slate-100 text-slate-600'
                                                             }`}>
-                                                                {change >= 0 ? '+' : ''}{formatCurrency(change)} ({changePercent}%)
+                                                                {change >= 0 ? '+' : ''}<CurrencyDisplay amount={change} /> ({changePercent}%)
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-sm text-slate-600">
@@ -531,7 +538,7 @@ export default function SalaryIncrements() {
                                                 );
                                                 return (
                                                     <SelectItem key={emp.id} value={emp.id}>
-                                                        {emp.name} ({emp.attendance_id}) - Current: AED {currentSalary?.total_salary?.toLocaleString() || 'N/A'}
+                                                        {emp.name} ({emp.attendance_id}) - Current: {currentSalary?.total_salary?.toLocaleString() || 'N/A'} AED
                                                     </SelectItem>
                                                 );
                                             })}
@@ -610,8 +617,8 @@ export default function SalaryIncrements() {
 
                                 <div className="col-span-2 bg-slate-50 rounded-lg p-4">
                                     <div className="text-sm text-slate-600">New Total Salary</div>
-                                    <div className="text-2xl font-bold text-green-600">
-                                        AED {Number(
+                                    <div className="text-2xl font-bold text-green-600 inline-flex items-center gap-1">
+                                        <AEDIcon className="w-6 h-6" />{Number(
                                             formData.new_basic_salary + 
                                             formData.new_allowances +
                                             formData.new_allowances_with_bonus

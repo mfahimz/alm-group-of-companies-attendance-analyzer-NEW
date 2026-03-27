@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { ChevronDown, BarChart3, Home } from 'lucide-react';
+import { ChevronDown, Home } from 'lucide-react';
+import AEDIcon from '../ui/AEDIcon';
 import { cn } from '@/lib/utils';
 
 /**
@@ -34,7 +35,7 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
                     <img src={companyLogo} alt="Company Logo" className="h-8 w-auto max-w-[200px] object-contain" />
                 ) : (
                     <>
-                        <BarChart3 className="w-8 h-8 text-[#0F1E36] flex-shrink-0" />
+                        <AEDIcon className="w-8 h-8 flex-shrink-0" />
                         <span className="font-bold text-lg text-[#0F1E36]">ALM Attendance</span>
                     </>
                 )}

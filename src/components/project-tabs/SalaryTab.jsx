@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar } from 'lucide-react';
+import { FileSpreadsheet, Download, Trash2, Eye, Plus, Calendar } from 'lucide-react';
+import AEDIcon from '../ui/AEDIcon';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import * as XLSX from 'xlsx';
@@ -460,7 +461,7 @@ export default function SalaryTab({ project }) {
                 <Card className="border-0 shadow-lg">
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
-                            <DollarSign className="w-6 h-6 text-indigo-600" />
+                            <AEDIcon className="w-6 h-6" />
                             Salary Reports - {project.company}
                         </CardTitle>
                         <Button 

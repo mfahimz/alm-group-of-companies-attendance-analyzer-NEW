@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TableHead } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { DollarSign, ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Download, Search, Save, FileSpreadsheet, RefreshCw, Eye, CheckCircle } from 'lucide-react';
+import AEDIcon from '../components/ui/AEDIcon';
 import {
     Dialog,
     DialogContent,
@@ -659,7 +660,7 @@ export default function SalaryReportDetail() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
-                                    <DollarSign className="w-6 h-6 text-indigo-600" />
+                                    <AEDIcon className="w-6 h-6" />
                                     {report.report_name}
                                 </CardTitle>
                                 <p className="text-sm text-slate-500 mt-1">
