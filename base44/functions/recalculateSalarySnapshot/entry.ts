@@ -148,12 +148,85 @@ Deno.serve(async (req) => {
         const isAlMaraghi = project.company === 'Al Maraghi Motors';
         let prevMonthSalaryForOT = salaryRecord.total_salary || 0;
         
+        /**
+         * Resolves and merges manual adjustments from OvertimeData with recurring adjustments.
+         */
+        const resolveAdjustments = (attendanceId: any, hrmsId: any, manualRecord: any, allRecurring: any[], projectFrom: string, projectTo: string) => {
+            const categories = ['bonus', 'incentive', 'otherDeduction', 'advanceSalaryDeduction', 'open_leave_salary', 'variable_salary'];
+            const result: Record<string, any> = {};
+
+            const employeeRecurring = allRecurring.filter(ra => 
+                (ra.employee_id && (String(ra.employee_id) === String(attendanceId) || String(ra.employee_id) === String(hrmsId))) &&
+                ra.start_date <= projectTo &&
+                (!ra.end_date || ra.end_date >= projectFrom)
+            );
+
+            categories.forEach(cat => {
+                let entries = [];
+                const dbValue = manualRecord ? manualRecord[cat] : null;
+
+                if (dbValue) {
+                    if (typeof dbValue === 'string' && (dbValue.trim().startsWith('[') || dbValue.trim().startsWith('{'))) {
+                        try {
+                            const parsed = JSON.parse(dbValue);
+                            // Filter out existing (Recurring) entries to avoid double-counting on recalculation
+                            if (Array.isArray(parsed)) entries = parsed.filter(e => !e.desc?.includes('(Recurring)'));
+                            else {
+                                const num = parseFloat(dbValue);
+                                if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                            }
+                        } catch (e) {
+                            const num = parseFloat(dbValue);
+                            if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                        }
+                    } else {
+                        const num = parseFloat(dbValue);
+                        if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                    }
+                }
+
+                const categoryRecurring = employeeRecurring.filter(ra => ra.category === cat);
+                categoryRecurring.forEach(ra => {
+                    entries.push({
+                        amount: ra.amount || 0,
+                        desc: `${ra.label || ra.category} (Recurring)`
+                    });
+                });
+
+                const sum = entries.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+                result[cat] = {
+                    sum,
+                    value: entries.length > 1 || categoryRecurring.length > 0 
+                        ? JSON.stringify(entries) 
+                        : (entries.length === 1 ? entries[0].amount : 0)
+                };
+            });
+
+            return result;
+        };
+
+        const [allOvertimeData, allRecurring] = await Promise.all([
+            base44.asServiceRole.entities.OvertimeData.filter({ 
+                project_id: project_id,
+                attendance_id: String(attendance_id)
+            }, null, 1),
+            base44.asServiceRole.entities.RecurringAdjustment.filter({ 
+                company: project.company, 
+                is_active: true
+            }, null, 5000)
+        ]);
+        
+        const otRecord = allOvertimeData.length > 0 ? allOvertimeData[0] : null;
+
         if (isAlMaraghi) {
-            // Fetch salary increments
-            const salaryIncrements = await base44.asServiceRole.entities.SalaryIncrement.filter({ 
+
+        // Fetch salary increments
+        const salaryIncrements = isAlMaraghi
+            ? await base44.asServiceRole.entities.SalaryIncrement.filter({ 
                 company: 'Al Maraghi Motors', 
                 active: true 
-            }, null, 5000);
+            }, null, 5000)
+            : [];
             
             // Get increments for this employee
             const empIncrements = salaryIncrements.filter(inc => 
@@ -233,15 +306,25 @@ Deno.serve(async (req) => {
         // ============================================================
         // EDITABLE ADJUSTMENT VALUES (preserve these, do NOT override)
         // ============================================================
+        // Merge manual adjustments with active recurring variables
+        const adjustments = resolveAdjustments(
+            attendance_id, 
+            snapshot.hrms_id, 
+            otRecord, 
+            allRecurring, 
+            project.date_from, 
+            project.date_to
+        );
+
         const adjustmentValues = {
             normalOtHours: snapshot.normalOtHours || 0,
             specialOtHours: snapshot.specialOtHours || 0,
-            bonus: snapshot.bonus || 0,
-            incentive: snapshot.incentive || 0,
-            open_leave_salary: Math.max(0, Number(snapshot.open_leave_salary || 0)),
-            variable_salary: Math.max(0, Number(snapshot.variable_salary || 0)),
-            otherDeduction: snapshot.otherDeduction || 0,
-            advanceSalaryDeduction: snapshot.advanceSalaryDeduction || 0
+            bonus: adjustments.bonus.sum,
+            incentive: adjustments.incentive.sum,
+            otherDeduction: adjustments.otherDeduction.sum,
+            advanceSalaryDeduction: adjustments.advanceSalaryDeduction.sum,
+            open_leave_salary: isAlMaraghi ? Math.max(0, adjustments.open_leave_salary.sum) : 0,
+            variable_salary: isAlMaraghi ? Math.max(0, adjustments.variable_salary.sum) : 0,
         };
 
         // ============================================================
@@ -280,7 +363,14 @@ Deno.serve(async (req) => {
             balance: snapshot.balance,
             wps_cap_enabled: snapshot.wps_cap_enabled,
             wps_cap_amount: snapshot.wps_cap_amount,
-            wps_cap_applied: snapshot.wps_cap_applied
+            wps_cap_applied: snapshot.wps_cap_applied,
+            // Adjustment fields
+            bonus: snapshot.bonus,
+            incentive: snapshot.incentive,
+            otherDeduction: snapshot.otherDeduction,
+            advanceSalaryDeduction: snapshot.advanceSalaryDeduction,
+            open_leave_salary: snapshot.open_leave_salary,
+            variable_salary: snapshot.variable_salary
         };
 
         // ============================================================
@@ -444,7 +534,14 @@ Deno.serve(async (req) => {
             balance: balance,
             wps_cap_enabled: wpsCapEnabled,
             wps_cap_amount: wpsCapAmount,
-            wps_cap_applied: wpsCapApplied
+            wps_cap_applied: wpsCapApplied,
+            // Updated adjustment fields (merged with recurring)
+            bonus: adjustments.bonus.value,
+            incentive: adjustments.incentive.value,
+            otherDeduction: adjustments.otherDeduction.value,
+            advanceSalaryDeduction: adjustments.advanceSalaryDeduction.value,
+            open_leave_salary: adjustments.open_leave_salary.value,
+            variable_salary: adjustments.variable_salary.value
         };
 
         // ============================================================
@@ -506,7 +603,15 @@ Deno.serve(async (req) => {
             // WPS Cap fields
             wps_cap_enabled: afterValues.wps_cap_enabled,
             wps_cap_amount: afterValues.wps_cap_amount,
-            wps_cap_applied: afterValues.wps_cap_applied
+            wps_cap_applied: afterValues.wps_cap_applied,
+
+            // Updated adjustments
+            bonus: afterValues.bonus,
+            incentive: afterValues.incentive,
+            otherDeduction: afterValues.otherDeduction,
+            advanceSalaryDeduction: afterValues.advanceSalaryDeduction,
+            open_leave_salary: afterValues.open_leave_salary,
+            variable_salary: afterValues.variable_salary
         };
 
         await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, updatePayload);

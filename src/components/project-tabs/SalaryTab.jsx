@@ -16,6 +16,26 @@ import { Label } from '@/components/ui/label';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 
+/**
+ * Helper to flatten potentially JSON-stringified adjustment values to a single number.
+ */
+const flattenToValue = (val) => {
+    if (!val) return 0;
+    if (typeof val === 'string' && (val.trim().startsWith('[') || val.trim().startsWith('{'))) {
+        try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) {
+                return parsed.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            }
+        } catch (e) {
+            return parseFloat(val) || 0;
+        }
+    }
+    const num = parseFloat(val);
+    return isNaN(num) ? 0 : num;
+};
+
+
 export default function SalaryTab({ project }) {
     const queryClient = useQueryClient();
     
@@ -327,14 +347,14 @@ export default function SalaryTab({ project }) {
                 'Special OT Hours': row.specialOtHours || 0,
                 'Special OT Salary': row.specialOtSalary || 0,
                 'Total OT Salary': (row.normalOtSalary || 0) + (row.specialOtSalary || 0),
-                'Other Deduction': row.otherDeduction || 0,
-                'Bonus': row.bonus || 0,
-                'Incentive': row.incentive || 0,
+                'Other Deduction': flattenToValue(row.otherDeduction),
+                'Bonus': flattenToValue(row.bonus),
+                'Incentive': flattenToValue(row.incentive),
                 ...(isAlMaraghi ? {
-                    'Open Leave Salary': Number(row.open_leave_salary || 0).toFixed(2),
-                    'Variable Salary': Number(row.variable_salary || 0).toFixed(2)
+                    'Open Leave Salary': flattenToValue(row.open_leave_salary).toFixed(2),
+                    'Variable Salary': flattenToValue(row.variable_salary).toFixed(2)
                 } : {}),
-                'Advance Salary Deduction': row.advanceSalaryDeduction || 0,
+                'Advance Salary Deduction': flattenToValue(row.advanceSalaryDeduction),
                 'Total': row.total,
                 'WPS Pay': row.wpsPay,
                 'Balance': row.balance || 0,

@@ -335,7 +335,7 @@ Deno.serve(async (req) => {
 
         // Fetch core data
         // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData] = await Promise.all([
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData, recurringAdjustments] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AnalysisResult.filter({
@@ -349,7 +349,8 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000),
             base44.asServiceRole.entities.Punch.filter({ project_id: project_id }, null, 5000),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }, null, 5000),
-            base44.asServiceRole.entities.OvertimeData.filter({ project_id: project_id }, null, 5000)
+            base44.asServiceRole.entities.OvertimeData.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.RecurringAdjustment.filter({ company: project.company, is_active: true }, null, 5000)
         ]);
 
         console.log(`[createSalarySnapshots] ============================================`);
@@ -1265,6 +1266,69 @@ Deno.serve(async (req) => {
 
         let loopIterationCount = 0;
         let skippedCount = 0;
+        /**
+         * Resolves and merges manual adjustments from OvertimeData with recurring adjustments.
+         * Returns both the numeric sum (for calculation) and the JSON entries (for snapshot storage).
+         */
+        const resolveAdjustments = (attendanceId: any, hrmsId: any, manualRecord: any, allRecurring: any[], projectFrom: string, projectTo: string) => {
+            const categories = ['bonus', 'incentive', 'otherDeduction', 'advanceSalaryDeduction', 'open_leave_salary', 'variable_salary'];
+            const result: Record<string, any> = {};
+
+            // Filter recurring adjustments for this employee and period
+            const employeeRecurring = allRecurring.filter(ra => 
+                (ra.employee_id && (String(ra.employee_id) === String(attendanceId) || String(ra.employee_id) === String(hrmsId))) &&
+                ra.start_date <= projectTo &&
+                (!ra.end_date || ra.end_date >= projectFrom)
+            );
+
+            categories.forEach(cat => {
+                let entries = [];
+                const dbValue = manualRecord ? manualRecord[cat] : null;
+
+                // 1. Load manual entries (handle both JSON array string and numeric legacy)
+                if (dbValue) {
+                    if (typeof dbValue === 'string' && (dbValue.trim().startsWith('[') || dbValue.trim().startsWith('{'))) {
+                        try {
+                            const parsed = JSON.parse(dbValue);
+                            // Filter out existing (Recurring) entries to avoid double-counting on recalculation
+                            if (Array.isArray(parsed)) entries = parsed.filter(e => !e.desc?.includes('(Recurring)'));
+                            else {
+                                const num = parseFloat(dbValue);
+                                if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                            }
+                        } catch (e) {
+                            const num = parseFloat(dbValue);
+                            if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                        }
+                    } else {
+                        const num = parseFloat(dbValue);
+                        if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                    }
+                }
+
+                // 2. Add matching recurring entries
+                const categoryRecurring = employeeRecurring.filter(ra => ra.category === cat);
+                categoryRecurring.forEach(ra => {
+                    entries.push({
+                        amount: ra.amount || 0,
+                        desc: `${ra.label || ra.category} (Recurring)`
+                    });
+                });
+
+                // 3. Compute final sum and format for storage
+                const sum = entries.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+                result[cat] = {
+                    sum,
+                    // If multiple entries or recurring items, store as JSON; otherwise use numeric sum for backward compatibility
+                    value: entries.length > 1 || categoryRecurring.length > 0 
+                        ? JSON.stringify(entries) 
+                        : (entries.length === 1 ? entries[0].amount : 0)
+                };
+            });
+
+            return result;
+        };
+
         for (const emp of employeesToProcess) {
             loopIterationCount++;
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
@@ -1595,13 +1659,22 @@ Deno.serve(async (req) => {
             const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours);
             const totalOtSalary = normalOtSalary + specialOtSalary;
 
-            // Get adjustment values from OvertimeData
-            const bonus = otRecord?.bonus || 0;
-            const incentive = otRecord?.incentive || 0;
-            const openLeaveSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.open_leave_salary || 0)) : 0;
-            const variableSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.variable_salary || 0)) : 0;
-            const otherDeduction = otRecord?.otherDeduction || 0;
-            const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
+            // Merge manual adjustments with active recurring variables
+            const adjustments = resolveAdjustments(
+                emp.attendance_id, 
+                emp.hrms_id, 
+                otRecord, 
+                recurringAdjustments, 
+                project.date_from, 
+                project.date_to
+            );
+            
+            const bonus = adjustments.bonus.sum;
+            const incentive = adjustments.incentive.sum;
+            const openLeaveSalary = isAlMaraghi ? Math.max(0, adjustments.open_leave_salary.sum) : 0;
+            const variableSalary = isAlMaraghi ? Math.max(0, adjustments.variable_salary.sum) : 0;
+            const otherDeduction = adjustments.otherDeduction.sum;
+            const advanceSalaryDeduction = adjustments.advanceSalaryDeduction.sum;
 
             // ============================================================
             // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
@@ -1715,13 +1788,13 @@ Deno.serve(async (req) => {
                 specialOtHours: specialOtHours,
                 specialOtSalary: specialOtSalary,
                 totalOtSalary: totalOtSalary,
-                // Adjustment Fields (populated from OvertimeData)
-                otherDeduction: otherDeduction,
-                bonus: bonus,
-                incentive: incentive,
-                open_leave_salary: openLeaveSalary,
-                variable_salary: variableSalary,
-                advanceSalaryDeduction: advanceSalaryDeduction,
+                // Adjustment Fields (populated from OvertimeData + RecurringAdjustment)
+                otherDeduction: adjustments.otherDeduction.value,
+                bonus: adjustments.bonus.value,
+                incentive: adjustments.incentive.value,
+                open_leave_salary: adjustments.open_leave_salary.value,
+                variable_salary: adjustments.variable_salary.value,
+                advanceSalaryDeduction: adjustments.advanceSalaryDeduction.value,
                 total: totalWithAdjustments,
                 wpsPay: finalWpsAmount,
                 balance: finalBalanceAmount,
