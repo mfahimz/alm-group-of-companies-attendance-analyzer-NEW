@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { Menu, X } from 'lucide-react';
-import AEDIcon from '../ui/AEDIcon';
+import { Menu, X, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -47,7 +46,7 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-[#E2E6EC]">
                     <Link to={createPageUrl('Dashboard')} onClick={closeDrawer} className="flex items-center gap-3">
-                        <AEDIcon className="w-6 h-6" />
+                        <BarChart3 className="w-6 h-6 text-[#0F1E36]" />
                         <span className="font-bold text-lg text-[#0F1E36]">ALM Attendance</span>
                     </Link>
                     <button
@@ -76,7 +75,7 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                                         currentPageName !== 'Dashboard' && 'text-[#4B5563] hover:bg-[#F7F9FC]'
                                     )}
                                 >
-                                    <AEDIcon className="w-5 h-5" />
+                                    <BarChart3 className="w-5 h-5" />
                                     Dashboard
                                 </Link>
                             )}
@@ -90,7 +89,7 @@ export default function MobileNav({ navStructure, currentPageName, canAccessPage
                                         currentPageName !== 'DepartmentHeadDashboard' && 'text-[#4B5563] hover:bg-[#F7F9FC]'
                                     )}
                                 >
-                                    <AEDIcon className="w-5 h-5" />
+                                    <BarChart3 className="w-5 h-5" />
                                     Department Head Dashboard
                                 </Link>
                             )}
