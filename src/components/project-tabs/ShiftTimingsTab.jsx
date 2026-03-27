@@ -947,13 +947,15 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
         );
 
         return (
-            <Card className="border-0 shadow-sm">
-                <CardHeader className="bg-slate-50">
+            <Card className="border-0 shadow-sm bg-white rounded-xl ring-1 ring-slate-200/80">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
-                            <Calendar className="w-5 h-5 text-indigo-600" />
+                            <div className="p-2 bg-indigo-50 rounded-lg">
+                                <Calendar className="w-5 h-5 text-indigo-600" />
+                            </div>
                             <div>
-                                <CardTitle className="text-base">{blockLabel}</CardTitle>
+                                <CardTitle className="text-base font-semibold text-slate-900">{blockLabel}</CardTitle>
                                 {editingBlockRange === blockId ? (
                                     <div className="flex gap-2 mt-2">
                                         <Input
@@ -967,7 +969,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             }}
                                             min={project.date_from}
                                             max={project.date_to}
-                                            className="w-40"
+                                            className="w-40 border-slate-200 focus:ring-indigo-100"
                                         />
                                         <Input
                                             type="date"
@@ -980,18 +982,16 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             }}
                                             min={blockDateRanges[blockId]?.from || project.date_from}
                                             max={project.date_to}
-                                            className="w-40"
+                                            className="w-40 border-slate-200 focus:ring-indigo-100"
                                         />
                                         <Button
                                             size="sm"
                                             onClick={() => {
-                                                // Get the old range from the first shift in this block, or from saved config
                                                 let oldRange = null;
                                                 const firstShift = shifts.find(s => s.shift_block === blockId);
                                                 if (firstShift) {
                                                     oldRange = { from: firstShift.effective_from, to: firstShift.effective_to };
                                                 } else {
-                                                    // Try to get from project config
                                                     try {
                                                         const savedRanges = project.shift_block_ranges ? JSON.parse(project.shift_block_ranges) : {};
                                                         oldRange = savedRanges[blockId] || null;
@@ -1006,6 +1006,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                                 });
                                             }}
                                             disabled={updateBlockRangeMutation.isPending}
+                                            className="bg-indigo-600 hover:bg-indigo-700"
                                         >
                                             Save
                                         </Button>
@@ -1014,7 +1015,6 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             variant="outline"
                                             onClick={() => {
                                                 setEditingBlockRange(null);
-                                                // Reset to saved values
                                                 const savedShift = shifts.find(s => s.shift_block === blockId);
                                                 if (savedShift) {
                                                     setBlockDateRanges(prev => ({
@@ -1043,6 +1043,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                         setCopySource({ ...copySource, type: 'block', targetBlockId: blockId });
                                         setShowCopyDialog(true);
                                     }}
+                                    className="border-slate-200 hover:bg-slate-50 transition-all"
                                 >
                                     <Copy className="w-4 h-4 mr-2" />
                                     Copy Shifts
@@ -1051,6 +1052,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                     size="sm"
                                     variant="outline"
                                     onClick={() => setEditingBlockRange(blockId)}
+                                    className="border-slate-200 hover:bg-slate-50 transition-all"
                                 >
                                     <Edit className="w-4 h-4 mr-2" />
                                     Edit Date Range
@@ -1061,14 +1063,15 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             size="sm"
                                             variant="outline"
                                             onClick={() => exportBlockShiftsToCSV(blockId, blockShifts)}
+                                            className="border-slate-200 hover:bg-slate-50 transition-all"
                                         >
                                             <Download className="w-4 h-4 mr-2" />
-                                            Export {blockLabel}
+                                            Export
                                         </Button>
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-100 transition-all"
                                             onClick={() => {
                                                 if (window.confirm(`Delete all ${blockShifts.length} shifts from ${blockLabel}?`)) {
                                                     deleteBlockShiftsMutation.mutate(blockId);
@@ -1076,67 +1079,63 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             }}
                                         >
                                             <Trash2 className="w-4 h-4 mr-2" />
-                                            Delete All Shifts
+                                            Delete All
                                         </Button>
                                     </>
                                 )}
                             </div>
                         )}
-
                     </div>
                 </CardHeader>
-                <CardContent className="pt-4">
+                <CardContent className="pt-6">
                     <div className="space-y-4">
                         {blockShifts.length === 0 ? (
-                            <p className="text-slate-500 text-center py-8">No shifts uploaded to this block yet</p>
+                            <div className="text-center py-12 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                <p className="text-slate-400 font-medium">No shifts uploaded to this block yet</p>
+                            </div>
                         ) : (
                             <>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <p className="text-sm text-slate-600">
-                                            {filteredShifts.length !== blockShifts.length && `${filteredShifts.length} of ${blockShifts.length} shown`}
-                                        </p>
+                                <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-2">
+                                    <div className="relative flex-1 max-w-sm">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                        <Input
+                                            placeholder="Search by ID or Name..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-10 h-10 border-slate-200 focus:ring-indigo-100 transition-all rounded-lg"
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 items-center">
                                         {selectedShifts.length > 0 && (
                                             <Button
                                                 size="sm"
                                                 onClick={() => setShowBulkEdit(true)}
-                                                className="bg-indigo-600 hover:bg-indigo-700"
+                                                className="bg-indigo-600 hover:bg-indigo-700 transition-all shadow-sm"
                                             >
                                                 <Edit className="w-4 h-4 mr-2" />
                                                 Bulk Edit ({selectedShifts.length})
                                             </Button>
                                         )}
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row gap-2 flex-wrap w-full sm:w-auto">
-                                       <Button
-                                           size="sm"
-                                           variant="outline"
-                                           onClick={() => {
-                                               const duplicates = findDuplicateShifts(blockShifts);
-                                               if (duplicates.length === 0) {
-                                                   toast.info('No duplicate shifts found in this block');
-                                               } else {
-                                                   setSearchTerm('');
-                                                   setSelectedShifts(duplicates);
-                                                   toast.success(`Found ${duplicates.length} duplicate shifts - now selected`);
-                                               }
-                                           }}
-                                           className="text-orange-600 hover:text-orange-700"
-                                       >
-                                           <Search className="w-4 h-4 mr-2" />
-                                           Find Duplicates
-                                       </Button>
-                                       <div className="relative flex-1 min-w-[200px]">
-                                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                           <Input
-                                               placeholder="Search by ID or name..."
-                                               value={searchTerm}
-                                               onChange={(e) => setSearchTerm(e.target.value)}
-                                               className="pl-9"
-                                           />
-                                       </div>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                const duplicates = findDuplicateShifts(blockShifts);
+                                                if (duplicates.length === 0) {
+                                                    toast.info('No duplicate shifts found');
+                                                } else {
+                                                    setSearchTerm('');
+                                                    setSelectedShifts(duplicates);
+                                                    toast.success(`Found ${duplicates.length} duplicate shifts selected`);
+                                                }
+                                            }}
+                                            className="text-amber-700 border-amber-200 hover:bg-amber-50"
+                                        >
+                                            <Search className="w-4 h-4 mr-2" />
+                                            Find Duplicates
+                                        </Button>
                                         <Select value={departmentFilter || undefined} onValueChange={setDepartmentFilter}>
-                                            <SelectTrigger className="w-[160px]">
+                                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100 w-[160px]">
                                                 <SelectValue placeholder="Department" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1145,13 +1144,12 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                                     <SelectItem key={dept} value={dept || 'unknown'}>{dept}</SelectItem>
                                                 )) || [
                                                     <SelectItem key="Admin" value="Admin">Admin</SelectItem>,
-                                                    <SelectItem key="Operations" value="Operations">Operations</SelectItem>,
-                                                    <SelectItem key="Front Office" value="Front Office">Front Office</SelectItem>
+                                                    <SelectItem key="Operations" value="Operations">Operations</SelectItem>
                                                 ]}
                                             </SelectContent>
                                         </Select>
                                         <Select value={shiftTypeFilter || undefined} onValueChange={setShiftTypeFilter}>
-                                            <SelectTrigger className="w-[140px]">
+                                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100 w-[140px]">
                                                 <SelectValue placeholder="Shift Type" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1161,151 +1159,153 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             </SelectContent>
                                         </Select>
                                         <Select value={applicableDayFilter || undefined} onValueChange={setApplicableDayFilter}>
-                                            <SelectTrigger className="w-[130px]">
+                                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100 w-[130px]">
                                                 <SelectValue placeholder="Day" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">All Days</SelectItem>
-                                                <SelectItem value="Sunday">Sunday</SelectItem>
-                                                <SelectItem value="Monday">Monday</SelectItem>
-                                                <SelectItem value="Tuesday">Tuesday</SelectItem>
-                                                <SelectItem value="Wednesday">Wednesday</SelectItem>
-                                                <SelectItem value="Thursday">Thursday</SelectItem>
-                                                <SelectItem value="Friday">Friday</SelectItem>
-                                                <SelectItem value="Saturday">Saturday</SelectItem>
+                                                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                                    <SelectItem key={day} value={day}>{day}</SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
                                 </div>
-                                <div className="max-h-96 overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                {!isUser && (
-                                                    <TableHead className="w-12">
+
+                                <div className="border rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200/60 bg-white">
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader className="bg-slate-50/90 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200/60">
+                                                <TableRow className="hover:bg-transparent">
+                                                    <TableHead className="w-12 px-4 text-center">
                                                         <Checkbox
-                                                            checked={selectedShifts.length === filteredShifts.length && filteredShifts.length > 0}
+                                                            checked={selectedShifts.length === paginatedShifts.length && paginatedShifts.length > 0}
                                                             onCheckedChange={(checked) => {
                                                                 if (checked) {
-                                                                    setSelectedShifts(filteredShifts.map(s => s));
+                                                                    setSelectedShifts(paginatedShifts);
                                                                 } else {
                                                                     setSelectedShifts([]);
                                                                 }
                                                             }}
+                                                            className="border-slate-300 data-[state=checked]:bg-indigo-600"
                                                         />
                                                     </TableHead>
-                                                )}
-                                                <TableHead className="w-24">ID</TableHead>
-                                                <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
-                                                    Attendance ID
-                                                </SortableTableHead>
-                                                <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
-                                                    Employee Name
-                                                </SortableTableHead>
-                                                <TableHead>Department</TableHead>
-                                                {project.company === 'Naser Mohsin Auto Parts' && (
-                                                    <TableHead>Weekly Off</TableHead>
-                                                )}
-                                                <TableHead>Shift Type</TableHead>
-                                                <TableHead>Shift Times</TableHead>
-                                                <TableHead>Applicable Days</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {paginatedShifts.map((shift) => {
-                                                const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
-                                                return (
-                                                    <TableRow key={shift.id}>
-                                                        <TableCell>
-                                                            <Checkbox
-                                                                checked={selectedShifts.some(s => s.id === shift.id)}
-                                                                onCheckedChange={(checked) => {
-                                                                    if (checked) {
-                                                                        setSelectedShifts([...selectedShifts, shift]);
-                                                                    } else {
-                                                                        setSelectedShifts(selectedShifts.filter(s => s.id !== shift.id));
-                                                                    }
-                                                                }}
-                                                            />
-                                                        </TableCell>
-                                                                <TableCell className="text-xs text-slate-500 font-mono">
-                                                                {shift.id.substring(0, 8)}
-                                                                </TableCell>
-                                                                <TableCell className="font-medium">{shift.attendance_id}</TableCell>
-                                                        <TableCell>{employee?.name || '-'}</TableCell>
-                                                        <TableCell>{employee?.department || '-'}</TableCell>
-                                                        {project.company === 'Naser Mohsin Auto Parts' && (
-                                                            <TableCell>{employee?.weekly_off || 'Sunday'}</TableCell>
-                                                        )}
-                                                        <TableCell>
-                                                            {shift.applicable_days?.includes('Ramadan') ? (
-                                                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded">
-                                                                    {shift.applicable_days.replace('Ramadan ', '')}
-                                                                </span>
-                                                            ) : shift.is_single_shift ? (
-                                                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">Single Shift</span>
-                                                            ) : (
-                                                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">Regular</span>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {shift.is_single_shift ? (
-                                                                <span>{formatTime(shift.am_start)} → {formatTime(shift.pm_end)}</span>
-                                                            ) : (
-                                                                <span>{formatTime(shift.am_start)}-{formatTime(shift.am_end)} / {formatTime(shift.pm_start)}-{formatTime(shift.pm_end)}</span>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {(() => {
-                                                                if (shift.date) return new Date(shift.date).toLocaleDateString('en-GB');
-                                                                if (!shift.applicable_days) return 'All days';
-
-                                                                // Try to parse as JSON array (Naser Mohsin format)
-                                                                try {
-                                                                    const daysArray = JSON.parse(shift.applicable_days);
-                                                                    if (Array.isArray(daysArray)) {
-                                                                        return daysArray.join(', ');
-                                                                    }
-                                                                } catch {
-                                                                    // Not JSON, return as string
-                                                                }
-
-                                                                return shift.applicable_days;
-                                                            })()}
-                                                            {shift.is_friday_shift && (
-                                                                <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded">
-                                                                    Friday
-                                                                </span>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <div className="flex gap-1 justify-end">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => setEditingShift(shift)}
-                                                                >
-                                                                    <Edit className="w-4 h-4 text-indigo-600" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => {
-                                                                        if (window.confirm('Delete this shift record?')) {
-                                                                            deleteMutation.mutate(shift.id);
+                                                    <TableHead className="w-24">ID</TableHead>
+                                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>
+                                                        Attendance ID
+                                                    </SortableTableHead>
+                                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort}>
+                                                        Employee Name
+                                                    </SortableTableHead>
+                                                    <TableHead>Department</TableHead>
+                                                    {project.company === 'Naser Mohsin Auto Parts' && (
+                                                        <TableHead>Weekly Off</TableHead>
+                                                    )}
+                                                    <TableHead>Shift Type</TableHead>
+                                                    <TableHead>Shift Times</TableHead>
+                                                    <TableHead>Applicable Days</TableHead>
+                                                    <TableHead className="text-right px-6">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {paginatedShifts.map((shift) => {
+                                                    const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
+                                                    return (
+                                                        <TableRow key={shift.id} className="hover:bg-slate-50/80 transition-colors duration-200 border-b border-slate-100 last:border-0 text-slate-700">
+                                                            <TableCell className="px-4 text-center">
+                                                                <Checkbox
+                                                                    checked={selectedShifts.some(s => s.id === shift.id)}
+                                                                    onCheckedChange={(checked) => {
+                                                                        if (checked) {
+                                                                            setSelectedShifts([...selectedShifts, shift]);
+                                                                        } else {
+                                                                            setSelectedShifts(selectedShifts.filter(s => s.id !== shift.id));
                                                                         }
                                                                     }}
-                                                                >
-                                                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                                                </Button>
-                                                            </div>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                );
-                                            })}
-                                        </TableBody>
-                                    </Table>
+                                                                    className="border-slate-300"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell className="text-xs text-slate-400 font-mono">
+                                                                {shift.id.substring(0, 8)}
+                                                            </TableCell>
+                                                            <TableCell className="font-medium text-slate-900">{shift.attendance_id}</TableCell>
+                                                            <TableCell>{employee?.name || '-'}</TableCell>
+                                                            <TableCell>
+                                                                <span className="text-slate-500">{employee?.department || '-'}</span>
+                                                            </TableCell>
+                                                            {project.company === 'Naser Mohsin Auto Parts' && (
+                                                                <TableCell>
+                                                                    <span className="text-slate-500">{employee?.weekly_off || 'Sunday'}</span>
+                                                                </TableCell>
+                                                            )}
+                                                            <TableCell>
+                                                                {shift.applicable_days?.includes('Ramadan') ? (
+                                                                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                                                                        {shift.applicable_days.replace('Ramadan ', '')}
+                                                                    </span>
+                                                                ) : shift.is_single_shift ? (
+                                                                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded-full border border-amber-100 font-medium">Single</span>
+                                                                ) : (
+                                                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs rounded-full border border-indigo-100 font-medium">Regular</span>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-col text-xs">
+                                                                    {shift.is_single_shift ? (
+                                                                        <span className="font-medium">{formatTime(shift.am_start)} → {formatTime(shift.pm_end)}</span>
+                                                                    ) : (
+                                                                        <span className="font-medium">{formatTime(shift.am_start)}-{formatTime(shift.am_end)} / {formatTime(shift.pm_start)}-{formatTime(shift.pm_end)}</span>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {(() => {
+                                                                        if (shift.date) return <span className="text-slate-600">{new Date(shift.date).toLocaleDateString('en-GB')}</span>;
+                                                                        if (!shift.applicable_days) return <span className="text-slate-400">All Working Days</span>;
+                                                                        try {
+                                                                            const days = JSON.parse(shift.applicable_days);
+                                                                            if (Array.isArray(days)) return days.map(d => (
+                                                                                <span key={d} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] uppercase tracking-wider">{d.substring(0, 3)}</span>
+                                                                            ));
+                                                                        } catch { }
+                                                                        return <span className="text-slate-600">{shift.applicable_days}</span>;
+                                                                    })()}
+                                                                    {shift.is_friday_shift && (
+                                                                        <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-[10px] uppercase tracking-wider font-semibold">FRI</span>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right px-6">
+                                                                <div className="flex gap-1 justify-end">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() => setEditingShift(shift)}
+                                                                        className="h-8 w-8 p-0 hover:bg-indigo-50 hover:text-indigo-600"
+                                                                    >
+                                                                        <Edit className="w-4 h-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() => {
+                                                                            if (window.confirm('Delete this shift record?')) {
+                                                                                deleteMutation.mutate(shift.id);
+                                                                            }
+                                                                        }}
+                                                                        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
                                 </div>
                                 {filteredShifts.length > 0 && (
                                     <TablePagination
@@ -1372,7 +1372,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                     Describe in natural language and we'll fill the form below
                                 </p>
                                 <div className="flex gap-2">
-                                    <Input
+                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                         placeholder="e.g., Ali 8am to 5pm single shift"
                                         value={nlpText}
                                         onChange={(e) => setNlpText(e.target.value)}
@@ -1413,7 +1413,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                     value={formData.attendance_id || undefined}
                                     onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                         <SelectValue placeholder="Select employee" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -1587,7 +1587,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                     <div>
                         <Label>Select Block to Upload To *</Label>
                         <Select value={selectedBlock || undefined} onValueChange={setSelectedBlock}>
-                            <SelectTrigger className="mt-2">
+                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100 mt-2">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1955,7 +1955,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                         </div>
                     </div>
                     <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setShowCopyDialog(false)}>Cancel</Button>
+                        <Button variant="ghost" className="hover:bg-slate-50 transition-all duration-200" onClick={() => setShowCopyDialog(false)}>Cancel</Button>
                         <Button
                             onClick={() => copyShiftsMutation.mutate({
                                 sourceType: copySource.type,

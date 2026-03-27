@@ -214,16 +214,16 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
 
     return (
         <>
-            <Card className="border-0 shadow-sm bg-purple-50 border-purple-200">
-                <CardHeader>
+            <Card className="border-0 shadow-sm bg-indigo-50/40 rounded-xl ring-1 ring-indigo-100 overflow-hidden">
+                <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-purple-600 flex items-center justify-center text-white text-xl">🌙</div>
+                        <div className="flex items-center gap-2">
+                            <div className="p-2 bg-indigo-100 rounded-lg">
+                                <Moon className="w-5 h-5 text-indigo-600" />
+                            </div>
                             <div>
-                                <CardTitle className="text-lg">Ramadan Shift Override</CardTitle>
-                                <p className="text-sm text-purple-700 mt-1">
-                                    Ramadan period: {new Date(ramadanOverlap.schedule.ramadan_start_date).toLocaleDateString('en-GB')} - {new Date(ramadanOverlap.schedule.ramadan_end_date).toLocaleDateString('en-GB')}
-                                </p>
+                                <CardTitle className="text-lg font-semibold text-indigo-900">Ramadan Shift Timings</CardTitle>
+                                <CardDescription className="text-indigo-700/70">Configure special work hours for the holy month</CardDescription>
                             </div>
                         </div>
                         {ramadanShiftsApplied && (
@@ -250,53 +250,64 @@ export default function RamadanShiftSection({ project, shifts, employees }) {
                         </Select>
                     </div>
 
-                    <div className="bg-white border border-purple-200 rounded-lg p-4">
-                        <p className="text-sm font-medium text-purple-900 mb-2">Overlap with Project</p>
-                        <p className="text-sm text-purple-700">
-                            Ramadan shifts will apply from <strong>{new Date(ramadanOverlap.from).toLocaleDateString('en-GB')}</strong> to <strong>{new Date(ramadanOverlap.to).toLocaleDateString('en-GB')}</strong>.
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 ring-1 ring-slate-100 shadow-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
+                            <p className="text-sm font-semibold text-slate-800">Overlap with Project</p>
+                        </div>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                            Ramadan shifts will apply from <span className="font-semibold text-indigo-700">{new Date(ramadanOverlap.from).toLocaleDateString('en-GB')}</span> to <span className="font-semibold text-indigo-700">{new Date(ramadanOverlap.to).toLocaleDateString('en-GB')}</span>. 
                         </p>
-                        <p className="text-xs text-purple-600 mt-2">Sundays are excluded as weekly holidays.</p>
+                        <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                            <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                            Sundays are excluded as weekly holidays.
+                        </p>
                     </div>
 
                     {/* Progress Bar */}
                     {applyProgress && (
-                        <div className="bg-white border border-purple-300 rounded-lg p-4">
+                        <div className="bg-white border border-indigo-200 rounded-xl p-4 shadow-sm">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-purple-900">{applyProgress.phase}</span>
-                                <span className="text-sm text-purple-700">{Math.round((applyProgress.current / applyProgress.total) * 100)}%</span>
+                                <span className="text-sm font-medium text-indigo-900">{applyProgress.phase}</span>
+                                <span className="text-sm font-semibold text-indigo-700">{Math.round((applyProgress.current / applyProgress.total) * 100)}%</span>
                             </div>
-                            <div className="w-full bg-purple-100 rounded-full h-2.5">
+                            <div className="w-full bg-indigo-100 rounded-full h-2">
                                 <div 
-                                    className="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
+                                    className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
                                     style={{ width: `${(applyProgress.current / applyProgress.total) * 100}%` }}
                                 />
                             </div>
                         </div>
                     )}
 
-                    {/* Action Buttons */}
-                    <div className="flex gap-3 flex-wrap">
-                        <Button onClick={handlePreviewRamadan} variant="outline" disabled={!selectedRamadanSchedule || isBusy}>
+                    <div className="flex gap-3 flex-wrap pt-2">
+                        <Button 
+                            onClick={handlePreviewRamadan} 
+                            variant="outline" 
+                            disabled={!selectedRamadanSchedule || isBusy}
+                            className="border-slate-200 hover:bg-slate-50 transition-all font-medium"
+                        >
                             <Eye className="w-4 h-4 mr-2" />Preview
+                        </Button>
+
+                        <Button
+                            onClick={handleApply}
+                            disabled={!selectedRamadanSchedule || isBusy}
+                            className="bg-indigo-600 hover:bg-indigo-700 transition-all shadow-sm font-medium"
+                        >
+                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : <><Play className="w-4 h-4 mr-2" />{ramadanShiftsApplied ? 'Sync/Apply More Shifts' : 'Apply Ramadan Shifts'}</>}
                         </Button>
 
                         {ramadanShiftsApplied && (
                             <Button
                                 onClick={handleUndo}
                                 disabled={isBusy}
-                                variant="destructive"
+                                variant="outline"
+                                className="text-red-600 border-red-100 hover:bg-red-50 transition-all font-medium ml-auto"
                             >
                                 {undoing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Removing...</> : <><Undo2 className="w-4 h-4 mr-2" />Undo Ramadan Shifts ({ramadanShiftCount})</>}
                             </Button>
                         )}
-
-                        <Button
-                            onClick={handleApply}
-                            disabled={!selectedRamadanSchedule || isBusy}
-                            className="bg-purple-600 hover:bg-purple-700"
-                        >
-                            {applying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Applying...</> : <><Play className="w-4 h-4 mr-2" />{ramadanShiftsApplied ? 'Sync/Apply More Shifts' : 'Apply Ramadan Shifts'}</>}
-                        </Button>
                     </div>
 
                     {/* Info box when applied */}

@@ -176,14 +176,14 @@ Focus on HIGH and MEDIUM confidence anomalies. Ignore minor variations.`;
     }, {}) || {};
 
     return (
-        <Card className="border-0 shadow-md bg-white ring-1 ring-slate-950/5">
+        <Card className="border-0 shadow-sm bg-white rounded-xl ring-1 ring-slate-200/80">
             <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                        <Brain className="w-5 h-5 text-purple-600" />
+                    <div className="p-2 bg-indigo-50 rounded-lg ring-1 ring-indigo-200/50">
+                        <Brain className="w-5 h-5 text-indigo-600" />
                     </div>
                     <div>
-                        <CardTitle className="text-lg">AI Anomaly Detection</CardTitle>
+                        <CardTitle className="text-lg font-semibold text-slate-900">AI Anomaly Detection</CardTitle>
                         <p className="text-sm text-slate-500 mt-0.5">
                             Proactively identify attendance discrepancies before report generation
                         </p>
@@ -192,7 +192,7 @@ Focus on HIGH and MEDIUM confidence anomalies. Ignore minor variations.`;
                 <Button
                     onClick={() => analyzeAnomaliesMutation.mutate()}
                     disabled={analyzeAnomaliesMutation.isPending || punches.length === 0}
-                    className="bg-purple-600 hover:bg-purple-700"
+                    className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 shadow-sm"
                 >
                     {analyzeAnomaliesMutation.isPending ? (
                         <>

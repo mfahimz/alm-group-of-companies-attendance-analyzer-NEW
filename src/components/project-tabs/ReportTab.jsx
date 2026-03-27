@@ -937,12 +937,20 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             </Button>
                             <Button
                                 onClick={handleAnalyze}
-                                disabled={isAnalyzing || !rules || punches.length === 0 || !dateFrom || !dateTo}
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                                size="lg"
+                                disabled={isAnalyzing || punches.length === 0}
+                                className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 shadow-sm"
                             >
-                                <Play className="w-5 h-5 mr-2" />
-                                {isAnalyzing ? 'Analyzing...' : 'Run Analysis'}
+                                {isAnalyzing ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Analyzing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play className="w-4 h-4 mr-2 capitalize" />
+                                        Run Analysis
+                                    </>
+                                )}
                             </Button>
                         </div>
                         <p className="text-sm text-slate-500">
@@ -1148,14 +1156,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 </CardHeader>
                 <CardContent>
                     {reportRuns.length === 0 ? (
-                        <div className="text-center py-12 text-slate-500">
-                            No reports generated yet. Go to Analysis tab to generate your first report.
+                        <div className="text-center py-12 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+                            <p className="text-slate-500 font-medium">No reports generated yet</p>
+                            <p className="text-xs text-slate-400 mt-1">Run analysis to create your first report</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div className="border rounded-xl overflow-hidden shadow-sm ring-1 ring-slate-200/60 bg-white">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
+                                <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200">
+                                    <TableRow className="hover:bg-transparent">
                                         <TableHead>Report Name</TableHead>
                                         <TableHead>Generated On</TableHead>
                                         <TableHead>Period</TableHead>
@@ -1173,7 +1183,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                             : (run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0);
                                         
                                         return (
-                                            <TableRow key={run.id}>
+                                            <TableRow key={run.id} className="hover:bg-slate-50/80 transition-colors duration-200">
                                                 <TableCell className="font-medium">
                                                     {run.report_name || 'Unnamed Report'}
                                                 </TableCell>
@@ -1236,17 +1246,18 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
-                                                        {!isDepartmentHead && isAdminOrSupervisor && !run.is_final && (
-                                                             <Button 
-                                                                 size="sm" 
-                                                                 variant="ghost"
-                                                                 onClick={() => handleMarkFinal(run.id)}
-                                                                 disabled={markFinalMutation.isPending || run.is_final}
-                                                                 title={run.is_final ? "Report already finalized" : "Mark as final report for salary"}
-                                                             >
-                                                                 <Star className="w-4 h-4 text-amber-600" />
-                                                             </Button>
-                                                         )}
+                                                        {!run.is_final && isAdminOrSupervisor && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleMarkFinal(run.id)}
+                                                                disabled={markFinalMutation.isPending}
+                                                                className="border-emerald-200 hover:bg-emerald-50 text-emerald-700 transition-all duration-200"
+                                                            >
+                                                                <Star className="w-4 h-4 mr-2" />
+                                                                Finalize
+                                                            </Button>
+                                                        )}
                                                         {!isDepartmentHead && canDeleteReports && (
                                                             <Button 
                                                                 size="sm" 

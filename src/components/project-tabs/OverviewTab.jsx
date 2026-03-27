@@ -338,18 +338,18 @@ export default function OverviewTab({ project }) {
         <div className="space-y-6">
             {/* Close & Finalize Button - Admin Only */}
             {canCloseProject && isAdmin && (
-                <Card className="border-red-200 bg-red-50">
+                <Card className="border-red-200/40 bg-red-50/80 shadow-sm rounded-xl ring-1 ring-red-200/50">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="font-medium text-red-900">Ready to close this project?</p>
+                                <p className="font-semibold text-red-900">Ready to close this project?</p>
                                 <p className="text-sm text-red-700 mt-1">
                                     Once closed, all punch data will be deleted and the project becomes read-only
                                 </p>
                             </div>
                             <Button 
                                 onClick={() => setShowCloseDialog(true)}
-                                className="bg-red-600 hover:bg-red-700"
+                                className="bg-red-600 hover:bg-red-700 transition-all duration-200 shadow-sm"
                             >
                                 <Lock className="w-4 h-4 mr-2" />
                                 Close & Finalize
@@ -363,14 +363,14 @@ export default function OverviewTab({ project }) {
                 {stats.map((stat) => {
                     const Icon = stat.icon;
                     return (
-                        <Card key={stat.label} className="border-0 bg-white shadow-sm">
+                        <Card key={stat.label} className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/80 border-0">
                             <CardContent className="p-6">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm text-slate-600">{stat.label}</p>
+                                        <p className="text-sm font-medium text-slate-500">{stat.label}</p>
                                         <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
                                     </div>
-                                    <div className={`${stat.bg} p-3 rounded-lg`}>
+                                    <div className={`${stat.bg} p-3 rounded-xl ring-1 ring-black/5`}>
                                         <Icon className={`w-5 h-5 ${stat.color}`} />
                                     </div>
                                 </div>
@@ -474,25 +474,26 @@ export default function OverviewTab({ project }) {
 
             {/* Unmatched Employees Warning */}
             {unmatchedCount > 0 && isAdmin && (
-                <Card className="border-amber-200 bg-amber-50">
+                <Card className="bg-amber-50/50 border-amber-200/50 shadow-sm ring-1 ring-amber-200/40 rounded-xl">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                                <div className="p-2 bg-amber-100 rounded-lg">
+                                    <AlertCircle className="w-5 h-5 text-amber-600" />
+                                </div>
                                 <div>
-                                    <p className="font-medium text-amber-900">
+                                    <p className="font-semibold text-amber-900">
                                         {unmatchedCount} Unmatched Attendance ID{unmatchedCount > 1 ? 's' : ''} Found
                                     </p>
                                     <p className="text-sm text-amber-700 mt-1">
                                         Some punch records have attendance IDs that don't exist in the employee master list.
-                                        Add project-specific overrides to include them in analysis.
                                     </p>
                                 </div>
                             </div>
                             <Button 
                                 onClick={() => setShowEmployeeOverrideDialog(true)}
                                 variant="outline"
-                                className="border-amber-300 hover:bg-amber-100"
+                                className="border-amber-200 hover:bg-amber-100 text-amber-700 transition-all duration-200"
                             >
                                 <UserPlus className="w-4 h-4 mr-2" />
                                 Manage Overrides

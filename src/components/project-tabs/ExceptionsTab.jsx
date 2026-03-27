@@ -250,27 +250,34 @@ function ChecklistSection({ project, checklistItems = [] }) {
     };
 
     return (
-        <Card className="border-0 shadow-sm bg-green-50/30">
-            <CardHeader>
+        <Card className="border-0 shadow-sm bg-white rounded-xl ring-1 ring-slate-200/80 overflow-hidden">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <CardTitle>Checklist</CardTitle>
+                        <div className="p-2 bg-emerald-50 rounded-lg">
+                            <Calendar className="w-5 h-5 text-emerald-600" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-lg font-semibold text-slate-900">Project Checklist</CardTitle>
+                            <p className="text-sm text-slate-500 font-normal">Manage verification tasks and compliance</p>
+                        </div>
                         {selectedIds.size > 0 && (
-                            <span className="text-xs font-medium bg-slate-50 text-slate-700 px-2 py-0.5 rounded-full ring-1 ring-slate-200">
-                                {selectedIds.size} selected
+                            <span className="text-xs font-semibold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full ring-1 ring-indigo-100 animate-in fade-in zoom-in duration-200">
+                                {selectedIds.size} Selected
                             </span>
                         )}
                     </div>
                     <div className="flex gap-2">
                         {selectedIds.size > 0 && (
                             <Button
-                                variant="destructive"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => setShowBulkDeleteConfirm(true)}
                                 disabled={bulkDeleteTasksMutation.isPending}
+                                className="text-red-600 border-red-100 hover:bg-red-50 transition-all duration-200"
                             >
                                 <Trash2 className="w-4 h-4 mr-2" />
-                                Delete Selected ({selectedIds.size})
+                                Delete ({selectedIds.size})
                             </Button>
                         )}
                         {checklistItems.length > 0 && (
@@ -278,24 +285,16 @@ function ChecklistSection({ project, checklistItems = [] }) {
                                 onClick={handleExportChecklist}
                                 size="sm"
                                 variant="outline"
+                                className="border-slate-200 hover:bg-slate-50 transition-all duration-200"
                             >
                                 <Download className="w-4 h-4 mr-2" />
                                 Export
                             </Button>
                         )}
-                        {checklistItems.length === 0 && (
-                            <Button
-                                onClick={() => initializePredefinedTasksMutation.mutate()}
-                                disabled={initializePredefinedTasksMutation.isPending}
-                                className="bg-green-700 hover:bg-green-800"
-                            >
-                                Initialize Predefined Tasks
-                            </Button>
-                        )}
                         <Button
                             onClick={() => setShowAddDialog(true)}
                             size="sm"
-                            className="bg-green-700 hover:bg-green-800"
+                            className="bg-indigo-600 hover:bg-indigo-700 transition-all shadow-sm"
                         >
                             <Plus className="w-4 h-4 mr-2" />
                             Add Task
@@ -303,38 +302,41 @@ function ChecklistSection({ project, checklistItems = [] }) {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-6">
                 {/* Task Type Overview */}
                 {checklistItems.length > 0 && (
-                    <Card className="border-0 shadow-sm bg-white">
-                        <CardContent className="py-4">
-                            <div className="flex items-center gap-2 overflow-x-auto">
-                                <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
-                                <div className="flex flex-wrap gap-2">
-                                    {Object.entries(taskTypeStats).map(([taskType, stats]) => {
-                                        const hasTasks = stats.total > 0;
-                                        return (
-                                            <div
-                                                key={taskType}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                                                    hasTasks 
-                                                        ? 'bg-green-50 border-green-200 text-green-700' 
-                                                        : 'bg-white border-slate-200 text-slate-500'
-                                                }`}
-                                            >
-                                                <span className="whitespace-nowrap">{taskType}</span>
-                                                {hasTasks && (
-                                                    <span className="ml-1 text-green-600 font-semibold">
-                                                        {stats.total}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+                        <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-slate-200">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap mr-2">Quick View:</span>
+                            <div className="flex gap-2">
+                                {Object.entries(taskTypeStats).map(([taskType, stats]) => {
+                                    const hasTasks = stats.total > 0;
+                                    const isAllDone = hasTasks && stats.completed === stats.total;
+                                    return (
+                                        <div
+                                            key={taskType}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all duration-200 ${
+                                                isAllDone 
+                                                    ? 'bg-emerald-50 border-emerald-100 text-emerald-700 shadow-sm' 
+                                                    : hasTasks 
+                                                        ? 'bg-white border-indigo-100 text-indigo-700 shadow-sm' 
+                                                        : 'bg-white/50 border-slate-100 text-slate-400'
+                                            }`}
+                                        >
+                                            <span className="whitespace-nowrap">{taskType}</span>
+                                            {hasTasks && (
+                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                                                    isAllDone ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                                                }`}>
+                                                    {stats.completed}/{stats.total}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
                 )}
 
                 {/* Checklist Table */}
@@ -428,7 +430,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowBulkDeleteConfirm(false)}>
+                        <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={() => setShowBulkDeleteConfirm(false)}>
                             Cancel
                         </Button>
                         <Button
@@ -465,7 +467,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                                         }
                                     }}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                         <SelectValue placeholder="Select task type..." />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -479,7 +481,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                                 </Select>
                             ) : (
                                 <div className="space-y-2">
-                                    <Input
+                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                         value={newTask.task_type}
                                         onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
                                         placeholder="Enter custom task type..."
@@ -520,7 +522,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => {
+                        <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={() => {
                             setShowAddDialog(false);
                             setIsCustomType(false);
                         }}>
@@ -547,7 +549,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         <div className="space-y-4 py-4">
                             <div>
                                 <Label>Task Type</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     value={editingTask.task_type}
                                     onChange={(e) => setEditingTask({...editingTask, task_type: e.target.value})}
                                 />
@@ -571,7 +573,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditingTask(null)}>
+                        <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={() => setEditingTask(null)}>
                             Cancel
                         </Button>
                         <Button
@@ -1689,7 +1691,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     Describe in natural language and we'll fill the form below
                                 </p>
                                 <div className="flex gap-2">
-                                    <Input
+                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                         placeholder="e.g., Mark Ahmed as annual leave from Jan 15-20"
                                         value={nlpText}
                                         onChange={(e) => setNlpText(e.target.value)}
@@ -1727,7 +1729,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 <div>
                                     <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && '*'}</Label>
                                     {formData.type === 'PUBLIC_HOLIDAY' || formData.type === 'HALF_DAY_HOLIDAY' ? (
-                                        <Input 
+                                        <Input className="border-slate-200 focus:ring-indigo-100" 
                                             value="All Employees" 
                                             disabled 
                                             className="bg-slate-50"
@@ -1737,13 +1739,13 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                                 <SelectValue placeholder="Select employee or all..." />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="ALL">All Employees</SelectItem>
                                                 <div className="p-2 border-t">
-                                                    <Input
+                                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                                         placeholder="Type to search..."
                                                         value={employeeSearch}
                                                         onChange={(e) => setEmployeeSearch(e.target.value)}
@@ -1774,12 +1776,12 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                         >
-                                            <SelectTrigger>
+                                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                                 <SelectValue placeholder="Search and select employee..." />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <div className="p-2">
-                                                    <Input
+                                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                                         placeholder="Type to search..."
                                                         value={employeeSearch}
                                                         onChange={(e) => setEmployeeSearch(e.target.value)}
@@ -1813,7 +1815,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         value={formData.type}
                                         onValueChange={(value) => setFormData({ ...formData, type: value })}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -1832,7 +1834,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                        <Label>From Date <span className="text-red-500">*</span></Label>
-                                        <Input
+                                        <Input className="border-slate-200 focus:ring-indigo-100"
                                             type="date"
                                             value={formData.date_from}
                                             onChange={(e) => {
@@ -1857,7 +1859,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     </div>
                                     <div>
                                        <Label>To Date <span className="text-red-500">*</span></Label>
-                                        <Input
+                                        <Input className="border-slate-200 focus:ring-indigo-100"
                                             type="date"
                                             value={formData.date_to}
                                             onChange={(e) => {
@@ -1886,7 +1888,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             {needsSalaryLeaveDays && (
                                 <div className="space-y-2 border-t pt-4">
                                     <Label>Salary Leave Days (for salary calculation only) <span className="text-red-500">*</span></Label>
-                                    <Input
+                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                         type="number"
                                         step="0.01"
                                         min="0"
@@ -1975,7 +1977,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <Label>Allowed Minutes *</Label>
-                                            <Input
+                                            <Input className="border-slate-200 focus:ring-indigo-100"
                                                 type="number"
                                                 placeholder="e.g. 60"
                                                 value={formData.allowed_minutes}
@@ -1992,7 +1994,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                 value={formData.allowed_minutes_type}
                                                 onValueChange={(value) => setFormData({ ...formData, allowed_minutes_type: value })}
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -2011,7 +2013,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             value={formData.target_punch || 'none'}
                                             onValueChange={(value) => setFormData({ ...formData, target_punch: value === 'none' ? null : value })}
                                         >
-                                            <SelectTrigger className="h-8 text-xs bg-white">
+                                            <SelectTrigger className="border-slate-200 focus:ring-indigo-100 h-8 text-xs bg-white">
                                                 <SelectValue placeholder="No specific punch target" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -2041,7 +2043,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                     value={formData.punch_to_skip}
                                                     onValueChange={(value) => setFormData({ ...formData, punch_to_skip: value })}
                                                 >
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -2073,7 +2075,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                 value={formData.half_day_target}
                                                 onValueChange={(value) => setFormData({ ...formData, half_day_target: value })}
                                             >
-                                                <SelectTrigger className="bg-white">
+                                                <SelectTrigger className="border-slate-200 focus:ring-indigo-100 bg-white">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -2121,7 +2123,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                         });
                                                     }}
                                                 >
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                                         <SelectValue placeholder="Select day..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -2138,7 +2140,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             </div>
                                             <div>
                                                 <Label>New Working Day (Auto-filled) *</Label>
-                                                <Input
+                                                <Input className="border-slate-200 focus:ring-indigo-100"
                                                     value={formData.working_day_override}
                                                     disabled
                                                     className="bg-slate-100"
@@ -2157,7 +2159,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
 
                             <div>
                                 <Label>Details / Reason</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     value={formData.details}
                                     onChange={(e) => setFormData({ ...formData, details: e.target.value })}
                                     placeholder="Optional notes"
@@ -2272,10 +2274,10 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             <div className="relative flex-1 max-w-xs">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <Input
+                                    className="border-slate-200 focus:ring-indigo-100 pl-9"
                                     placeholder="Search ID, name, or details..."
                                     value={filter.search}
                                     onChange={(e) => setFilter({ ...filter, search: e.target.value })}
-                                    className="pl-9"
                                 />
                             </div>
                             <Button
@@ -2307,7 +2309,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         value={filter.type}
                                         onValueChange={(value) => setFilter({ ...filter, type: value })}
                                     >
-                                        <SelectTrigger className="h-9">
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100 h-9">
                                             <SelectValue placeholder="All types" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2326,7 +2328,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         value={filter.department}
                                         onValueChange={(value) => setFilter({ ...filter, department: value })}
                                     >
-                                        <SelectTrigger className="h-9">
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100 h-9">
                                             <SelectValue placeholder="All departments" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2339,7 +2341,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 </div>
                                 <div>
                                     <Label className="text-xs text-slate-600 mb-1">From Date</Label>
-                                    <Input
+                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                         type="date"
                                         value={filter.dateFrom}
                                         onChange={(e) => {
@@ -2356,7 +2358,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 </div>
                                 <div>
                                     <Label className="text-xs text-slate-600 mb-1">To Date</Label>
-                                    <Input
+                                    <Input className="border-slate-200 focus:ring-indigo-100"
                                         type="date"
                                         value={filter.dateTo}
                                         onChange={(e) => {
@@ -2377,7 +2379,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         value={filter.createdFromReport}
                                         onValueChange={(value) => setFilter({ ...filter, createdFromReport: value })}
                                     >
-                                        <SelectTrigger className="h-9">
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100 h-9">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -2551,17 +2553,17 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             <div className="relative flex-1 w-full sm:max-w-xs">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <Input
+                                    className="border-slate-200 focus:ring-indigo-100 pl-9"
                                     placeholder="Search by ID or name..."
                                     value={reportFilter.search}
                                     onChange={(e) => setReportFilter({ ...reportFilter, search: e.target.value })}
-                                    className="pl-9"
                                 />
                             </div>
                             <Select
                                 value={reportFilter.type}
                                 onValueChange={(value) => setReportFilter({ ...reportFilter, type: value })}
                             >
-                                <SelectTrigger className="w-full sm:max-w-xs">
+                                <SelectTrigger className="border-slate-200 focus:ring-indigo-100 w-full sm:max-w-xs">
                                     <SelectValue placeholder="All types" />
                                 </SelectTrigger>
                                 <SelectContent>

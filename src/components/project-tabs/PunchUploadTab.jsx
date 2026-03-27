@@ -563,17 +563,17 @@ export default function PunchUploadTab({ project }) {
         <div className="space-y-6">
             {/* Upload Progress */}
             {uploadProgress && (
-                <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
+                <Card className="border-0 shadow-sm bg-indigo-50/50 ring-1 ring-indigo-100 rounded-xl">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="flex-1">
-                                <p className="font-medium text-indigo-900">{uploadProgress.status || uploadProgress.phase}</p>
+                                <p className="font-semibold text-indigo-900">{uploadProgress.status || uploadProgress.phase}</p>
                                 <p className="text-sm text-indigo-700 mt-1">
                                     {uploadProgress.current} / {uploadProgress.total} records completed
                                 </p>
                             </div>
                         </div>
-                        <Progress value={uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0} />
+                        <Progress value={uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0} className="bg-indigo-100" />
                     </CardContent>
                 </Card>
             )}
@@ -621,14 +621,16 @@ export default function PunchUploadTab({ project }) {
                     </div>
 
                     {warnings.length > 0 && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <div className="flex items-start gap-2">
-                                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                        <div className="bg-amber-50/50 border border-amber-200/50 rounded-xl p-4 ring-1 ring-amber-200/30">
+                            <div className="flex items-start gap-3">
+                                <div className="p-1.5 bg-amber-100 rounded-lg">
+                                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                                </div>
                                 <div>
-                                    <p className="font-medium text-amber-900">Warnings</p>
+                                    <p className="font-semibold text-amber-900">Warnings</p>
                                     <ul className="text-sm text-amber-700 mt-1 space-y-1">
                                         {warnings.map((warning, idx) => (
-                                            <li key={idx}>• {warning}</li>
+                                            <li key={idx} className="flex gap-2"><span>•</span> {warning}</li>
                                         ))}
                                     </ul>
                                 </div>
@@ -723,13 +725,14 @@ export default function PunchUploadTab({ project }) {
                             </div>
                             <div className="overflow-auto">
                                 <Table>
-                                    <TableHeader>
-                                       <TableRow>
+                                    <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200/60 shadow-sm">
+                                        <TableRow className="hover:bg-transparent border-b border-slate-200">
                                            {!isUser && (
                                                <TableHead className="w-12">
                                                    <Checkbox
                                                        checked={selectedPunches.length === paginatedPunches.length && paginatedPunches.length > 0}
                                                        onCheckedChange={toggleSelectAll}
+                                                       className="border-slate-300 data-[state=checked]:bg-indigo-600"
                                                    />
                                                </TableHead>
                                            )}
@@ -747,7 +750,7 @@ export default function PunchUploadTab({ project }) {
                                     </TableHeader>
                                     <TableBody>
                                        {paginatedPunches.map((punch) => (
-                                           <TableRow key={punch.id}>
+                                           <TableRow key={punch.id} className="hover:bg-slate-50/80 transition-colors duration-200 border-b border-slate-100 last:border-0 text-slate-700">
                                                {!isUser && (
                                                    <TableCell>
                                                        <Checkbox
