@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import TimePicker from '../ui/TimePicker';
+import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 
 export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData }) {
     const [formData, setFormData] = useState({
@@ -728,13 +729,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="MANUAL_PRESENT">Present</SelectItem>
-                                <SelectItem value="MANUAL_ABSENT">Absent</SelectItem>
-
-                                <SelectItem value="OFF">Off/Leave</SelectItem>
-                                {isAdmin && (
-                                    <SelectItem value="SICK_LEAVE">Sick Leave (Admin Only)</SelectItem>
-                                )}
+                                {getFilteredExceptionTypes('day_override', isAdmin || isSupervisor).map(type => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                        {type.label || formatExceptionTypeLabel(type.value)}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>

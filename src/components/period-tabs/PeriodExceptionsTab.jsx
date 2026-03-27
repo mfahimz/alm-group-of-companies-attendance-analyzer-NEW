@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EXCEPTION_TYPES, formatExceptionTypeLabel, getFilteredExceptionTypes } from '@/lib/exception-types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -661,21 +662,21 @@ const formatMergedWorksheet = (worksheet, data, XLSX) => {
     worksheet['!merges'] = merges;
 };
 
-// Map user-friendly names to system type codes
-const TYPE_MAP = {
-    'public holiday': 'PUBLIC_HOLIDAY',
-    'holiday': 'PUBLIC_HOLIDAY',
-    'shift override': 'SHIFT_OVERRIDE',
-    'manual present': 'MANUAL_PRESENT',
-    'present': 'MANUAL_PRESENT',
-    'manual absent': 'MANUAL_ABSENT',
-    'absent': 'MANUAL_ABSENT',
-    'manual_absent': 'MANUAL_ABSENT',
-    'sick_leave': 'SICK_LEAVE',
-    'annual_leave': 'ANNUAL_LEAVE',
-    'allowed minutes': 'ALLOWED_MINUTES',
-    'allowed_minutes': 'ALLOWED_MINUTES'
-};
+// Map user-friendly names to system type codes generated from central source
+const TYPE_MAP = EXCEPTION_TYPES.reduce((acc, type) => {
+    // Standard mapping: 'shift override' -> 'SHIFT_OVERRIDE'
+    const key = type.value.toLowerCase().replace(/_/g, ' ');
+    acc[key] = type.value;
+    
+    // Add common aliases
+    if (type.value === 'PUBLIC_HOLIDAY') acc['holiday'] = 'PUBLIC_HOLIDAY';
+    if (type.value === 'MANUAL_PRESENT') acc['present'] = 'MANUAL_PRESENT';
+    if (type.value === 'MANUAL_ABSENT') acc['absent'] = 'MANUAL_ABSENT';
+    
+    return acc;
+}, {
+    'manual_absent': 'MANUAL_ABSENT' // Keeping historical fallback
+});
 
 export default function PeriodExceptionsTab({ calendarPeriod }) {
     const [showForm, setShowForm] = useState(false);
@@ -1236,14 +1237,7 @@ Project date range: ${calendarPeriod.date_from} to ${calendarPeriod.date_to}
 Available employees: ${employees.map(e => `${e.attendance_id} (${e.name})`).join(', ')}
 
 Exception types:
-- PUBLIC_HOLIDAY: National/religious holidays affecting all employees
-- SHIFT_OVERRIDE: Temporary change to work hours/shift timings
-- MANUAL_PRESENT: Mark someone as present when they have no punches
-- MANUAL_ABSENT: Mark someone as absent (LOP)
-
-- SICK_LEAVE: Medical leave
-- ANNUAL_LEAVE: Vacation/paid leave
-- ALLOWED_MINUTES: Excuse late arrival or early checkout (natural calamity, personal reasons)
+${getFilteredExceptionTypes('general', true).map(t => `- ${t.value}: ${t.label}`).join('\n')}
 
 User request: "${nlpText}"
 
@@ -1812,16 +1806,11 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
-                                            <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
-                                            <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
-                                            <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-
-                                            <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                            <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
-                                            <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
-                                            <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
-                                            <SelectItem value="DAY_SWAP">Day Swap (Weekly Off Override)</SelectItem>
+                                            {getFilteredExceptionTypes('general', isAdmin || isSupervisor).map(type => (
+                                                <SelectItem key={type.value} value={type.value}>
+                                                    {type.label || formatExceptionTypeLabel(type.value)}
+                                                </SelectItem>
+                                            ))}
                                             {/* MANUAL_LATE, MANUAL_EARLY_CHECKOUT, MANUAL_OTHER_MINUTES are excluded - only creatable from report edits */}
                                         </SelectContent>
                                     </Select>
@@ -2288,16 +2277,11 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All types</SelectItem>
-                                            <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
-                                            <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
-                                            <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
-                                            <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-
-                                            <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                            <SelectItem value="ANNUAL_LEAVE">Annual Leave</SelectItem>
-                                            <SelectItem value="ALLOWED_MINUTES">Allowed Minutes</SelectItem>
-                                            <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
-                                            <SelectItem value="DAY_SWAP">Day Swap</SelectItem>
+                                            {getFilteredExceptionTypes('filter', true).map(type => (
+                                                <SelectItem key={type.value} value={type.value}>
+                                                    {type.label || formatExceptionTypeLabel(type.value)}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                 </div>

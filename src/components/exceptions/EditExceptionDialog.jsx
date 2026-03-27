@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 import TimePicker from '../ui/TimePicker';
 import { useQuery } from '@tanstack/react-query';
+import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 
 export default function EditExceptionDialog({ open, onClose, exception, projectId }) {
     const { data: project } = useQuery({
@@ -223,26 +224,11 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
-                                    <SelectItem value="SHIFT_OVERRIDE">Shift Override</SelectItem>
-                                    <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
-                                    <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-
-                                    <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                    <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
-                                    <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
-                                    {/*
-                                     * MANUAL_OTHER_MINUTES: adds the entered minutes directly to the
-                                     * other_minutes field in the attendance analysis for that specific day.
-                                     * This is distinct from ALLOWED_MINUTES, which reduces deductible
-                                     * late/early minutes. MANUAL_OTHER_MINUTES is purely additive to
-                                     * other_minutes and does NOT affect late or early checkout totals.
-                                     */}
-                                    <SelectItem value="MANUAL_OTHER_MINUTES">Manual Other Minutes</SelectItem>
-                                    <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
-                                    <SelectItem value="HALF_DAY_HOLIDAY">Half Day Holiday (Global)</SelectItem>
-                                    <SelectItem value="DAY_SWAP">Day Swap (Weekly Off Override)</SelectItem>
-                                    <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
+                                        {getFilteredExceptionTypes('all', true).map(type => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label || formatExceptionTypeLabel(type.value)}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                             </Select>
                         </div>

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 
 export default function BulkEditExceptionDialog({ open, onClose, selectedExceptions, projectId }) {
     const [updates, setUpdates] = useState({
@@ -77,17 +78,11 @@ export default function BulkEditExceptionDialog({ open, onClose, selectedExcepti
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="PUBLIC_HOLIDAY">Public Holiday</SelectItem>
-                                        <SelectItem value="SICK_LEAVE">Sick Leave</SelectItem>
-                                        <SelectItem value="MANUAL_PRESENT">Manual Present</SelectItem>
-                                        <SelectItem value="MANUAL_ABSENT">Manual Absent</SelectItem>
-                                        {/*
-                                         * MANUAL_OTHER_MINUTES: when set on an exception, the analysis engine
-                                         * reads allowed_minutes from the exception and adds it directly to the
-                                         * other_minutes field in the attendance analysis for that specific day.
-                                         * This is distinct from ALLOWED_MINUTES which reduces deductible minutes.
-                                         */}
-                                        <SelectItem value="MANUAL_OTHER_MINUTES">Manual Other Minutes</SelectItem>
+                                        {getFilteredExceptionTypes('all', true).map(type => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label || formatExceptionTypeLabel(type.value)}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
