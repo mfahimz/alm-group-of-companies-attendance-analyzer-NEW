@@ -352,8 +352,8 @@ function ChecklistSection({ project, checklistItems = [] }) {
                 ) : (
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader>
-                                <TableRow>
+                            <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                <TableRow className="hover:bg-transparent border-none">
                                     <TableHead className="w-10 px-4">
                                         <Checkbox
                                             checked={someSelected ? 'indeterminate' : allSelected}
@@ -372,8 +372,9 @@ function ChecklistSection({ project, checklistItems = [] }) {
                                     <TableRow
                                         key={task.id}
                                         className={[
-                                            task.status === 'completed' ? 'bg-green-50' : '',
-                                            selectedIds.has(task.id) ? 'ring-1 ring-inset ring-green-400 bg-green-50/60' : ''
+                                            'transition-colors duration-200',
+                                            task.status === 'completed' ? 'bg-green-50/50 hover:bg-green-100/60' : 'hover:bg-slate-50/80',
+                                            selectedIds.has(task.id) ? 'ring-1 ring-inset ring-green-400 bg-green-50/60 shadow-sm transition-all duration-200' : ''
                                         ].join(' ')}
                                     >
                                         <TableCell className="px-4">
@@ -2400,8 +2401,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     ) : (
                         <div className="overflow-x-auto">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
+                                <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                    <TableRow className="hover:bg-transparent border-none">
                                         {!isUser && (
                                             <TableHead className="w-12">
                                                 <Checkbox
@@ -2437,7 +2438,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                    {paginatedExceptions.map((exception) => {
                                        const employeeName = employees.find(e => String(e.attendance_id) === String(exception.attendance_id) && e.company === project.company)?.name || '—';
                                        return (
-                                           <TableRow key={exception.id}>
+                                           <TableRow key={exception.id} className="hover:bg-slate-50/80 transition-colors duration-200">
                                            {!isUser && (
                                                 <TableCell className="p-1">
                                                     <Checkbox
@@ -2579,8 +2580,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                         </div>
                         <div className="overflow-x-auto">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
+                                <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                    <TableRow className="hover:bg-transparent border-none">
                                         <TableHead className="w-12">Use</TableHead>
                                         <TableHead className="w-24">ID</TableHead>
                                         <TableHead>Attendance ID</TableHead>
@@ -2600,7 +2601,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             </TableCell>
                                         </TableRow>
                                     ) : filteredReportExceptions.map((exception) => (
-                                        <TableRow key={exception.id}>
+                                        <TableRow key={exception.id} className="hover:bg-slate-50/80 transition-colors duration-200">
                                             <TableCell className="p-1">
                                                 <Checkbox
                                                     checked={exception.use_in_analysis !== false}

@@ -168,7 +168,7 @@ export default function ProjectDetail() {
       { label: project.name }]
       } />
             {/* Header */}
-            <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-xl p-4 sm:p-8 border border-slate-200 animate-in slide-in-from-top-4 duration-700">
+            <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/40 rounded-[2rem] shadow-sm p-6 sm:p-10 border border-slate-200/60 animate-in slide-in-from-top-4 duration-700">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
@@ -179,10 +179,10 @@ export default function ProjectDetail() {
               'from-red-400 to-red-600'}`
               } />
                             <div>
-                                <h1 className="bg-clip-text text-slate-950 text-xl font-bold sm:text-4xl from-slate-900 to-slate-600">
+                                <h1 className="bg-clip-text text-transparent bg-gradient-to-r from-slate-950 via-slate-800 to-slate-600 text-2xl font-extrabold sm:text-5xl tracking-tight">
                                     {project.name}
                                 </h1>
-                                <p className="text-slate-600 mt-1 text-xs font-semibold">{project.company}</p>
+                                <p className="text-slate-500 mt-2 text-sm font-medium tracking-wide uppercase">{project.company}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 text-slate-600">
@@ -193,13 +193,12 @@ export default function ProjectDetail() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
-                         <span className="bg-gradient-to-r text-green-700 px-4 py-2.5 text-xs font-bold uppercase tracking-wider opacity-100 rounded-2xl shadow-lg ring-2 whitespace-nowrap from-green-50 to-green-100 ring-green-200">
-
-
-
-
-
-
+                         <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ring-1 ring-inset transition-all duration-200 ${
+                            project.status === 'draft' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
+                            project.status === 'analyzed' ? 'bg-green-50 text-green-700 ring-green-200' :
+                            project.status === 'locked' ? 'bg-blue-50 text-blue-700 ring-blue-200' :
+                            'bg-red-50 text-red-700 ring-red-200'
+                            }`}>
                             {project.status}
                             </span>
                             {project.status === 'closed' && isAdmin &&
@@ -288,80 +287,82 @@ export default function ProjectDetail() {
                 <ReportTab project={project} isDepartmentHead={true} />
             ) : (
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-3 border-b border-slate-200">
-                    <TabsList className="bg-white shadow-lg rounded-2xl p-1.5 flex flex-nowrap overflow-x-auto scrollbar-hide h-auto gap-1 w-full sm:w-auto border-0">
+                <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-4 border-b border-slate-200/60">
+                    <TabsList className="bg-slate-200/50 backdrop-blur-md rounded-full p-1.5 flex flex-nowrap overflow-x-auto scrollbar-hide h-auto gap-1 w-full sm:w-auto border border-slate-300/50 shadow-inner">
                         <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-600 data-[state=active]:to-slate-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Overview
                         </TabsTrigger>
                         <TabsTrigger
               value="shifts"
               disabled={isReadOnly}
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Shifts {isReadOnly && '🔒'}
                         </TabsTrigger>
                         <TabsTrigger
               value="punches"
               disabled={isReadOnly}
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-cyan-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Punches {isReadOnly && '🔒'}
                         </TabsTrigger>
                         <TabsTrigger
               value="exceptions"
               disabled={isReadOnly}
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-amber-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Exceptions {isReadOnly && '🔒'}
                         </TabsTrigger>
                         {isAlMaraghiMotors &&
             <TabsTrigger
               value="overtime"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600 data-[state=active]:to-orange-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                                 Adjustments
                             </TabsTrigger>
             }
                         <TabsTrigger
               value="report"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-indigo-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Attendance {isReadOnly && '🔒'}
                         </TabsTrigger>
                         {isAlMaraghiMotors &&
             <TabsTrigger
               value="salary"
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-600 data-[state=active]:to-green-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">
+              className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                                 Salary
                             </TabsTrigger>
             }
                     </TabsList>
                 </div>
 
-                <TabsContent value="overview">
-                    {activeTab === 'overview' && <OverviewTab project={project} />}
-                </TabsContent>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-2 sm:p-6 min-h-[400px]">
+                    <TabsContent value="overview">
+                        {activeTab === 'overview' && <OverviewTab project={project} />}
+                    </TabsContent>
 
-                <TabsContent value="shifts">
-                    {activeTab === 'shifts' && <ShiftTimingsTab project={project} />}
-                </TabsContent>
+                    <TabsContent value="shifts">
+                        {activeTab === 'shifts' && <ShiftTimingsTab project={project} />}
+                    </TabsContent>
 
-                <TabsContent value="punches">
-                    {activeTab === 'punches' && <PunchUploadTab project={project} />}
-                </TabsContent>
+                    <TabsContent value="punches">
+                        {activeTab === 'punches' && <PunchUploadTab project={project} />}
+                    </TabsContent>
 
-                <TabsContent value="exceptions">
-                    {activeTab === 'exceptions' && <ExceptionsTab project={project} />}
-                </TabsContent>
+                    <TabsContent value="exceptions">
+                        {activeTab === 'exceptions' && <ExceptionsTab project={project} />}
+                    </TabsContent>
 
-                <TabsContent value="overtime">
-                    {activeTab === 'overtime' && <OvertimeTab project={project} />}
-                </TabsContent>
+                    <TabsContent value="overtime">
+                        {activeTab === 'overtime' && <OvertimeTab project={project} />}
+                    </TabsContent>
 
-                <TabsContent value="report">
-                    {activeTab === 'report' && <ReportTab project={project} />}
-                </TabsContent>
+                    <TabsContent value="report">
+                        {activeTab === 'report' && <ReportTab project={project} />}
+                    </TabsContent>
 
-                <TabsContent value="salary">
-                    {activeTab === 'salary' && <SalaryTab project={project} />}
-                </TabsContent>
+                    <TabsContent value="salary">
+                        {activeTab === 'salary' && <SalaryTab project={project} />}
+                    </TabsContent>
+                </div>
             </Tabs>
             )}
         </div>);

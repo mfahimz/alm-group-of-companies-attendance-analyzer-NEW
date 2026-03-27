@@ -957,8 +957,8 @@ export default function OvertimeTab({ project }) {
                 {/* OT Table */}
                 <div className="border rounded-lg overflow-auto max-h-[500px]">
                     <Table>
-                        <TableHeader className="sticky top-0 bg-slate-50 z-10">
-                            <TableRow>
+                        <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                            <TableRow className="hover:bg-transparent border-none">
                                 <SortableTableHead label="Att. ID" sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
                                 <SortableTableHead label="Name" sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
                                 <SortableTableHead label="Department" sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
@@ -977,7 +977,7 @@ export default function OvertimeTab({ project }) {
                             ) : filteredData.map(row => {
                                 const hasEdits = editableData[row.attendance_id];
                                 return (
-                                    <TableRow key={row.attendance_id} className={hasEdits ? 'bg-amber-50' : ''}>
+                                    <TableRow key={row.attendance_id} className={`${hasEdits ? 'bg-amber-50/70 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-50/80'} transition-all duration-200`}>
                                         <TableCell className="font-medium">{row.attendance_id}</TableCell>
                                         <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                         <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
@@ -1067,8 +1067,8 @@ export default function OvertimeTab({ project }) {
                     {/* Adjustments Table */}
                     <div className="border rounded-lg overflow-auto max-h-[500px]">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-50 z-10">
-                                <TableRow>
+                            <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                <TableRow className="hover:bg-transparent border-none">
                                     <SortableTableHead label="Att. ID" sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
                                     <SortableTableHead label="Name" sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
                                     <SortableTableHead label="Department" sortKey="department" currentSort={sortColumn} onSort={setSortColumn}>Department</SortableTableHead>
@@ -1091,7 +1091,7 @@ export default function OvertimeTab({ project }) {
                                 ) : filteredData.map(row => {
                                    const hasAdjustmentEdits = editableAdjustments[row.attendance_id];
                                    return (
-                                        <TableRow key={`adj-${row.attendance_id}`} className={hasAdjustmentEdits ? 'bg-amber-50' : ''}>
+                                        <TableRow key={`adj-${row.attendance_id}`} className={`${hasAdjustmentEdits ? 'bg-amber-50/70 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-50/80'} transition-all duration-200`}>
                                            <TableCell className="font-medium">{row.attendance_id}</TableCell>
                                            <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
                                            <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
