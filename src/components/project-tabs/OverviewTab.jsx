@@ -94,6 +94,27 @@ export default function OverviewTab({ project }) {
     });
     const isAlMaraghiMotors = companyRecord?.company_id === AL_MARAGHI_MOTORS_COMPANY_ID;
 
+    const uniqueEmployees = new Set(punches.map(p => String(p.attendance_id))).size;
+
+    const unmatchedCount = React.useMemo(() => {
+        if (!punches.length) return 0;
+        const masterIds = new Set(employees.map(e => String(e.attendance_id)));
+        const projectIds = new Set(projectEmployees.map(e => String(e.attendance_id)));
+        const punchIds = new Set(punches.map(p => String(p.attendance_id)));
+        return Array.from(punchIds).filter(id => !masterIds.has(id) && !projectIds.has(id)).length;
+    }, [punches, employees, projectEmployees]);
+
+    const calculateWorkingDays = () => {
+        const startDate = new Date(project.date_from);
+        const endDate = new Date(project.date_to);
+        let days = 0;
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            if (d.getDay() !== 0) days++;
+        }
+        return days;
+    };
+    const workingDays = calculateWorkingDays();
+
     const closeMutation = useMutation({
         mutationFn: async () => {
             // 1. Update employees with unused grace minutes
