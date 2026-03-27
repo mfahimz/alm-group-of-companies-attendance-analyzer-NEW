@@ -43,15 +43,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 // --- Constants ---
-const STATUSES = ['Pending', 'In Progress', 'Frozen', 'Completed'];
-const PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
-const CATEGORIES = ['Logic', 'UI', 'Architecture'];
+const STATUSES = ['Backlog', 'Prompt Drafting', 'AI Generating', 'Testing', 'Deployed'];
+const PRIORITIES = ['High', 'Medium', 'Low'];
+const CATEGORIES = ['UI/UX', 'Backend Logic', 'Database/Schema'];
 
 const STATUS_ICONS = {
-    'Pending': <Clock className="w-4 h-4 text-slate-400" />,
-    'In Progress': <Loader2 className="w-4 h-4 text-blue-500 animate-spin-slow" />,
-    'Frozen': <Snowflake className="w-4 h-4 text-cyan-500" />,
-    'Completed': <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+    'Backlog': <Clock className="w-4 h-4 text-slate-400" />,
+    'Prompt Drafting': <StickyNote className="w-4 h-4 text-orange-400" />,
+    'AI Generating': <Loader2 className="w-4 h-4 text-blue-500 animate-spin-slow" />,
+    'Testing': <Filter className="w-4 h-4 text-purple-500" />,
+    'Deployed': <CheckCircle2 className="w-4 h-4 text-emerald-500" />
 };
 
 const PRIORITY_COLORS = {
@@ -62,9 +63,9 @@ const PRIORITY_COLORS = {
 };
 
 const CATEGORY_COLORS = {
-    'Logic': 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    'UI': 'bg-pink-50 text-pink-700 border-pink-200',
-    'Architecture': 'bg-purple-50 text-purple-700 border-purple-200'
+    'UI/UX': 'bg-pink-50 text-pink-700 border-pink-200',
+    'Backend Logic': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'Database/Schema': 'bg-purple-50 text-purple-700 border-purple-200'
 };
 
 export default function ChangeManagement() {
@@ -81,10 +82,9 @@ export default function ChangeManagement() {
         title: '',
         description: '',
         priority: 'Medium',
-        status: 'Pending',
-        category: 'Logic',
+        status: 'Backlog',
+        category: 'UI/UX',
         implemented_date: '',
-        implemented_by: '',
         technical_notes: ''
     });
 
@@ -135,10 +135,9 @@ export default function ChangeManagement() {
                 title: req.title || '',
                 description: req.description || '',
                 priority: req.priority || 'Medium',
-                status: req.status || 'Pending',
-                category: req.category || 'Logic',
+                status: req.status || 'Backlog',
+                category: req.category || 'UI/UX',
                 implemented_date: req.implemented_date || '',
-                implemented_by: req.implemented_by || '',
                 technical_notes: req.technical_notes || ''
             });
         } else {
@@ -147,10 +146,9 @@ export default function ChangeManagement() {
                 title: '',
                 description: '',
                 priority: 'Medium',
-                status: 'Pending',
-                category: 'Logic',
+                status: 'Backlog',
+                category: 'UI/UX',
                 implemented_date: '',
-                implemented_by: '',
                 technical_notes: ''
             });
         }
@@ -174,7 +172,6 @@ export default function ChangeManagement() {
             } else {
                 await base44.entities.DeveloperChangeLog.create({
                     ...formValues,
-                    section_type: 'Changes', // Default section for Kanban
                     created_by: user?.email || 'admin',
                     created_at: new Date().toISOString()
                 });
@@ -321,7 +318,6 @@ export default function ChangeManagement() {
                                 <th className="px-4 py-3">Status</th>
                                 <th className="px-4 py-3">Priority</th>
                                 <th className="px-4 py-3">Category</th>
-                                <th className="px-4 py-3">Implemented Date</th>
                                 <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
@@ -344,9 +340,6 @@ export default function ChangeManagement() {
                                         <Badge variant="outline" className={cn("border", CATEGORY_COLORS[req.category])}>
                                             {req.category}
                                         </Badge>
-                                    </td>
-                                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">
-                                        {req.implemented_date || 'No date'}
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-1">
@@ -434,21 +427,14 @@ export default function ChangeManagement() {
                             />
                         </div>
                         <div className="col-span-2 space-y-2">
-                            <label className="text-sm font-semibold text-slate-700">Implemented By</label>
-                            <Input 
-                                placeholder="Developer name..." 
-                                value={formValues.implemented_by}
-                                onChange={(e) => setFormValues({...formValues, implemented_by: e.target.value})}
-                            />
-                        </div>
-                        <div className="col-span-2 space-y-2">
                             <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                                 <StickyNote className="w-3.5 h-3.5" />
-                                Technical Notes / Prompts
+                                AI Prompt & Technical Notes
                             </label>
                             <textarea 
-                                className="flex min-h-[80px] w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-[11px]"
+                                className="flex min-h-[160px] w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-[11px]"
                                 placeholder="Paste relevant AI prompts or technical context here..."
+                                rows={8}
                                 value={formValues.technical_notes}
                                 onChange={(e) => setFormValues({...formValues, technical_notes: e.target.value})}
                             />

@@ -93,7 +93,7 @@ const EditableRow = ({ item, onUpdate, onDelete }) => {
     return (
         <tr className={cn(
             "hover:bg-slate-50/80 transition-colors group border-b border-slate-100 last:border-0",
-            localItem.status === 'Completed' && "bg-emerald-50/60 hover:bg-emerald-100/60"
+            localItem.status === 'Deployed' && "bg-emerald-50/60 hover:bg-emerald-100/60"
         )}>
             <td className="p-2 flex-1 min-w-[400px]">
                 <Textarea 
@@ -251,7 +251,7 @@ const KanbanColumn = ({ title, items, onUpdate, onDelete, onAdd }) => {
                                         <Card className={cn(
                                             "group p-4 border-slate-200 hover:border-indigo-300 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white cursor-default select-none relative overflow-hidden",
                                             snapshot.isDragging && "shadow-2xl border-indigo-500 rotate-[2deg] scale-105 z-50 ring-4 ring-indigo-100",
-                                            item.status === 'Completed' && "bg-emerald-50/20 border-emerald-100 opacity-80"
+                                            item.status === 'Deployed' && "bg-emerald-50/20 border-emerald-100 opacity-80"
                                         )}>
                                             <div {...provided.dragHandleProps} className="absolute left-0 top-0 bottom-0 w-1 flex items-center justify-center opacity-0 group-hover:opacity-100 text-slate-300 hover:text-indigo-400 transition-opacity cursor-grab active:cursor-grabbing hover:bg-indigo-50">
                                                 <GripVertical className="w-3 h-3" />
@@ -275,7 +275,7 @@ const KanbanColumn = ({ title, items, onUpdate, onDelete, onAdd }) => {
                                                         )}>
                                                             {item.priority}
                                                         </Badge>
-                                                        {item.status === 'Completed' && (
+                                                        {item.status === 'Deployed' && (
                                                             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[9px] font-black px-1.5 py-0.5 h-4 uppercase">
                                                                 DONE
                                                             </Badge>
@@ -292,7 +292,7 @@ const KanbanColumn = ({ title, items, onUpdate, onDelete, onAdd }) => {
                                                             <div className="px-2 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest">Update Status</div>
                                                             {STATUSES.map(s => (
                                                                 <DropdownMenuItem key={s} className="rounded-lg text-xs font-medium focus:bg-indigo-50 focus:text-indigo-700" onClick={() => onUpdate(item.id, { status: s })}>
-                                                                    <div className={cn("w-2 h-2 rounded-full mr-2", s === 'Completed' ? 'bg-emerald-500' : 'bg-slate-300')} />
+                                                                    <div className={cn("w-2 h-2 rounded-full mr-2", s === 'Deployed' ? 'bg-emerald-500' : 'bg-slate-300')} />
                                                                     {s}
                                                                 </DropdownMenuItem>
                                                             ))}
@@ -383,12 +383,12 @@ export default function ChangeTracker() {
     };
 
     const handleAdd = (sectionOrData) => {
-        const baseData = typeof sectionOrData === 'string' ? { section_type: sectionOrData, description: '' } : sectionOrData;
+        const baseData = typeof sectionOrData === 'string' ? { status: sectionOrData, description: '' } : sectionOrData;
         base44.entities.DeveloperChangeLog.create({
             title: 'Request',
-            category: 'Logic',
+            category: 'UI/UX',
             priority: 'Medium',
-            status: 'Pending',
+            status: 'Backlog',
             created_by: user?.email || 'admin',
             created_at: new Date().toISOString(),
             ...baseData
@@ -416,7 +416,7 @@ export default function ChangeTracker() {
     const onDragEnd = (result) => {
         const { destination, source, draggableId } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
-        handleUpdate(draggableId, { section_type: destination.droppableId });
+        handleUpdate(draggableId, { status: destination.droppableId });
         toast.success(`Moved to ${destination.droppableId}`, { icon: <Zap className="w-3.5 h-3.5 text-indigo-500" /> });
     };
 
@@ -424,7 +424,7 @@ export default function ChangeTracker() {
         let result = [...allRecords];
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            result = result.filter(r => (r.description || '').toLowerCase().includes(query) || (r.section_type || '').toLowerCase().includes(query));
+            result = result.filter(r => (r.description || '').toLowerCase().includes(query) || (r.status || '').toLowerCase().includes(query));
         }
         return sortChangeLogs(result, sortConfig);
     }, [allRecords, searchQuery, sortConfig]);
@@ -502,7 +502,7 @@ export default function ChangeTracker() {
                             <SectionContainer 
                                 key={section} 
                                 title={section} 
-                                items={processedRecords.filter(r => r.section_type === section)} 
+                                items={processedRecords.filter(r => r.status === section)} 
                                 onUpdate={handleUpdate} 
                                 onDelete={handleDelete} 
                                 onAdd={handleAdd} 
@@ -518,7 +518,7 @@ export default function ChangeTracker() {
                                 <KanbanColumn 
                                     key={section} 
                                     title={section} 
-                                    items={processedRecords.filter(r => r.section_type === section)} 
+                                    items={processedRecords.filter(r => r.status === section)} 
                                     onUpdate={handleUpdate} 
                                     onDelete={handleDelete} 
                                     onAdd={handleAdd} 

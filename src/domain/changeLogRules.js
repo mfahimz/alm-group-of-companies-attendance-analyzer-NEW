@@ -3,22 +3,23 @@
  * Portable business logic for filtering, sorting, and parsing developer changes.
  */
 
-export const PRIORITIES = ["Low", "Medium", "High", "Critical"];
-export const STATUSES = ["Pending", "In Progress", "Frozen", "Completed"];
-export const SECTIONS = ["Changes", "User Requests", "CEO Approval"];
+export const PRIORITIES = ["High", "Medium", "Low"];
+export const STATUSES = ["Backlog", "Prompt Drafting", "AI Generating", "Testing", "Deployed"];
+export const CATEGORIES = ["UI/UX", "Backend Logic", "Database/Schema"];
+export const SECTIONS = STATUSES;
 
 export const PRIORITY_WEIGHTS = {
-    'Critical': 4,
     'High': 3,
     'Medium': 2,
     'Low': 1
 };
 
 export const STATUS_WEIGHTS = {
-    'Pending': 1,
-    'In Progress': 2,
-    'Frozen': 3,
-    'Completed': 4
+    'Backlog': 1,
+    'Prompt Drafting': 2,
+    'AI Generating': 3,
+    'Testing': 4,
+    'Deployed': 5
 };
 
 /**
@@ -26,12 +27,12 @@ export const STATUS_WEIGHTS = {
  */
 export const sortChangeLogs = (items, sortConfig) => {
     return [...items].sort((a, b) => {
-        // Rule 1: 'Completed' tasks are pinned to the bottom
-        const isACompleted = a.status === 'Completed';
-        const isBCompleted = b.status === 'Completed';
+        // Rule 1: 'Deployed' tasks are pinned to the bottom
+        const isADeployed = a.status === 'Deployed';
+        const isBDeployed = b.status === 'Deployed';
 
-        if (isACompleted && !isBCompleted) return 1;
-        if (!isACompleted && isBCompleted) return -1;
+        if (isADeployed && !isBDeployed) return 1;
+        if (!isADeployed && isBDeployed) return -1;
 
         // Rule 2: Normal sorting logic for non-completed items
         let valA = a[sortConfig.key];
@@ -62,8 +63,8 @@ export const sortChangeLogs = (items, sortConfig) => {
 export const parseQuickAdd = (input) => {
     let description = input;
     let priority = "Medium";
-    let status = "Pending";
-    let section = "Changes";
+    let status = "Backlog";
+    let section = "Backlog";
 
     // Extract Priority (#)
     const priorityMatch = description.match(/#(\w+)/);
@@ -96,7 +97,7 @@ export const parseQuickAdd = (input) => {
         priority,
         status,
         section_type: section,
-        category: 'Logic', // default
+        category: 'UI/UX', // default
         title: 'Request' // default
     };
 };
