@@ -78,6 +78,21 @@
         "new_am_start": { "type": "string", "default": null },
         "new_am_end": { "type": "string", "default": null },
         "new_pm_start": { "type": "string", "default": null },
-        "new_pm_end": { "type": "string", "default": null }
+        "new_pm_end": { "type": "string", "default": null },
+        "punch_to_skip": {
+            "type": "string",
+            "enum": ["AM_PUNCH_IN", "AM_PUNCH_OUT", "PM_PUNCH_IN", "PM_PUNCH_OUT", "FULL_SKIP"],
+            "description": "For SKIP_PUNCH type: which punch to skip from analysis."
+        },
+        "half_day_target": {
+            "type": "string",
+            "enum": ["AM", "PM"],
+            "description": "For HALF_DAY_HOLIDAY type: specifies which half of the day is the holiday."
+        },
+        "target_punch": {
+            "type": "string",
+            "enum": ["AM_START", "AM_END", "PM_START", "PM_END"],
+            "description": "Specifies which punch this exception targets (for Unified Grace / ALLOWED_MINUTES)."
+        }
     }
 }

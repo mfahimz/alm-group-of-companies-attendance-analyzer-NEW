@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
         include_friday: false,
         salary_leave_days: '',
         punch_to_skip: 'AM_PUNCH_IN',
+        half_day_target: 'AM',
+        target_punch: 'AM_START',
         new_weekly_off: '',
         working_day_override: ''
     });
@@ -62,9 +64,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             // Calculate default salary_leave_days if not set
             let calculatedDays = '';
             if (exception.type === 'ANNUAL_LEAVE' && exception.date_from && exception.date_to) {
-                const from = new Date(exception.date_from);
-                const to = new Date(exception.date_to);
-                const diffTime = Math.abs(to - from);
+                const fromTime = new Date(exception.date_from).getTime();
+                const toTime = new Date(exception.date_to).getTime();
+                const diffTime = Math.abs(toTime - fromTime);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
                 calculatedDays = exception.salary_leave_days ?? diffDays;
             }
@@ -85,6 +87,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 include_friday: exception.include_friday || false,
                 salary_leave_days: calculatedDays,
                 punch_to_skip: exception.punch_to_skip || 'AM_PUNCH_IN',
+                half_day_target: exception.half_day_target || 'AM',
+                target_punch: exception.target_punch || 'AM_START',
                 new_weekly_off: exception.new_weekly_off || '',
                 working_day_override: exception.working_day_override || ''
             });
@@ -94,7 +98,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const updateMutation = useMutation({
         mutationFn: (data) => base44.entities.Exception.update(exception.id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', projectId]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', projectId] });
             toast.success('Exception updated successfully');
             onClose();
         },
@@ -151,6 +155,15 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.punch_to_skip = formData.punch_to_skip;
         }
 
+        if (formData.type === 'HALF_DAY_HOLIDAY') {
+            cleanedData.half_day_target = formData.half_day_target || 'AM';
+            cleanedData.attendance_id = 'ALL';
+        }
+
+        if (formData.type === 'ALLOWED_MINUTES' && formData.allowed_minutes) {
+            cleanedData.target_punch = formData.target_punch || null;
+        }
+
         if (formData.type === 'DAY_SWAP') {
             cleanedData.new_weekly_off = formData.new_weekly_off;
             cleanedData.working_day_override = formData.working_day_override;
@@ -166,6 +179,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
     const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
+    const needsHalfDayHoliday = formData.type === 'HALF_DAY_HOLIDAY';
     const needsDaySwap = formData.type === 'DAY_SWAP';
     // Controls the Other Minutes input — shown only for MANUAL_OTHER_MINUTES type.
     // These minutes are added directly to the other_minutes field in analysis, not to late/early.
@@ -174,9 +188,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     // Calculate days between dates for annual leave
     const calculateDaysBetween = () => {
         if (formData.date_from && formData.date_to) {
-            const from = new Date(formData.date_from);
-            const to = new Date(formData.date_to);
-            const diffTime = Math.abs(to - from);
+            const fromTime = new Date(formData.date_from).getTime();
+            const toTime = new Date(formData.date_to).getTime();
+            const diffTime = Math.abs(toTime - fromTime);
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
             return diffDays;
         }
@@ -226,6 +240,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                      */}
                                     <SelectItem value="MANUAL_OTHER_MINUTES">Manual Other Minutes</SelectItem>
                                     <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
+                                    <SelectItem value="HALF_DAY_HOLIDAY">Half Day Holiday (Global)</SelectItem>
                                     <SelectItem value="DAY_SWAP">Day Swap (Weekly Off Override)</SelectItem>
                                     <SelectItem value="CUSTOM">Custom Type (Not used in analysis)</SelectItem>
                                     </SelectContent>
@@ -243,9 +258,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     setFormData({ ...formData, date_from: e.target.value });
                                     // Auto-calculate salary_leave_days for annual leave
                                     if (needsSalaryLeaveDays && formData.date_to) {
-                                        const from = new Date(e.target.value);
-                                        const to = new Date(formData.date_to);
-                                        const diffTime = Math.abs(to - from);
+                                        const fromTime = new Date(e.target.value).getTime();
+                                        const toTime = new Date(formData.date_to).getTime();
+                                        const diffTime = Math.abs(toTime - fromTime);
                                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
                                         setFormData(prev => ({ ...prev, salary_leave_days: diffDays.toFixed(2) }));
                                     }
@@ -261,9 +276,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     setFormData({ ...formData, date_to: e.target.value });
                                     // Auto-calculate salary_leave_days for annual leave
                                     if (needsSalaryLeaveDays && formData.date_from) {
-                                        const from = new Date(formData.date_from);
-                                        const to = new Date(e.target.value);
-                                        const diffTime = Math.abs(to - from);
+                                        const fromTime = new Date(formData.date_from).getTime();
+                                        const toTime = new Date(e.target.value).getTime();
+                                        const diffTime = Math.abs(toTime - fromTime);
                                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
                                         setFormData(prev => ({ ...prev, salary_leave_days: diffDays.toFixed(2) }));
                                     }
@@ -426,6 +441,27 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     </Select>
                                 </div>
                             </div>
+                            
+                            <div className="border border-indigo-100 bg-indigo-50/30 p-3 rounded-lg">
+                                <Label className="text-xs text-indigo-700 mb-2 block font-semibold">Unified Grace (Optional)</Label>
+                                <Label className="text-[10px] text-indigo-600 mb-1 block">Target a specific punch for these minutes (Report-wide if ID is ALL)</Label>
+                                <Select
+                                    value={formData.target_punch || 'none'}
+                                    onValueChange={(value) => setFormData({ ...formData, target_punch: value === 'none' ? null : value })}
+                                >
+                                    <SelectTrigger className="h-8 text-xs">
+                                        <SelectValue placeholder="No specific punch target" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">General (Late/Early Deductible)</SelectItem>
+                                        <SelectItem value="AM_START">AM Start (Shift In)</SelectItem>
+                                        <SelectItem value="AM_END">AM End (Morning Out)</SelectItem>
+                                        <SelectItem value="PM_START">PM Start (Afternoon In)</SelectItem>
+                                        <SelectItem value="PM_END">PM End (Shift Out)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
                             <p className="text-xs text-slate-500">Minutes to excuse due to natural calamity or personal reasons</p>
                         </div>
                     )}
@@ -468,11 +504,45 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="AM_PUNCH_IN">AM Punch In (Morning Start)</SelectItem>
-                                            <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Evening End)</SelectItem>
-                                            <SelectItem value="FULL_SKIP">Full Skip (Both AM & PM)</SelectItem>
+                                            <SelectItem value="AM_PUNCH_IN">AM Punch In (Shift Start)</SelectItem>
+                                            <SelectItem value="AM_PUNCH_OUT">AM Punch Out (Morning End)</SelectItem>
+                                            <SelectItem value="PM_PUNCH_IN">PM Punch In (Afternoon Start)</SelectItem>
+                                            <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Shift End)</SelectItem>
+                                            <SelectItem value="FULL_SKIP">Full Skip (Ignore All Punches)</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {needsHalfDayHoliday && (
+                        <div className="border-t pt-4">
+                            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                <p className="text-sm text-indigo-800 mb-3 font-medium">
+                                    Half-Day Holiday (Global Configuration)
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label>Holiday Target *</Label>
+                                        <Select
+                                            value={formData.half_day_target}
+                                            onValueChange={(value) => setFormData({ ...formData, half_day_target: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="AM">Morning Shift (AM)</SelectItem>
+                                                <SelectItem value="PM">Afternoon/Evening Shift (PM)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex flex-col justify-center">
+                                        <p className="text-[10px] text-indigo-600">
+                                            This will mark the selected shift as a holiday for ALL employees.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

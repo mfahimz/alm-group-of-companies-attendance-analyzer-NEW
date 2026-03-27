@@ -48,7 +48,7 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({
-  className,
+  className = "",
   ...props
 }) => (
   <div
@@ -58,7 +58,7 @@ const DialogHeader = ({
 DialogHeader.displayName = "DialogHeader"
 
 const DialogFooter = ({
-  className,
+  className = "",
   ...props
 }) => (
   <div
@@ -67,19 +67,23 @@ const DialogFooter = ({
 )
 DialogFooter.displayName = "DialogFooter"
 
-const DialogTitle = React.forwardRef(({ className, ...props }, ref) => (
+const DialogTitle = React.forwardRef(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
     className={cn("text-lg font-semibold leading-none tracking-tight text-[#1F2937]", className)}
-    {...props} />
+    {...props}>
+    {children}
+  </DialogPrimitive.Title>
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
-const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (
+const DialogDescription = React.forwardRef(({ className, children, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
     className={cn("text-sm text-[#6B7280]", className)}
-    {...props} />
+    {...props}>
+    {children}
+  </DialogPrimitive.Description>
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 

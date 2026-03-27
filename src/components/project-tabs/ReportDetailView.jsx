@@ -742,6 +742,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
 
             // TRACK ATTENDANCE STATUS
+            const halfDayEx = matchingExceptionsCalc.find(ex => ex.type === 'HALF_DAY_HOLIDAY');
+            const skipPunchEx = matchingExceptionsCalc.find(ex => ex.type === 'SKIP_PUNCH');
+            const hasSkipPunchApplied = !!skipPunchEx || !!halfDayEx;
+
             if (dayOverride) {
                 if (dayOverride.type === 'MANUAL_PRESENT') presentDays++;
                 else if (dayOverride.type === 'MANUAL_ABSENT') fullAbsenceCount++;
@@ -749,13 +753,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 else if (dayOverride.type === 'SICK_LEAVE') sickLeaveCount++;
             } else if (dateException) {
                 if (dateException.type === 'OFF' || dateException.type === 'PUBLIC_HOLIDAY') workingDays--;
+                else if (dateException.type === 'HALF_DAY_HOLIDAY') presentDays++;
                 else if (dateException.type === 'MANUAL_PRESENT') presentDays++;
                 else if (dateException.type === 'MANUAL_ABSENT') fullAbsenceCount++;
                 else if (dateException.type === 'SICK_LEAVE') sickLeaveCount++;
                 else if (dateException.type === 'ANNUAL_LEAVE') {
                     if (dayPunches.length === 0) workingDays--;
                     else presentDays++;
-                } else if (dayPunches.length > 0) presentDays++;
+                } else if (hasSkipPunchApplied || dayPunches.length > 0) presentDays++;
                 else fullAbsenceCount++;
             } else if (dayPunches.length > 0) {
                 // PUNCH COMPLETENESS STATUS (FRONTEND - ReportDetailView)
@@ -803,17 +808,63 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             let dayLateMinutes = 0;
             let dayEarlyMinutes = 0;
 
-            // 1. Calculation phase: punches (regardless of partial day status - match backend)
+            // 1. Calculation phase: punches
             if (shift && punchMatchesTotals.length > 0 && !shouldSkipTimeCalc) {
+                const skipTargets = new Set();
+                
+                // Collect skip targets from SKIP_PUNCH or HALF_DAY_HOLIDAY
+                if (skipPunchEx) {
+                    const skipType = skipPunchEx.punch_to_skip;
+                    if (skipType === 'AM_PUNCH_IN') skipTargets.add('AM_START');
+                    else if (skipType === 'AM_PUNCH_OUT') skipTargets.add('AM_END');
+                    else if (skipType === 'PM_PUNCH_IN') skipTargets.add('PM_START');
+                    else if (skipType === 'PM_PUNCH_OUT') skipTargets.add('PM_END');
+                    else if (skipType === 'FULL_SKIP') {
+                        skipTargets.add('AM_START'); skipTargets.add('AM_END');
+                        skipTargets.add('PM_START'); skipTargets.add('PM_END');
+                    }
+                }
+                
+                if (halfDayEx) {
+                    const holidayTarget = halfDayEx.half_day_target; // 'AM' or 'PM'
+                    if (holidayTarget === 'AM') {
+                        skipTargets.add('AM_START'); skipTargets.add('AM_END');
+                    } else if (holidayTarget === 'PM') {
+                        skipTargets.add('PM_START'); skipTargets.add('PM_END');
+                    }
+                }
+
+                // Collect punch-specific grace (Unified Grace Minutes)
+                const punchSpecificGrace = {
+                    'AM_START': 0, 'AM_END': 0, 'PM_START': 0, 'PM_END': 0
+                };
+                
+                matchingExceptionsCalc.forEach(ex => {
+                    if (ex.type === 'ALLOWED_MINUTES' && ex.attendance_id === 'ALL' && ex.target_punch) {
+                        punchSpecificGrace[ex.target_punch] += (ex.allowed_minutes || 0);
+                    }
+                });
+
                 for (const match of punchMatchesTotals) {
-                    if (!match.matchedTo) continue;
+                    if (!match.matchedTo || skipTargets.has(match.matchedTo)) continue;
+                    
                     const punchTime = match.punch.time;
                     const shiftTime = match.shiftTime;
+                    const grace = punchSpecificGrace[match.matchedTo] || 0;
+
                     if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) dayLateMinutes += Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                        if (punchTime > shiftTime) {
+                            let minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                            minutes = Math.max(0, minutes - grace);
+                            dayLateMinutes += minutes;
+                        }
                     }
                     if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) dayEarlyMinutes += Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                        if (punchTime < shiftTime) {
+                            let minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                            minutes = Math.max(0, minutes - grace);
+                            dayEarlyMinutes += minutes;
+                        }
                     }
                 }
             }
@@ -830,14 +881,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (dayOverride.otherMinutes !== undefined) totalOtherMinutes += dayOverride.otherMinutes;
             }
 
-            // 3. Deduction Reduction
-            const totalDayMinutesNet = dayLateMinutes + dayEarlyMinutes;
-            if (allowedMinutesForDay > 0 && totalDayMinutesNet > 0) {
-                const remaining = Math.max(0, totalDayMinutesNet - allowedMinutesForDay);
-                const lateRatio = dayLateMinutes / totalDayMinutesNet;
-                const earlyRatio = dayEarlyMinutes / totalDayMinutesNet;
-                dayLateMinutes = Math.round(remaining * lateRatio);
-                dayEarlyMinutes = Math.round(remaining * earlyRatio);
+            // 3. Deduction Reduction (ALLOWED_MINUTES / Unified Grace)
+            // Employee specific reduction (total level)
+            const employeeSpecificAllowed = matchingExceptionsCalc
+                .filter(ex => ex.type === 'ALLOWED_MINUTES' && String(ex.attendance_id) === attendanceIdStr)
+                .reduce((sum, ex) => sum + (ex.allowed_minutes || 0), 0);
+            
+            if (employeeSpecificAllowed > 0) {
+                const totalDayMinutesNet = dayLateMinutes + dayEarlyMinutes;
+                if (totalDayMinutesNet > 0) {
+                    const remaining = Math.max(0, totalDayMinutesNet - employeeSpecificAllowed);
+                    const lateRatio = dayLateMinutes / totalDayMinutesNet;
+                    const earlyRatio = dayEarlyMinutes / totalDayMinutesNet;
+                    dayLateMinutes = Math.round(remaining * lateRatio);
+                    dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                }
             }
 
             totalLateMinutes += dayLateMinutes;

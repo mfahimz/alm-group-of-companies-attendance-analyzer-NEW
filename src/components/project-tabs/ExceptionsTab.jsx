@@ -74,7 +74,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
             await Promise.all(tasksToCreate.map(task => base44.entities.ChecklistItem.create(task)));
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['checklistItems', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
             toast.success('Checklist initialized with predefined tasks');
         },
         onError: (error) => {
@@ -90,7 +90,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
             status: 'pending'
         }),
         onSuccess: () => {
-            queryClient.invalidateQueries(['checklistItems', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
             toast.success('Task added to checklist');
             setShowAddDialog(false);
             setIsCustomType(false);
@@ -104,7 +104,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const updateTaskMutation = useMutation({
         mutationFn: ({ id, updates }) => base44.entities.ChecklistItem.update(id, updates),
         onSuccess: () => {
-            queryClient.invalidateQueries(['checklistItems', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
             toast.success('Task updated');
             setEditingTask(null);
         },
@@ -116,7 +116,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
     const deleteTaskMutation = useMutation({
         mutationFn: (id) => base44.entities.ChecklistItem.delete(id),
         onSuccess: () => {
-            queryClient.invalidateQueries(['checklistItems', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
             toast.success('Task deleted');
         },
         onError: (error) => {
@@ -130,7 +130,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
             await Promise.all([...ids].map(id => base44.entities.ChecklistItem.delete(id)));
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['checklistItems', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
             toast.success(`${selectedIds.size} task(s) deleted`);
             setSelectedIds(new Set());
             setShowBulkDeleteConfirm(false);
@@ -664,7 +664,9 @@ const TYPE_MAP = {
     'sick_leave': 'SICK_LEAVE',
     'annual_leave': 'ANNUAL_LEAVE',
     'allowed minutes': 'ALLOWED_MINUTES',
-    'allowed_minutes': 'ALLOWED_MINUTES'
+    'allowed_minutes': 'ALLOWED_MINUTES',
+    'half day holiday': 'HALF_DAY_HOLIDAY',
+    'half_day_holiday': 'HALF_DAY_HOLIDAY'
 };
 
 export default function ExceptionsTab({ project }) {
@@ -688,6 +690,8 @@ export default function ExceptionsTab({ project }) {
         include_friday: false,
         other_minutes: '',
         punch_to_skip: 'AM_PUNCH_IN',
+        half_day_target: 'AM',
+        target_punch: 'AM_START',
         new_weekly_off: '',
         working_day_override: '',
         salary_leave_days: ''
@@ -835,7 +839,7 @@ export default function ExceptionsTab({ project }) {
             return await base44.entities.Exception.create(exceptionData);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             toast.success('Exception added successfully');
             setShowForm(false);
             resetForm();
@@ -850,7 +854,7 @@ export default function ExceptionsTab({ project }) {
             await base44.entities.Exception.delete(id);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             setSelectedItems([]);
             setSelectedExceptions([]);
             toast.success('Exception deleted');
@@ -866,7 +870,7 @@ export default function ExceptionsTab({ project }) {
             await Promise.all(ids.map(id => base44.entities.Exception.delete(id)));
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             setSelectedExceptions([]);
             toast.success('Selected exceptions deleted');
         },
@@ -882,7 +886,7 @@ export default function ExceptionsTab({ project }) {
             ));
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             setSelectedExceptions([]);
             toast.success('Selected exceptions updated');
         },
@@ -894,14 +898,14 @@ export default function ExceptionsTab({ project }) {
     const updateMutation = useMutation({
         mutationFn: ({ id, data }) => base44.entities.Exception.update(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
         }
     });
 
     const toggleUseInAnalysisMutation = useMutation({
         mutationFn: ({ id, use_in_analysis }) => base44.entities.Exception.update(id, { use_in_analysis }),
         onSuccess: () => {
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             toast.success('Exception updated');
         }
     });
@@ -1067,7 +1071,7 @@ export default function ExceptionsTab({ project }) {
             });
         }
 
-        queryClient.invalidateQueries(['exceptions', project.id]);
+        queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
         toast.success(`Imported ${importPreview.exceptions.length} exceptions successfully`);
         setUploadProgress(null);
         setImportPreview(null);
@@ -1207,6 +1211,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
             allowed_minutes: '',
             allowed_minutes_type: 'both',
             punch_to_skip: 'AM_PUNCH_IN',
+            half_day_target: 'AM',
+            target_punch: 'AM_START',
             new_weekly_off: '',
             working_day_override: '',
             salary_leave_days: ''
@@ -1293,6 +1299,11 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 other_minutes: '',
                 allowed_minutes: parsed.allowed_minutes || '',
                 allowed_minutes_type: parsed.allowed_minutes_type || 'both',
+                punch_to_skip: 'AM_PUNCH_IN',
+                half_day_target: 'AM',
+                target_punch: 'AM_START',
+                new_weekly_off: '',
+                working_day_override: '',
                 salary_leave_days: parsed.salary_leave_days || ''
             });
 
@@ -1309,14 +1320,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, and SKIP_PUNCH types, attendance_id is optional
-        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && !formData.attendance_id) {
+        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, SKIP_PUNCH, and HALF_DAY_HOLIDAY types, attendance_id is optional
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && formData.type !== 'HALF_DAY_HOLIDAY' && !formData.attendance_id) {
             toast.error('Please select an employee');
             return;
         }
 
-        // For ALLOWED_MINUTES and SKIP_PUNCH, default to ALL if not selected
-        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH') && !formData.attendance_id) {
+        // For ALLOWED_MINUTES, SKIP_PUNCH and HALF_DAY_HOLIDAY, default to ALL if not selected
+        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'HALF_DAY_HOLIDAY') && !formData.attendance_id) {
             formData.attendance_id = 'ALL';
         }
         
@@ -1365,6 +1376,17 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         // Add skip punch configuration
         if (submitData.type === 'SKIP_PUNCH') {
             cleanedData.punch_to_skip = submitData.punch_to_skip;
+        }
+
+        // Add half day holiday configuration
+        if (submitData.type === 'HALF_DAY_HOLIDAY') {
+            cleanedData.half_day_target = submitData.half_day_target || 'AM';
+            cleanedData.attendance_id = 'ALL';
+        }
+
+        // Add punch-specific target for allowed minutes
+        if (submitData.type === 'ALLOWED_MINUTES' && submitData.allowed_minutes) {
+            cleanedData.target_punch = submitData.target_punch || null;
         }
 
         // Annual leave salary days override (supports decimals)
@@ -1489,6 +1511,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
+    const needsHalfDayHoliday = formData.type === 'HALF_DAY_HOLIDAY';
     const needsDaySwap = formData.type === 'DAY_SWAP';
     const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
     // Hierarchical Sorting Logic for Exceptions: Type Name (A-Z) -> Employee Name
@@ -1713,14 +1736,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && '*'}</Label>
-                                    {formData.type === 'PUBLIC_HOLIDAY' || formData.type === 'SKIP_PUNCH' ? (
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && '*'}</Label>
+                                    {formData.type === 'PUBLIC_HOLIDAY' || formData.type === 'HALF_DAY_HOLIDAY' ? (
                                         <Input 
                                             value="All Employees" 
                                             disabled 
                                             className="bg-slate-50"
                                         />
-                                    ) : formData.type === 'ALLOWED_MINUTES' ? (
+                                    ) : formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' ? (
                                         <Select
                                             value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
@@ -1754,12 +1777,12 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                                {emp.attendance_id} - {emp.name}
                                                            </SelectItem>
                                                         ))}
-                                                        </div>
-                                                        </SelectContent>
-                                                        </Select>
-                                                        ) : (
-                                                        <Select
-                                                        value={formData.attendance_id || undefined}
+                                                </div>
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <Select
+                                            value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
                                         >
                                             <SelectTrigger>
@@ -1790,11 +1813,11 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                                {emp.attendance_id} - {emp.name}
                                                            </SelectItem>
                                                         ))}
-                                                        </div>
-                                                        </SelectContent>
-                                                        </Select>
-                                                        )}
-                                                        </div>
+                                                </div>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                </div>
                                                         <div>
                                                         <Label>Exception Type *</Label>
                                     <Select
@@ -1814,6 +1837,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectItem value="ANNUAL_LEAVE">Annual Leave / Vacation</SelectItem>
                                             <SelectItem value="ALLOWED_MINUTES">Allowed Minutes (Grace)</SelectItem>
                                             <SelectItem value="SKIP_PUNCH">Skip Specific Punch</SelectItem>
+                                            <SelectItem value="HALF_DAY_HOLIDAY">Half-Day Holiday (Natural Calamity)</SelectItem>
                                             <SelectItem value="DAY_SWAP">Day Swap (Weekly Off Override)</SelectItem>
                                             {/* MANUAL_LATE, MANUAL_EARLY_CHECKOUT, MANUAL_OTHER_MINUTES are excluded - only creatable from report edits */}
                                         </SelectContent>
@@ -1836,7 +1860,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                         if (prev.type === 'ANNUAL_LEAVE' && prev.date_to) {
                                                             const from = new Date(newDate);
                                                             const to = new Date(prev.date_to);
-                                                            const diffDays = Math.ceil((Math.abs(to - from)) / (1000 * 60 * 60 * 24)) + 1;
+                                                            const diffDays = Math.ceil((Math.abs(to.getTime() - from.getTime())) / (1000 * 60 * 60 * 24)) + 1;
                                                             next.salary_leave_days = Number.isFinite(diffDays) ? diffDays.toFixed(2) : prev.salary_leave_days;
                                                         }
                                                         return next;
@@ -1861,7 +1885,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                         if (prev.type === 'ANNUAL_LEAVE' && prev.date_from) {
                                                             const from = new Date(prev.date_from);
                                                             const to = new Date(newDate);
-                                                            const diffDays = Math.ceil((Math.abs(to - from)) / (1000 * 60 * 60 * 24)) + 1;
+                                                            const diffDays = Math.ceil((Math.abs(to.getTime() - from.getTime())) / (1000 * 60 * 60 * 24)) + 1;
                                                             next.salary_leave_days = Number.isFinite(diffDays) ? diffDays.toFixed(2) : prev.salary_leave_days;
                                                         }
                                                         return next;
@@ -1889,7 +1913,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     />
                                     {formData.date_from && formData.date_to && (
                                         <p className="text-xs text-emerald-700">
-                                            💡 Calculated: {Math.ceil((Math.abs(new Date(formData.date_to) - new Date(formData.date_from))) / (1000 * 60 * 60 * 24)) + 1} days between selected dates.
+                                            💡 Calculated: {Math.ceil((Math.abs(new Date(formData.date_to).getTime() - new Date(formData.date_from).getTime())) / (1000 * 60 * 60 * 24)) + 1} days between selected dates.
                                             Edit if partial days are needed.
                                         </p>
                                     )}
@@ -1996,6 +2020,27 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             </Select>
                                         </div>
                                     </div>
+                                    
+                                    <div className="border border-indigo-100 bg-indigo-50/20 p-3 rounded-lg space-y-2">
+                                        <Label className="text-xs text-indigo-700 font-semibold block">Unified Grace Target (Optional)</Label>
+                                        <p className="text-[10px] text-indigo-600 mb-2">Target a specific punch for these minutes. If Employee is 'All Employees', this adds grace to EVERY employee's matching punch.</p>
+                                        <Select
+                                            value={formData.target_punch || 'none'}
+                                            onValueChange={(value) => setFormData({ ...formData, target_punch: value === 'none' ? null : value })}
+                                        >
+                                            <SelectTrigger className="h-8 text-xs bg-white">
+                                                <SelectValue placeholder="No specific punch target" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">General (Late/Early Deductible)</SelectItem>
+                                                <SelectItem value="AM_START">AM Start (Shift In)</SelectItem>
+                                                <SelectItem value="AM_END">AM End (Morning Out)</SelectItem>
+                                                <SelectItem value="PM_START">PM Start (Afternoon In)</SelectItem>
+                                                <SelectItem value="PM_END">PM End (Shift Out)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     <p className="text-xs text-slate-500">Minutes to excuse due to natural calamity or personal reasons</p>
                                 </div>
                             )}
@@ -2006,46 +2051,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         <p className="text-sm text-amber-800 mb-3">
                                             This exception will skip a specific punch (AM Punch In or PM Punch Out) from the analysis for the selected dates.
                                         </p>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <Label>Apply To *</Label>
-                                                <Select
-                                                    value={formData.attendance_id || 'ALL'}
-                                                    onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select scope..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="ALL">All Employees</SelectItem>
-                                                        <div className="p-2 border-t">
-                                                            <Input
-                                                                placeholder="Search employees..."
-                                                                value={employeeSearch}
-                                                                onChange={(e) => setEmployeeSearch(e.target.value)}
-                                                                className="mb-2"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                onKeyDown={(e) => e.stopPropagation()}
-                                                            />
-                                                        </div>
-                                                        <div className="max-h-[200px] overflow-y-auto">
-                                                            {employees
-                                                                .filter(emp => {
-                                                                    if (!employeeSearch) return true;
-                                                                    const search = employeeSearch.toLowerCase();
-                                                                    return emp.name.toLowerCase().includes(search) || 
-                                                                           String(emp.attendance_id).toLowerCase().includes(search);
-                                                                })
-                                                                .filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '')
-                                                                .map(emp => (
-                                                                   <SelectItem key={emp.id} value={String(emp.attendance_id)}>
-                                                                       {emp.attendance_id} - {emp.name}
-                                                                   </SelectItem>
-                                                                ))}
-                                                        </div>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                        <div className="grid grid-cols-1 gap-4">
                                             <div>
                                                 <Label>Punch to Skip *</Label>
                                                 <Select
@@ -2056,12 +2062,42 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="AM_PUNCH_IN">AM Punch In (Morning Start)</SelectItem>
-                                                        <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Evening End)</SelectItem>
-                                                        <SelectItem value="FULL_SKIP">Full Skip (Both AM & PM)</SelectItem>
+                                                        <SelectItem value="AM_PUNCH_IN">AM Punch In (Shift Start)</SelectItem>
+                                                        <SelectItem value="AM_PUNCH_OUT">AM Punch Out (Morning End)</SelectItem>
+                                                        <SelectItem value="PM_PUNCH_IN">PM Punch In (Afternoon Start)</SelectItem>
+                                                        <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Shift End)</SelectItem>
+                                                        <SelectItem value="FULL_SKIP">Full Skip (Ignore All Punches)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {needsHalfDayHoliday && (
+                                <div className="space-y-4">
+                                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                        <p className="text-sm text-indigo-800 mb-3 font-medium">
+                                            Half-Day Holiday (Natural Calamity / Global)
+                                        </p>
+                                        <p className="text-xs text-indigo-600 mb-4">
+                                            This will mark all employees as present and skip all shift points for the selected target (AM or PM).
+                                        </p>
+                                        <div>
+                                            <Label>Half-Day Target *</Label>
+                                            <Select
+                                                value={formData.half_day_target}
+                                                onValueChange={(value) => setFormData({ ...formData, half_day_target: value })}
+                                            >
+                                                <SelectTrigger className="bg-white">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="AM">AM Shift (Morning)</SelectItem>
+                                                    <SelectItem value="PM">PM Shift (Afternoon)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
                                 </div>
@@ -2179,7 +2215,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     });
                                     if (response.data.success) {
                                         toast.success(response.data.message);
-                                        queryClient.invalidateQueries(['exceptions', project.id]);
+                                        queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
                                     }
                                 } catch (error) {
                                     toast.error('Failed to import: ' + error.message);

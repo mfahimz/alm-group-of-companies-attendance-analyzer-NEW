@@ -1090,29 +1090,48 @@ Deno.serve(async (req: Request) => {
                 }
                 
                 // ================================================================
-                // SKIP_PUNCH: Determine if skip applies and what type
+                // SKIP_PUNCH & HALF_DAY_HOLIDAY: Determine targeted skip points
                 // ================================================================
-                let hasSkipPunchApplied = false;
-                let skipType = null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | 'FULL_SKIP'
-                let skipPunchForced0PunchPresent = false; // Tracks the "LOP Saver" case
+                let skippedShiftPoints = new Set<string>();
+                let skipPunchForced0PunchPresent = false;
                 
-                if (skipPunchException && !isNonWorkingStatus && skipPunchException.punch_to_skip) {
-                    skipType = skipPunchException.punch_to_skip; // 'AM_PUNCH_IN', 'PM_PUNCH_OUT', or 'FULL_SKIP'
-                    hasSkipPunchApplied = true;
+                if (skipPunchException && !isNonWorkingStatus) {
+                    const skipType = skipPunchException.punch_to_skip;
+                    if (skipType === 'AM_PUNCH_IN') skippedShiftPoints.add('AM_START');
+                    else if (skipType === 'AM_PUNCH_OUT') skippedShiftPoints.add('AM_END');
+                    else if (skipType === 'PM_PUNCH_IN') skippedShiftPoints.add('PM_START');
+                    else if (skipType === 'PM_PUNCH_OUT') skippedShiftPoints.add('PM_END');
+                    else if (skipType === 'FULL_SKIP') {
+                        skippedShiftPoints.add('AM_START');
+                        skippedShiftPoints.add('AM_END');
+                        skippedShiftPoints.add('PM_START');
+                        skippedShiftPoints.add('PM_END');
+                    }
                     
                     // LOP SAVER: 0 punches + FULL_SKIP → force Present (Skip Punch)
-                    // This handles company-wide half-days where people didn't come in at all
-                    if (filteredPunches.length === 0 && skipType === 'FULL_SKIP') {
+                    if (filteredPunches.length === 0 && (skipType === 'FULL_SKIP' || skipType === 'AM_PUNCH_IN' || skipType === 'PM_PUNCH_OUT')) {
                         filteredPunches = [{ _fake_skip_punch: true }];
                         skipPunchForced0PunchPresent = true;
-                        console.log(`[runAnalysis] SKIP_PUNCH LOP SAVER: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + FULL_SKIP → Present (Skip Punch)`);
-                    } else if (filteredPunches.length === 0) {
-                        // AM_PUNCH_IN or PM_PUNCH_OUT with 0 punches: still mark present to avoid LOP
-                        // but this is a less common case — employee should have SOME punches
+                        console.log(`[runAnalysis] SKIP_PUNCH LOP SAVER: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + ${skipType} → adding fake punch`);
+                    }
+                } else if (dateException && dateException.type === 'HALF_DAY_HOLIDAY' && !isNonWorkingStatus) {
+                    const holidayTarget = dateException.half_day_target; // 'AM' or 'PM'
+                    if (holidayTarget === 'AM') {
+                        skippedShiftPoints.add('AM_START');
+                        skippedShiftPoints.add('AM_END');
+                    } else if (holidayTarget === 'PM') {
+                        skippedShiftPoints.add('PM_START');
+                        skippedShiftPoints.add('PM_END');
+                    }
+                    
+                    if (filteredPunches.length === 0) {
                         filteredPunches = [{ _fake_skip_punch: true }];
-                        console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + ${skipType} → adding fake punch`);
+                        skipPunchForced0PunchPresent = true;
+                        console.log(`[runAnalysis] HALF_DAY_HOLIDAY LOP SAVER: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches → adding fake punch`);
                     }
                 }
+                
+                const hasSkipApplied = skippedShiftPoints.size > 0;
 
                 let punchMatches: any[] = [];
                 let hasUnmatchedPunch = false;
@@ -1142,42 +1161,32 @@ Deno.serve(async (req: Request) => {
                 const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
                 if (punchCount > 0) {
-                    if (skipPunchForced0PunchPresent) {
-                        // LOP SAVER: If presence was forced via SKIP_PUNCH + 0 punches
+                    if (skipPunchForced0PunchPresent || hasSkipApplied) {
+                        // SKIP_PUNCH or HALF_DAY_HOLIDAY is applied, always Present
                         presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                    } else if (!hasSkipPunchApplied) {
+                    } else {
                         // NORMAL PUNCH COMPLETENESS LOGIC
                         if (isSingleShift) {
                             if (punchCount === 1) {
-                                // CHANGE 2: Single shift, 1 punch = Half Day
                                 presentDays++;
                                 halfAbsenceCount++;
                                 dateStatusMap[dateStr] = 'PRESENT';
-                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Single shift, 1 punch → Half Day`);
                             } else {
-                                // 2 or more punches = Present
                                 presentDays++;
                                 dateStatusMap[dateStr] = 'PRESENT';
                             }
                         } else {
                             // SPLIT SHIFT (4 expected)
                             if (punchCount === 1 || punchCount === 2) {
-                                // CHANGE 2: Split shift, 1 or 2 punches = Half Day
                                 presentDays++;
                                 halfAbsenceCount++;
                                 dateStatusMap[dateStr] = 'PRESENT';
-                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Split shift, ${punchCount} punch(es) → Half Day`);
                             } else {
-                                // 3 or 4 punches = Present
                                 presentDays++;
                                 dateStatusMap[dateStr] = 'PRESENT';
                             }
                         }
-                    } else {
-                        // SKIP_PUNCH is applied, always Present
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
                     }
                 } else {
                     // Zero punches
@@ -1197,13 +1206,25 @@ Deno.serve(async (req: Request) => {
                 //    This means the raw late/early stored in AnalysisResult are ALREADY reduced.
                 //    totalApprovedMinutes is the SUM of per-day reductions, tracked for DISPLAY only.
                 let approvedMinutesForDay = 0;
+                let punchSpecificGrace: Record<string, number> = {
+                    'AM_START': 0, 'AM_END': 0, 'PM_START': 0, 'PM_END': 0
+                };
+                
                 try {
-                    if (rules.approved_minutes_enabled &&
-                        dateException &&
-                        dateException.type === 'ALLOWED_MINUTES' &&
-                        dateException.approval_status === 'approved_dept_head' &&
-                        filteredPunches.length > 0) {  // FIX: only apply if employee was present
-                        approvedMinutesForDay = dateException.allowed_minutes || 0;
+                    // Collect ALL ALLOWED_MINUTES exceptions for this date
+                    const allowedExceptions = matchingExceptions.filter(ex => 
+                        ex.type === 'ALLOWED_MINUTES' && 
+                        (ex.approval_status === 'approved_dept_head' || ex.approval_status === 'approved')
+                    );
+                    
+                    for (const ex of allowedExceptions) {
+                        if (ex.attendance_id === 'ALL' && ex.target_punch) {
+                            // Unified Grace Minutes for specific punch
+                            punchSpecificGrace[ex.target_punch] += (ex.allowed_minutes || 0);
+                        } else if (String(ex.attendance_id) === attendanceIdStr) {
+                             // Regular employee-specific allowed minutes (handled at total level)
+                             approvedMinutesForDay += (ex.allowed_minutes || 0);
+                        }
                     }
                 } catch {
                     approvedMinutesForDay = 0;
@@ -1269,46 +1290,29 @@ Deno.serve(async (req: Request) => {
                     
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
+                        
+                        // Force 0 for skipped points
+                        if (skippedShiftPoints.has(match.matchedTo)) continue;
 
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
+                        const grace = punchSpecificGrace[match.matchedTo] || 0;
 
                         if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
                             if (punchTime > shiftTime) {
-                                const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                                let minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                                // Apply punch specific grace
+                                minutes = Math.max(0, minutes - grace);
                                 dayLateMinutes += minutes;
                             }
                         }
 
                         if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
                             if (punchTime < shiftTime) {
-                                const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                                let minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                                // Apply punch specific grace
+                                minutes = Math.max(0, minutes - grace);
                                 dayEarlyMinutes += minutes;
-                            }
-                        }
-                    }
-                    
-                    // ================================================================
-                    // SKIP_PUNCH: Zero out specific minutes based on skip type
-                    // This runs AFTER punch calculation so we can correctly detect
-                    // which punches were missing and zero the right values.
-                    // ================================================================
-                    if (hasSkipPunchApplied && skipType) {
-                        const amStartMissing = !matchedShiftPoints.has('AM_START');
-                        const pmEndMissing = !matchedShiftPoints.has('PM_END');
-                        
-                        if (skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') {
-                            // AM skip: zero late minutes if AM_START punch was missing
-                            if (amStartMissing) {
-                                console.log(`[runAnalysis] SKIP_PUNCH (${skipType}): Employee ${attendanceIdStr}, Date ${dateStr}: AM_START missing → zeroing late (was ${dayLateMinutes})`);
-                                dayLateMinutes = 0;
-                            }
-                        }
-                        if (skipType === 'PM_PUNCH_OUT' || skipType === 'FULL_SKIP') {
-                            // PM skip: zero early checkout if PM_END punch was missing
-                            if (pmEndMissing) {
-                                console.log(`[runAnalysis] SKIP_PUNCH (${skipType}): Employee ${attendanceIdStr}, Date ${dateStr}: PM_END missing → zeroing early (was ${dayEarlyMinutes})`);
-                                dayEarlyMinutes = 0;
                             }
                         }
                     }
@@ -1330,7 +1334,7 @@ Deno.serve(async (req: Request) => {
                     
                     lateMinutes += dayLateMinutes;
                     earlyCheckoutMinutes += dayEarlyMinutes;
-                } else if (hasSkipPunchApplied && hasOnlyFakePunches && !shouldSkipTimeCalculation) {
+                } else if (hasSkipApplied && hasOnlyFakePunches && !shouldSkipTimeCalculation) {
                     // SKIP_PUNCH with only fake punches (0 real punches + FULL_SKIP):
                     // No time calculation needed — all minutes already 0
                     console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 real punches, skip applied → no time calc needed`);
