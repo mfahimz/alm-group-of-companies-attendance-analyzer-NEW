@@ -238,7 +238,7 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 prevDayObj.setDate(prevDayObj.getDate() - 1);
                 const prevDateStr = prevDayObj.toISOString().split('T')[0];
 
-                const prevShift = resolveShift(prevDateStr, prevDayObj, employeeShifts, employeeExceptions);
+                const prevShift = dayOverrides[prevDateStr]?.shiftOverride || resolveShift(prevDateStr, prevDayObj, employeeShifts, employeeExceptions);
                 const prevEndsNearMidnight = prevShift ? shiftEndsNearMidnight(prevShift) : false;
 
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
@@ -250,14 +250,10 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                     todayPunchesRaw = todayPunchesRaw.filter(p => !localIsWithinMidnightBuffer(p.timestamp_raw));
                 }
 
-                const todayEndsNearMidnight = shiftEndsNearMidnight(shift);
-
                 const dayPunches = [
                     ...todayPunchesRaw.map(p => ({ ...p, _isNext: false })),
-                    ...(todayEndsNearMidnight
-                        ? empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
-                        : []
-                    ).map(p => ({ ...p, _isNext: true }))
+                    ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
+                        .map(p => ({ ...p, _isNext: true }))
                 ].map(p => {
                     const pt = localParseTime(p.timestamp_raw);
                     if (!pt) return null;
@@ -522,7 +518,7 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 prevDayObj.setDate(prevDayObj.getDate() - 1);
                 const prevDateStr = prevDayObj.toISOString().split('T')[0];
 
-                const prevShift = resolveShift(prevDateStr, prevDayObj, employeeShifts, employeeExceptions);
+                const prevShift = dayOverrides[prevDateStr]?.shiftOverride || resolveShift(prevDateStr, prevDayObj, employeeShifts, employeeExceptions);
                 const prevEndsNearMidnight = prevShift ? shiftEndsNearMidnight(prevShift) : false;
 
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
@@ -534,14 +530,9 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                     currentDayPunches = currentDayPunches.filter(p => !localIsWithinMidnightBuffer(p.timestamp_raw));
                 }
 
-                const todayEndsNearMidnight = shiftEndsNearMidnight(shift);
-
                 const combined = [
                     ...currentDayPunches,
-                    ...(todayEndsNearMidnight
-                        ? empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
-                        : []
-                    )
+                    ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
                 ];
 
                 if (combined.length === 0) continue;
