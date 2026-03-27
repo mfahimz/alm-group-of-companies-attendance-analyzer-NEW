@@ -47,7 +47,7 @@ export default function SalaryAdjustments() {
     const [searchTerm, setSearchTerm] = useState('');
     const [formData, setFormData] = useState({
         company: '',
-        hrms_id: '',
+        employee_id: '',
         category: 'bonus',
         label: '',
         amount: '',
@@ -125,11 +125,11 @@ export default function SalaryAdjustments() {
     // Filtering
     const filteredAdjustments = useMemo(() => {
         return adjustments.filter(adj => {
-            const employee = employees.find(e => e.hrms_id === adj.hrms_id);
+            const employee = employees.find(e => e.hrms_id === adj.employee_id);
             const employeeName = employee?.name || 'Unknown Employee';
             const matchesSearch = !searchTerm || 
                 employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                adj.hrms_id?.includes(searchTerm) ||
+                adj.employee_id?.includes(searchTerm) ||
                 adj.label?.toLowerCase().includes(searchTerm.toLowerCase());
             
             return matchesSearch;
@@ -139,7 +139,7 @@ export default function SalaryAdjustments() {
     const resetForm = () => {
         setFormData({
             company: filterCompany || '',
-            hrms_id: '',
+            employee_id: '',
             category: 'bonus',
             label: '',
             amount: '',
@@ -154,7 +154,7 @@ export default function SalaryAdjustments() {
         setEditingAdjustment(adj);
         setFormData({
             company: adj.company,
-            hrms_id: adj.hrms_id,
+            employee_id: adj.employee_id,
             category: adj.category,
             label: adj.label || '',
             amount: adj.amount,
@@ -167,7 +167,7 @@ export default function SalaryAdjustments() {
     };
 
     const handleSubmit = () => {
-        if (!formData.company || !formData.hrms_id || !formData.category || !formData.amount || !formData.start_date) {
+        if (!formData.company || !formData.employee_id || !formData.category || !formData.amount || !formData.start_date) {
             toast.error('Please fill required fields (Company, Employee, Category, Amount, Start Date)');
             return;
         }
@@ -181,8 +181,8 @@ export default function SalaryAdjustments() {
         return CATEGORIES.find(c => c.value === cat)?.label || cat;
     };
 
-    const getEmployeeName = (hrms_id) => {
-        return employees.find(e => e.hrms_id === hrms_id)?.name || hrms_id;
+    const getEmployeeName = (employee_id) => {
+        return employees.find(e => e.hrms_id === employee_id)?.name || employee_id;
     };
 
     if (!currentUser) return null;
@@ -254,11 +254,11 @@ export default function SalaryAdjustments() {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-xs">
-                                                    {getEmployeeName(adj.hrms_id).substring(0, 2).toUpperCase()}
+                                                    {getEmployeeName(adj.employee_id).substring(0, 2).toUpperCase()}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-slate-900">{getEmployeeName(adj.hrms_id)}</span>
-                                                    <span className="text-xs text-slate-500 font-semibold">{adj.hrms_id}</span>
+                                                    <span className="font-bold text-slate-900">{getEmployeeName(adj.employee_id)}</span>
+                                                    <span className="text-xs text-slate-500 font-semibold">{adj.employee_id}</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -317,7 +317,7 @@ export default function SalaryAdjustments() {
             </Card>
 
             <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if(!open) setEditingAdjustment(null); }}>
-                <DialogContent className="max-w-xl p-0 overflow-hidden sm:rounded-2xl border-none shadow-2xl">
+                <DialogContent className="max-w-xl p-0 overflow-hidden sm:rounded-2xl border-none shadow-2xl max-h-[90vh] flex flex-col">
                     <DialogHeader className="p-8 bg-slate-950 relative">
                         <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3 text-white">
                             <Plus className="w-6 h-6 text-indigo-400" />
@@ -327,7 +327,7 @@ export default function SalaryAdjustments() {
                             Set up a long-term adjustment for payroll injection
                         </p>
                     </DialogHeader>
-                    <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto bg-white">
+                    <div className="p-8 space-y-6 overflow-y-auto bg-white flex-1">
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-black uppercase text-slate-500 ml-1">Company Selection</Label>
@@ -347,8 +347,8 @@ export default function SalaryAdjustments() {
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-black uppercase text-slate-500 ml-1">Employee</Label>
                                 <Select
-                                    value={formData.hrms_id}
-                                    onValueChange={(val) => setFormData({ ...formData, hrms_id: val })}
+                                    value={formData.employee_id}
+                                    onValueChange={(val) => setFormData({ ...formData, employee_id: val })}
                                 >
                                     <SelectTrigger className="h-12 border-slate-200 rounded-xl focus:ring-indigo-500 font-semibold">
                                         <SelectValue placeholder="Select Employee" />
@@ -439,7 +439,7 @@ export default function SalaryAdjustments() {
                             />
                         </div>
                     </div>
-                    <DialogFooter className="p-8 bg-slate-50 border-t border-slate-100">
+                    <DialogFooter className="p-6 bg-slate-50 border-t border-slate-100 flex-shrink-0">
                         <Button variant="ghost" onClick={() => setShowDialog(false)} className="font-bold text-slate-500 hover:text-slate-700">Cancel</Button>
                         <Button onClick={handleSubmit} className="bg-slate-950 hover:bg-black px-8 font-black shadow-xl shadow-slate-200">
                             {editingAdjustment ? 'Save Changes' : 'Create Adjustment'}
