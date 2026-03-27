@@ -43,7 +43,8 @@
         "DAY_SWAP",
         "GIFT_MINUTES",
         "CUSTOM",
-        "DISMISSED_MISMATCH"
+        "DISMISSED_MISMATCH",
+        "HALF_DAY_HOLIDAY"
       ],
       "description": "Exception type"
     },
@@ -54,6 +55,14 @@
         "PM_PUNCH_OUT"
       ],
       "description": "For SKIP_PUNCH type: which punch to skip from analysis (AM_PUNCH_IN or PM_PUNCH_OUT)"
+    },
+    "half_day_target": {
+      "type": "string",
+      "description": "For HALF_DAY_HOLIDAY type: specifies which half of the day is the holiday (e.g., AM or PM)"
+    },
+    "target_punch": {
+      "type": "string",
+      "description": "Specifies which punch this exception targets (e.g., AM_PUNCH_IN, PM_PUNCH_OUT)"
     },
     "new_weekly_off": {
       "type": "string",
