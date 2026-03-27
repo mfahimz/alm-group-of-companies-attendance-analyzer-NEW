@@ -16,6 +16,7 @@ import AnomalyDetectionCard from './AnomalyDetectionCard';
 import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 import CloseProjectDialog from './CloseProjectDialog';
 import ProjectEmployeeOverrideDialog from '../projects/ProjectEmployeeOverrideDialog';
+import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 
 export default function OverviewTab({ project }) {
     const [showCloseDialog, setShowCloseDialog] = useState(false);
@@ -86,42 +87,12 @@ export default function OverviewTab({ project }) {
         queryFn: () => base44.entities.ProjectEmployee.filter({ project_id: project.id })
     });
 
-    const uniqueEmployees = new Set(punches.map(p => String(p.attendance_id))).size;
-
-    // Check for unmatched attendance IDs
-    const unmatchedCount = React.useMemo(() => {
-        if (!punches.length) return 0;
-        const masterIds = new Set(employees.map(e => String(e.attendance_id)));
-        const projectIds = new Set(projectEmployees.map(e => String(e.attendance_id)));
-        const punchIds = new Set(punches.map(p => String(p.attendance_id)));
-        return Array.from(punchIds).filter(id => !masterIds.has(id) && !projectIds.has(id)).length;
-    }, [punches, employees, projectEmployees]);
-
-    // Calculate working days (Monday to Saturday, excluding Sundays)
-    const calculateWorkingDays = () => {
-        const startDate = new Date(project.date_from);
-        const endDate = new Date(project.date_to);
-        let workingDays = 0;
-        
-        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const dayOfWeek = d.getDay();
-            if (dayOfWeek !== 0) { // Exclude Sunday
-                workingDays++;
-            }
-        }
-        
-        return workingDays;
-    };
-
-    const workingDays = calculateWorkingDays();
-
-    const lockMutation = useMutation({
-        mutationFn: () => base44.entities.Project.update(project.id, { status: 'locked' }),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['project', project.id]);
-            toast.success('Project locked successfully');
-        }
+    const { data: companyRecord } = useQuery({
+        queryKey: ['companyByName', project.company],
+        queryFn: () => base44.entities.Company.filter({ name: project.company }).then(r => r[0] || null),
+        enabled: !!project.company
     });
+    const isAlMaraghiMotors = companyRecord?.company_id === AL_MARAGHI_MOTORS_COMPANY_ID;
 
     const closeMutation = useMutation({
         mutationFn: async () => {
@@ -765,7 +736,7 @@ export default function OverviewTab({ project }) {
                             </p>
                         </div>
 
-                        {project.status !== 'closed' && (
+                        {project.status !== 'closed' && isAlMaraghiMotors && (
                             <div className="flex items-center space-x-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100/50">
                                 <Checkbox 
                                     id="sync_recurring_edit" 
