@@ -14,13 +14,13 @@ import {
     Search,
     Edit2,
     Trash2,
-    DollarSign,
     User,
     Calendar,
     Power,
     X,
     FolderKanban
 } from 'lucide-react';
+import AEDIcon from '@/components/ui/AEDIcon';
 import { toast } from 'sonner';
 import Breadcrumb from '@/components/ui/Breadcrumb';
 import { usePermissions } from '@/components/hooks/usePermissions';
@@ -317,12 +317,12 @@ export default function SalaryAdjustments() {
 
             <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if(!open) setEditingAdjustment(null); }}>
                 <DialogContent className="max-w-xl p-0 overflow-hidden sm:rounded-2xl border-none shadow-2xl">
-                    <DialogHeader className="p-8 bg-slate-950 text-white relative">
-                        <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+                    <DialogHeader className="p-8 bg-slate-950 relative">
+                        <DialogTitle className="text-2xl font-black tracking-tight flex items-center gap-3 text-white">
                             <Plus className="w-6 h-6 text-indigo-400" />
                             {editingAdjustment ? 'Edit Adjustment' : 'New Recurring Adjustment'}
                         </DialogTitle>
-                        <p className="text-slate-400 text-sm font-medium mt-1">
+                        <p className="text-white/80 text-sm font-medium mt-1">
                             Set up a long-term adjustment for payroll injection
                         </p>
                     </DialogHeader>
@@ -395,7 +395,7 @@ export default function SalaryAdjustments() {
                             <div className="space-y-2.5">
                                 <Label className="text-xs font-black uppercase text-slate-500 ml-1">Adjustment Amount</Label>
                                 <div className="relative">
-                                    <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    <AEDIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 opacity-60" />
                                     <Input
                                         type="number"
                                         value={formData.amount}
