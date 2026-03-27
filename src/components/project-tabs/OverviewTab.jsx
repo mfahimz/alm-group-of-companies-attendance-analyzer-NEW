@@ -115,6 +115,18 @@ export default function OverviewTab({ project }) {
     };
     const workingDays = calculateWorkingDays();
 
+    const lockMutation = useMutation({
+        mutationFn: () => base44.entities.Project.update(project.id, { status: 'locked' }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['project', project.id]);
+            queryClient.invalidateQueries(['projects']);
+            toast.success('Project locked successfully');
+        },
+        onError: () => {
+            toast.error('Failed to lock project');
+        }
+    });
+
     const closeMutation = useMutation({
         mutationFn: async () => {
             // 1. Update employees with unused grace minutes
