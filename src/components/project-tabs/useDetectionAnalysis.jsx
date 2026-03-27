@@ -13,20 +13,39 @@ export const extractTime = (timestamp) => {
  * Shared time parsing utility
  */
 const localParseTime = (timeStr) => {
-    if (!timeStr || timeStr === '—' || timeStr === '-') return null;
-    let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i) || timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-    if (timeMatch) {
-        let hours = parseInt(timeMatch[1]);
-        const minutes = parseInt(timeMatch[2]);
-        const period = (timeMatch[timeMatch.length - 1] || '').toUpperCase();
-        if (period === 'PM' && hours !== 12) hours += 12;
-        if (period === 'AM' && hours === 12) hours = 0;
-        const d = new Date(); d.setHours(hours, minutes, 0, 0); return d;
+    if (!timeStr || typeof timeStr !== 'string' || timeStr === '—' || timeStr === '-') return null;
+    
+    const normalized = timeStr.trim();
+    
+    // Capture AM/PM modifier and HH:MM(:SS)
+    const ampmMatch = normalized.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)/i);
+    if (ampmMatch) {
+        let hours = parseInt(ampmMatch[1]);
+        const minutes = parseInt(ampmMatch[2]);
+        const seconds = ampmMatch[3] ? parseInt(ampmMatch[3]) : 0;
+        const period = ampmMatch[4].toUpperCase();
+
+        if (period === 'AM') {
+            if (hours === 12) hours = 0;
+            // if hours < 12, remains (no change)
+        } else if (period === 'PM') {
+            if (hours < 12) hours += 12;
+            // if hours === 12, remains (no change)
+        }
+        
+        const d = new Date();
+        d.setHours(hours, minutes, seconds, 0);
+        return d;
     }
-    const hms = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (hms) {
-        const d = new Date(); d.setHours(parseInt(hms[1]), parseInt(hms[2]), hms[3] ? parseInt(hms[3]) : 0, 0); return d;
+
+    // Fallback for HH:MM(:SS) in 24h format
+    const hmsMatch = normalized.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (hmsMatch) {
+        const d = new Date();
+        d.setHours(parseInt(hmsMatch[1]), parseInt(hmsMatch[2]), hmsMatch[3] ? parseInt(hmsMatch[3]) : 0, 0);
+        return d;
     }
+
     return null;
 };
 
