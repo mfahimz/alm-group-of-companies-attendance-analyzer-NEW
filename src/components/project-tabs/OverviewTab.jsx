@@ -45,7 +45,8 @@ export default function OverviewTab({ project }) {
         // Added: Gift minutes date range fields tracking
         gift_minutes_date_from: project.gift_minutes_date_from || '',
         gift_minutes_date_to: project.gift_minutes_date_to || '',
-        shift_blocks_count: project.shift_blocks_count || 2
+        shift_blocks_count: project.shift_blocks_count || 2,
+        sync_recurring_adjustments: false
     });
 
     const { data: currentUser } = useQuery({
@@ -237,7 +238,6 @@ export default function OverviewTab({ project }) {
             await deleteBatch(shiftItems, base44.entities.ShiftTiming);
             await delay(500);
             
-            // Finally delete the project
             await base44.entities.Project.delete(project.id);
         },
         onSuccess: () => {
@@ -250,6 +250,23 @@ export default function OverviewTab({ project }) {
         }
     });
 
+    const syncRecurringMutation = useMutation({
+        mutationFn: async () => {
+            // Trigger the seeding function
+            await base44.functions.invoke('seedRecurringAdjustments', {
+                projectId: project.id
+            });
+        },
+        onSuccess: () => {
+            toast.success('Recurring adjustments synchronized successfully');
+            // We might need to invalidate OvertimeData queries if they are visible
+            queryClient.invalidateQueries(['overtimeData', project.id]);
+        },
+        onError: (error) => {
+            toast.error('Failed to sync recurring adjustments: ' + error.message);
+        }
+    });
+
     const handleDelete = () => {
         if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
             deleteMutation.mutate();
@@ -258,9 +275,9 @@ export default function OverviewTab({ project }) {
 
     const updateProjectMutation = useMutation({
         mutationFn: (data) => base44.entities.Project.update(project.id, {
-            ...data, // Pass all fields from editData // Comment: Ensure all form fields are sent
-            use_gift_minutes: !!data.use_gift_minutes, // Explicitly ensure use_gift_minutes is sent as a boolean // Fix: Explicitly include use_gift_minutes in the update payload
-            use_carried_grace_minutes: !!data.use_carried_grace_minutes // Explicitly ensure use_carried_grace_minutes is sent as a boolean // Fix: Explicitly include use_carried_grace_minutes to match gift minutes
+            ...data,
+            use_gift_minutes: !!data.use_gift_minutes,
+            use_carried_grace_minutes: !!data.use_carried_grace_minutes
         }),
         onSuccess: () => {
             queryClient.invalidateQueries(['project', project.id]);
@@ -273,7 +290,7 @@ export default function OverviewTab({ project }) {
         }
     });
 
-    const handleEditSubmit = (e) => {
+    const handleEditSubmit = async (e) => {
         e.preventDefault();
         if (!editData.name.trim()) {
             toast.error('Project name is required');
@@ -292,7 +309,20 @@ export default function OverviewTab({ project }) {
             toast.error('Start date must be before end date');
             return;
         }
-        updateProjectMutation.mutate(editData);
+
+        // Trigger sync if requested
+        if (editData.sync_recurring_adjustments) {
+            try {
+                await syncRecurringMutation.mutateAsync();
+            } catch (err) {
+                // Error handled by mutation already
+            }
+        }
+
+        updateProjectMutation.mutate({
+            ...editData,
+            sync_recurring_adjustments: undefined // Don't persist this flag
+        });
     };
 
     const stats = [
@@ -503,6 +533,18 @@ export default function OverviewTab({ project }) {
                             <Lock className="w-4 h-4 mr-2" />
                             {project.status === 'locked' ? 'Locked' : 'Lock Project'}
                         </Button>
+
+                        {(isAdmin || isSupervisor) && project.status !== 'closed' && (
+                            <Button
+                                onClick={() => syncRecurringMutation.mutate()}
+                                disabled={syncRecurringMutation.isPending}
+                                variant="outline"
+                                className="border-indigo-200 hover:bg-indigo-50 text-indigo-700"
+                            >
+                                <Calendar className="w-4 h-4 mr-2" />
+                                {syncRecurringMutation.isPending ? 'Syncing...' : 'Sync Recurring Adjustments'}
+                            </Button>
+                        )}
 
                         {isAdmin && project.status === 'analyzed' && (
                             <Button
@@ -721,6 +763,24 @@ export default function OverviewTab({ project }) {
                                 How many shift timing blocks this project needs
                             </p>
                         </div>
+
+                        {project.status !== 'closed' && (
+                            <div className="flex items-center space-x-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100/50">
+                                <Checkbox 
+                                    id="sync_recurring_edit" 
+                                    checked={editData.sync_recurring_adjustments}
+                                    onCheckedChange={(checked) => setEditData({ ...editData, sync_recurring_adjustments: checked })}
+                                />
+                                <div className="flex-1">
+                                    <Label htmlFor="sync_recurring_edit" className="font-semibold text-indigo-900 cursor-pointer">
+                                        Sync Recurring Adjustments
+                                    </Label>
+                                    <p className="text-[10px] text-indigo-600 mt-0.5">
+                                        Fetch latest recurring variables (Housing, etc.) from employee master.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex gap-3 pt-2">
                             <Button
                                 type="submit"

@@ -32,7 +32,8 @@ export default function CreateProjectDialog({ open, onClose }) {
         gift_minutes_date_from: '', // Added: Gift minutes date range tracking
         gift_minutes_date_to: '',   // Added: Gift minutes date range tracking
         weekly_off_override: '',
-        salary_calculation_days: 30
+        salary_calculation_days: 30,
+        fetch_recurring_adjustments: true
     });
     const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
     const [showRamadanDialog, setShowRamadanDialog] = useState(false);
@@ -94,6 +95,19 @@ export default function CreateProjectDialog({ open, onClose }) {
                     ramadanFrom: ramadanDateRange.from,
                     ramadanTo: ramadanDateRange.to
                 });
+            }
+
+            // Apply Recurring Adjustments if requested
+            if (data.fetch_recurring_adjustments) {
+                try {
+                    await base44.functions.invoke('seedRecurringAdjustments', {
+                        projectId: project.id
+                    });
+                    console.log(`[CreateProjectDialog] Recurring adjustments seeded for project ${project.id}`);
+                } catch (error) {
+                    console.error('[CreateProjectDialog] Failed to seed recurring adjustments:', error);
+                    toast.error('Project created, but failed to seed recurring adjustments');
+                }
             }
             
             return project;
@@ -407,6 +421,22 @@ export default function CreateProjectDialog({ open, onClose }) {
                             </p>
                         </div>
                     )}
+
+                    <div className="flex items-center space-x-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100/50">
+                        <Checkbox 
+                            id="fetch_recurring" 
+                            checked={formData.fetch_recurring_adjustments}
+                            onCheckedChange={(checked) => setFormData({ ...formData, fetch_recurring_adjustments: checked })}
+                        />
+                        <div className="flex-1">
+                            <Label htmlFor="fetch_recurring" className="font-semibold text-indigo-900 cursor-pointer">
+                                Fetch and Apply Recurring Adjustments
+                            </Label>
+                            <p className="text-[10px] text-indigo-600 mt-0.5">
+                                Automatically pre-populate adjustments from employee master (Housing, Incentive, etc.)
+                            </p>
+                        </div>
+                    </div>
 
                     <div className="flex justify-end gap-3 pt-4">
                         <Button type="button" variant="outline" onClick={onClose}>
