@@ -162,13 +162,13 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 px-4 md:px-0">
             <Breadcrumb items={[
       { label: 'Projects', href: 'Projects' },
       { label: project.name }]
       } />
             {/* Header */}
-            <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-xl p-6 sm:p-8 border border-slate-200 animate-in slide-in-from-top-4 duration-700">
+            <div className="bg-gradient-to-br from-white to-slate-50 rounded-3xl shadow-xl p-4 sm:p-8 border border-slate-200 animate-in slide-in-from-top-4 duration-700">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-3">
@@ -289,7 +289,7 @@ export default function ProjectDetail() {
             ) : (
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-3 border-b border-slate-200">
-                    <TabsList className="bg-white shadow-lg rounded-2xl p-1.5 flex flex-wrap h-auto gap-1 w-full sm:w-auto border-0">
+                    <TabsList className="bg-white shadow-lg rounded-2xl p-1.5 flex flex-nowrap overflow-x-auto scrollbar-hide h-auto gap-1 w-full sm:w-auto border-0">
                         <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-slate-600 data-[state=active]:to-slate-700 data-[state=active]:text-white data-[state=active]:shadow-lg text-xs sm:text-sm font-semibold rounded-xl transition-all duration-300">

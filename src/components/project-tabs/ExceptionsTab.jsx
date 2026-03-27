@@ -1635,7 +1635,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             {/* Group Export Button */}
             <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-green-50">
                 <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <p className="font-medium text-slate-900">Export All Data</p>
                             <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in a single consolidated sheet</p>
@@ -2188,7 +2188,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             {/* Exceptions Section */}
             <Card className="border-0 shadow-sm bg-blue-50/30">
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <CardTitle>Exceptions ({filteredExceptions.length})</CardTitle>
                         <div className="flex gap-2">
                         <Button
@@ -2550,8 +2550,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     </CardHeader>
                     <CardContent>
                         {/* Search and Filters for Report Exceptions */}
-                        <div className="flex gap-4 mb-4">
-                            <div className="relative flex-1 max-w-xs">
+                        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                            <div className="relative flex-1 w-full sm:max-w-xs">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <Input
                                     placeholder="Search by ID or name..."
@@ -2564,7 +2564,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 value={reportFilter.type}
                                 onValueChange={(value) => setReportFilter({ ...reportFilter, type: value })}
                             >
-                                <SelectTrigger className="max-w-xs">
+                                <SelectTrigger className="w-full sm:max-w-xs">
                                     <SelectValue placeholder="All types" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -2866,7 +2866,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 </p>
                             </div>
 
-                            <div className="border rounded-lg overflow-hidden">
+                            <div className="border rounded-lg overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>

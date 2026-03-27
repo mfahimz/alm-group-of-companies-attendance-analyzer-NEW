@@ -949,7 +949,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
         return (
             <Card className="border-0 shadow-sm">
                 <CardHeader className="bg-slate-50">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                             <Calendar className="w-5 h-5 text-indigo-600" />
                             <div>
@@ -1107,7 +1107,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                             </Button>
                                         )}
                                     </div>
-                                    <div className="flex gap-2 flex-wrap">
+                                    <div className="flex flex-col sm:flex-row gap-2 flex-wrap w-full sm:w-auto">
                                        <Button
                                            size="sm"
                                            variant="outline"
@@ -1177,7 +1177,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                         </Select>
                                     </div>
                                 </div>
-                                <div className="max-h-96 overflow-auto">
+                                <div className="max-h-96 overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
@@ -1559,7 +1559,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
             {/* Upload Section */}
             <Card className="border-0 shadow-sm">
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <CardTitle>Upload Shift Timings</CardTitle>
                         <div className="flex gap-2">
                             <Button 
@@ -1714,7 +1714,7 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                             </div>
                         )}
 
-                        <div className="border rounded-lg overflow-hidden">
+                        <div className="border rounded-lg overflow-x-auto">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
