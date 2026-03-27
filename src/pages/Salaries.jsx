@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Edit, Trash2, DollarSign, Upload, Download, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, Download, AlertTriangle, RefreshCw } from 'lucide-react';
+import AEDIcon from '../components/ui/AEDIcon';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -681,7 +682,7 @@ export default function Salaries() {
             <Card className="border-0 shadow-sm">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <DollarSign className="w-5 h-5" />
+                        <AEDIcon className="w-5 h-5" />
                         Salary Records ({filteredSalaries.length})
                     </CardTitle>
                 </CardHeader>
@@ -727,16 +728,16 @@ export default function Salaries() {
                                                 {salary.working_hours || 9} hrs/day
                                             </TableCell>
                                             <TableCell className="font-semibold">
-                                                AED {Number(salary.basic_salary || 0).toFixed(2)}
+                                                <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Number(salary.basic_salary || 0).toFixed(2)}</span>
                                             </TableCell>
                                             <TableCell>
-                                                AED {Number(salary.allowances || 0).toFixed(2)}
+                                                <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Number(salary.allowances || 0).toFixed(2)}</span>
                                             </TableCell>
                                             <TableCell>
-                                                AED {Number(salary.allowances_with_bonus || 0).toFixed(2)}
+                                                <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Number(salary.allowances_with_bonus || 0).toFixed(2)}</span>
                                             </TableCell>
                                             <TableCell className="font-bold text-green-700">
-                                                AED {Number(salary.total_salary || 0).toFixed(2)}
+                                                <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Number(salary.total_salary || 0).toFixed(2)}</span>
                                             </TableCell>
                                             <TableCell>
                                                 {salary.company === 'Al Maraghi Motors' && salary.wps_cap_enabled ? (
@@ -925,8 +926,8 @@ export default function Salaries() {
 
                         <div className="col-span-2 bg-slate-50 rounded-lg p-4">
                             <div className="text-sm text-slate-600">Total Salary</div>
-                            <div className="text-2xl font-bold text-green-600">
-                                AED {Number(
+                            <div className="text-2xl font-bold text-green-600 inline-flex items-center gap-1">
+                                <AEDIcon className="w-6 h-6" />{Number(
                                     formData.basic_salary + 
                                     formData.allowances +
                                     formData.allowances_with_bonus
@@ -998,10 +999,10 @@ export default function Salaries() {
                                                         <TableCell>{record.name}</TableCell>
                                                         <TableCell>{record.company}</TableCell>
                                                         <TableCell>{record.workingHours}</TableCell>
-                                                        <TableCell>AED {record.basicSalary}</TableCell>
-                                                        <TableCell>AED {record.allowances}</TableCell>
-                                                        <TableCell>AED {record.bonus}</TableCell>
-                                                        <TableCell className="font-semibold">AED {record.totalSalary}</TableCell>
+                                                        <TableCell><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.basicSalary}</span></TableCell>
+                                                        <TableCell><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.allowances}</span></TableCell>
+                                                        <TableCell><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.bonus}</span></TableCell>
+                                                        <TableCell className="font-semibold"><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.totalSalary}</span></TableCell>
                                                         <TableCell>
                                                             <span className={`px-2 py-1 rounded text-xs ${
                                                                 record.action === 'Create' 
