@@ -413,6 +413,17 @@ export default function ChangeTracker() {
         }
     };
 
+    /**
+     * Updates the sorting configuration for the change tracker list view.
+     * Toggles direction if the same column is clicked, otherwise defaults to ascending.
+     */
+    const handleSort = (key) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
     const onDragEnd = (result) => {
         const { destination, source, draggableId } = result;
         if (!destination || (destination.droppableId === source.droppableId && destination.index === source.index)) return;
