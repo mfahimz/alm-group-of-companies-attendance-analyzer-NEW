@@ -354,20 +354,6 @@ export default function SalaryAdjustments() {
                                         <SelectValue placeholder="Select Employee" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <div className="p-2 sticky top-0 bg-white z-10 border-b border-slate-100 mb-1">
-                                            <div className="relative">
-                                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                                <Input 
-                                                    placeholder="Filter employees..." 
-                                                    className="pl-8 h-8 text-xs border-none bg-slate-50"
-                                                    onChange={(e) => {
-                                                        const term = e.target.value.toLowerCase();
-                                                        // Note: This is a mental filter since SelectItem doesn't handle visibility easily in standard shadcn Select
-                                                        // but standard practice here is to rely on natural scrolling or a better combobox if needed
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
                                         {employees.filter(e => !formData.company || e.company === formData.company).map(e => (
                                             <SelectItem key={e.hrms_id} value={e.hrms_id} className="font-medium">
                                                 {e.name} ({e.hrms_id})
