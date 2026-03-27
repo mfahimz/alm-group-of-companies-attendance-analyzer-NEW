@@ -287,7 +287,7 @@ export default function ProjectDetail() {
                 <ReportTab project={project} isDepartmentHead={true} />
             ) : (
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl -mx-6 px-6 py-4 border-b border-slate-200/60">
+                <div className="sticky top-0 z-10 bg-slate-50/80 backdrop-blur-xl py-4 border-b border-slate-200/60">
                     <TabsList className="bg-slate-200/50 backdrop-blur-md rounded-full p-1.5 flex flex-nowrap overflow-x-auto scrollbar-hide h-auto gap-1 w-full sm:w-auto border border-slate-300/50 shadow-inner">
                         <TabsTrigger
               value="overview"
