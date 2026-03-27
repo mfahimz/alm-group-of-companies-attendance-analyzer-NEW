@@ -14,6 +14,7 @@ import {
     Search,
     Edit2,
     Trash2,
+    DollarSign,
     User,
     Calendar,
     Power,
