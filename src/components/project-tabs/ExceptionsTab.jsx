@@ -819,12 +819,8 @@ export default function ExceptionsTab({ project }) {
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user';
-
-    const { data: allUsers = [] } = useQuery({
-        queryKey: ['users'],
-        queryFn: () => base44.entities.User.list(),
-        enabled: !!currentUser && isUser
-    });
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
