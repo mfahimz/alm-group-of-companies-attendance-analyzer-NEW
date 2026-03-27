@@ -141,6 +141,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         refetchOnMount: false
     });
 
+    const shiftEndsNearMidnight = (shift) => {
+        const tEnd = parseTime(shift?.pm_end) || parseTime(shift?.am_end);
+        if (!tEnd) return false;
+        const h = tEnd.getHours();
+        return h === 23 || h === 0 || h === 1;
+    };
+
+    /**
+     * Check if a shift starts near midnight (11 PM, 12 AM, 1 AM, or 2 AM)
+     */
+    const shiftStartsNearMidnight = (shift) => {
+        const tStart = parseTime(shift?.am_start);
+        if (!tStart) return false;
+        const h = tStart.getHours();
+        return h === 23 || h === 0 || h === 1 || h === 2;
+    };
+
     // Filter employees and results for department heads - MUST use managed_employee_ids
     const employees = React.useMemo(() => {
         if (!isDepartmentHead || !deptHeadVerification?.verified) {
@@ -591,18 +608,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            let rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
-                .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw);
-                    const timeB = parseTime(b.timestamp_raw);
-                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
-                });
-
-            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
-            if (prevShiftEndsNearMidnight) {
-                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
-            }
-
             const matchingExceptionsCalc = employeeExceptions.filter(ex => {
                 const exFrom = new Date(ex.date_from);
                 const exTo = new Date(ex.date_to);
@@ -679,6 +684,19 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     am_start: dayOverride.shiftOverride.am_start, am_end: dayOverride.shiftOverride.am_end,
                     pm_start: dayOverride.shiftOverride.pm_start, pm_end: dayOverride.shiftOverride.pm_end
                 };
+            }
+
+            let rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw);
+                    const timeB = parseTime(b.timestamp_raw);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
+            // FIX: Unconditionally exclude midnight buffer punches unless today's shift starts near midnight
+            // OR previous shift actually ended near midnight (meaning it was already 'consumed' yesterday)
+            if (prevShiftEndsNearMidnight || !shiftStartsNearMidnight(shift)) {
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
             }
 
             let shiftEndsNearMidnight = false;

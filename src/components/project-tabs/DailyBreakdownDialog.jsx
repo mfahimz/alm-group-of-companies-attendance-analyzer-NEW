@@ -143,6 +143,13 @@ export default function DailyBreakdownDialog({
                 weeklyOffDay = dayNameToNumber[employee.weekly_off];
             }
 
+            const shiftStartsNearMidnight = (s) => {
+                const tStart = parseTime(s?.am_start, includeSeconds);
+                if (!tStart) return false;
+                const h = tStart.getHours();
+                return h === 23 || h === 0 || h === 1 || h === 2;
+            };
+
             // If this weekly off day was counted as LOP-adjacent, include it in breakdown with special flag
             if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
                 if (lopAdjacentDates.has(dateStr)) {
@@ -188,34 +195,6 @@ export default function DailyBreakdownDialog({
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
-            // Check if previous day's shift ended near midnight
-            let prevShiftEndsNearMidnight = false;
-            {
-                const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
-                const prevGeneralShifts = employeeShifts.filter(s => !s.date);
-                const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
-                for (const ps of prevShiftCandidates) {
-                    const pEndTime = parseTime(ps.pm_end, includeSeconds);
-                    if (pEndTime) {
-                        const h = pEndTime.getHours();
-                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
-                    }
-                }
-            }
-
-            // Get punches for this date
-            let rawDayPunches = allEmployeePunchesExtended.filter(p => p.punch_date === dateStr)
-                .sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
-                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
-                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
-                });
-
-            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
-            if (prevShiftEndsNearMidnight) {
-                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
-            }
-
             // Find shift for this date
             const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             const currentDayName = dayNames[dayOfWeek];
@@ -232,6 +211,29 @@ export default function DailyBreakdownDialog({
             const dateException = matchingExceptions.length > 0
                 ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
                 : null;
+
+            // Get punches for this date
+            let rawDayPunches = allEmployeePunchesExtended.filter(p => p.punch_date === dateStr)
+                .sort((a, b) => {
+                    const timeA = parseTime(a.timestamp_raw, includeSeconds);
+                    const timeB = parseTime(b.timestamp_raw, includeSeconds);
+                    return (timeA?.getTime() || 0) - (timeB?.getTime() || 0);
+                });
+
+            // Check if previous day's shift ended near midnight
+            let prevShiftEndsNearMidnight = false;
+            {
+                const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
+                const prevGeneralShifts = employeeShifts.filter(s => !s.date);
+                const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
+                for (const ps of prevShiftCandidates) {
+                    const pEndTime = parseTime(ps.pm_end, includeSeconds);
+                    if (pEndTime) {
+                        const h = pEndTime.getHours();
+                        if (h === 23 || h === 0) { prevShiftEndsNearMidnight = true; break; }
+                    }
+                }
+            }
 
             let shift = employeeShifts.find(s => s.date === dateStr && checkShiftEffective(s, currentDate));
 
@@ -269,6 +271,12 @@ export default function DailyBreakdownDialog({
                         pm_start: dateException.new_pm_start, pm_end: dateException.new_pm_end
                     };
                 }
+            }
+
+            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
+            // We now exclude UNCONDITIONALLY if prev ended near midnight OR today doesn't start near midnight
+            if (prevShiftEndsNearMidnight || !shiftStartsNearMidnight(shift)) {
+                rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
             }
 
             // Check if THIS shift ends near midnight → grab next-day crossover punches

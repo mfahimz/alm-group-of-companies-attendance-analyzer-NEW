@@ -136,6 +136,16 @@ const shiftEndsNearMidnight = (shift) => {
     return h === 23 || h === 0 || h === 1;
 };
 
+/**
+ * Check if a shift starts near midnight (11 PM, 12 AM, 1 AM, or 2 AM)
+ */
+const localShiftStartsNearMidnight = (shift) => {
+    const tStart = localParseTime(shift?.am_start);
+    if (!tStart) return false;
+    const h = tStart.getHours();
+    return h === 23 || h === 0 || h === 1 || h === 2;
+};
+
 // =====================================================================
 // HOOK: useDetectionAnalysis
 // Extracts shift mismatch and no-match detection logic from ReportDetailView
@@ -211,7 +221,9 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
                 let todayPunchesRaw = empPunches.filter(p => p.punch_date === dateStr);
 
-                if (prevEndsNearMidnight || !prevShift) {
+                // FIX: Unconditionally exclude midnight buffer punches unless today's shift starts near midnight
+                // OR previous shift actually ended near midnight (meaning it was already 'consumed' yesterday)
+                if (prevEndsNearMidnight || !localShiftStartsNearMidnight(shift)) {
                     todayPunchesRaw = todayPunchesRaw.filter(p => !localIsWithinMidnightBuffer(p.timestamp_raw));
                 }
 
@@ -342,9 +354,10 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
         const flagged = [];
         if (!reportRun?.date_to || !punches.length || !shifts.length) return flagged;
 
-        const localFilterMultiplePunches = (punchList) => {
+        const localFilterMultiplePunches = (punchList, shift) => {
             if (punchList.length <= 1) return punchList;
             const withTime = punchList.map(p => ({ ...p, time: localParseTime(p.timestamp_raw) })).filter(p => p.time);
+            if (withTime.length === 0) return punchList;
             const deduped = [];
             for (const current of withTime) {
                 if (!deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10)) {
@@ -354,7 +367,7 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
             return deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
         };
 
-        const localMatchPunches = (dayPunches, shift, nextDateStr) => {
+        const localMatchPunchesToShiftPointsWithMidnight = (dayPunches, shift, nextDateStr) => {
             if (!shift || dayPunches.length === 0) return [];
             const punchesWithTime = dayPunches.map(p => {
                 const time = localParseTime(p.timestamp_raw);
@@ -375,16 +388,53 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
             const usedPoints = new Set();
             for (const punch of punchesWithTime) {
                 let closest = null, minD = Infinity;
+                let isExtendedMatch = false;
+                let isFarExtendedMatch = false;
+
+                // Tier 1: 60m
                 for (const sp of shiftPoints) {
                     if (usedPoints.has(sp.type)) continue;
                     const d = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
-                    if (d <= 180 && d < minD) { minD = d; closest = sp; }
+                    if (d <= 60 && d < minD) { minD = d; closest = sp; }
                 }
+
+                // Tier 2: 120m
+                if (!closest) {
+                    for (const sp of shiftPoints) {
+                        if (usedPoints.has(sp.type)) continue;
+                        const d = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
+                        if (d <= 120 && d < minD) { minD = d; closest = sp; isExtendedMatch = true; }
+                    }
+                }
+
+                // Tier 3: 180m
+                if (!closest) {
+                    for (const sp of shiftPoints) {
+                        if (usedPoints.has(sp.type)) continue;
+                        const d = Math.abs(punch.time.getTime() - sp.time.getTime()) / (1000 * 60);
+                        if (d <= 180 && d < minD) { minD = d; closest = sp; isFarExtendedMatch = true; }
+                    }
+                }
+
                 if (closest) {
-                    matches.push({ punch, matchedTo: closest.type });
+                    matches.push({
+                        punch,
+                        matchedTo: closest.type,
+                        distance: minD,
+                        shiftTime: closest.time,
+                        isExtendedMatch,
+                        isFarExtendedMatch
+                    });
                     usedPoints.add(closest.type);
                 } else {
-                    matches.push({ punch, matchedTo: null });
+                    matches.push({
+                        punch,
+                        matchedTo: null,
+                        distance: null,
+                        shiftTime: null,
+                        isExtendedMatch: false,
+                        isFarExtendedMatch: false
+                    });
                 }
             }
             return matches;
@@ -455,8 +505,9 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 const empPunches = punches.filter(p => String(p.attendance_id) === String(employeeAttendanceId));
                 let currentDayPunches = empPunches.filter(p => p.punch_date === dateStr);
 
-                // Only exclude midnight buffer punches if previous shift actually ended near midnight
-                if (prevEndsNearMidnight) {
+                // FIX: Unconditionally exclude midnight buffer punches unless today's shift starts near midnight
+                // OR previous shift actually ended near midnight (meaning it was already 'consumed' yesterday)
+                if (prevEndsNearMidnight || !localShiftStartsNearMidnight(shift)) {
                     currentDayPunches = currentDayPunches.filter(p => !localIsWithinMidnightBuffer(p.timestamp_raw));
                 }
 
@@ -472,8 +523,8 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
 
                 if (combined.length === 0) continue;
 
-                const filtered = localFilterMultiplePunches(combined);
-                const matches = localMatchPunches(filtered, shift, nextDateStr);
+                const filtered = localFilterMultiplePunches(combined, shift);
+                const matches = localMatchPunchesToShiftPointsWithMidnight(filtered, shift, nextDateStr);
 
                 const noMatches = matches.filter(m => m.matchedTo === null);
 
