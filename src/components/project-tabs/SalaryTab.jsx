@@ -511,7 +511,7 @@ export default function SalaryTab({ project }) {
                         ) : (
                             <div className="overflow-x-auto">
                                 <Table>
-                                    <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                    <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
                                         <TableRow className="hover:bg-transparent border-none">
                                             <TableHead>Report Name</TableHead>
                                             <TableHead>Generated On</TableHead>
@@ -522,7 +522,7 @@ export default function SalaryTab({ project }) {
                                     </TableHeader>
                                     <TableBody>
                                         {savedSalaryReports.map(report => (
-                                            <TableRow key={report.id} className="hover:bg-slate-50/80 transition-colors duration-200">
+                                            <TableRow key={report.id} className="hover:bg-slate-100/50 transition-colors duration-200">
                                                 <TableCell className="font-medium">{report.report_name}</TableCell>
                                                 <TableCell className="text-slate-600">
                                                     {new Date(report.created_date).toLocaleString('en-US', {

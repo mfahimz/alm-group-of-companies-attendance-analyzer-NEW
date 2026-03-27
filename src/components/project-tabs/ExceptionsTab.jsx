@@ -256,7 +256,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                     <div className="flex items-center gap-3">
                         <CardTitle>Checklist</CardTitle>
                         {selectedIds.size > 0 && (
-                            <span className="text-xs font-medium bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
+                            <span className="text-xs font-medium bg-slate-50 text-slate-700 px-2 py-0.5 rounded-full ring-1 ring-slate-200">
                                 {selectedIds.size} selected
                             </span>
                         )}
@@ -352,7 +352,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                 ) : (
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                            <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
                                 <TableRow className="hover:bg-transparent border-none">
                                     <TableHead className="w-10 px-4">
                                         <Checkbox
@@ -373,7 +373,7 @@ function ChecklistSection({ project, checklistItems = [] }) {
                                         key={task.id}
                                         className={[
                                             'transition-colors duration-200',
-                                            task.status === 'completed' ? 'bg-green-50/50 hover:bg-green-100/60' : 'hover:bg-slate-50/80',
+                                            task.status === 'completed' ? 'bg-green-50/50 hover:bg-green-100/60' : 'hover:bg-slate-100/50',
                                             selectedIds.has(task.id) ? 'ring-1 ring-inset ring-green-400 bg-green-50/60 shadow-sm transition-all duration-200' : ''
                                         ].join(' ')}
                                     >
@@ -1176,18 +1176,18 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 
     const getTypeColor = (type) => {
         const colors = {
-            'PUBLIC_HOLIDAY': 'bg-purple-100 text-purple-700 border-purple-200',
-            'SICK_LEAVE': 'bg-red-100 text-red-700 border-red-200',
-            'ANNUAL_LEAVE': 'bg-blue-100 text-blue-700 border-blue-200',
-            'SHIFT_OVERRIDE': 'bg-orange-100 text-orange-700 border-orange-200',
-            'MANUAL_PRESENT': 'bg-green-100 text-green-700 border-green-200',
-            'MANUAL_ABSENT': 'bg-red-100 text-red-700 border-red-200',
+            'PUBLIC_HOLIDAY': 'bg-purple-50 text-purple-700 ring-1 ring-purple-200',
+            'SICK_LEAVE': 'bg-red-50 text-red-700 ring-1 ring-red-200',
+            'ANNUAL_LEAVE': 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+            'SHIFT_OVERRIDE': 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
+            'MANUAL_PRESENT': 'bg-green-50 text-green-700 ring-1 ring-green-200',
+            'MANUAL_ABSENT': 'bg-red-50 text-red-700 ring-1 ring-red-200',
 
-            'ALLOWED_MINUTES': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-            'SKIP_PUNCH': 'bg-cyan-100 text-cyan-700 border-cyan-200',
-            'DAY_SWAP': 'bg-pink-100 text-pink-700 border-pink-200'
+            'ALLOWED_MINUTES': 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
+            'SKIP_PUNCH': 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200',
+            'DAY_SWAP': 'bg-pink-50 text-pink-700 ring-1 ring-pink-200',
         };
-        return colors[type] || 'bg-slate-100 text-slate-700 border-slate-200';
+        return colors[type] || 'bg-slate-50 text-slate-700 ring-1 ring-slate-200';
     };
 
     const resetForm = () => {
@@ -2397,7 +2397,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     ) : (
                         <div className="overflow-x-auto">
                             <Table>
-                                <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
                                     <TableRow className="hover:bg-transparent border-none">
                                         {!isUser && (
                                             <TableHead className="w-12">
@@ -2434,7 +2434,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                    {paginatedExceptions.map((exception) => {
                                        const employeeName = employees.find(e => String(e.attendance_id) === String(exception.attendance_id) && e.company === project.company)?.name || '—';
                                        return (
-                                           <TableRow key={exception.id} className="hover:bg-slate-50/80 transition-colors duration-200">
+                                           <TableRow key={exception.id} className="hover:bg-slate-100/50 transition-colors duration-200">
                                            {!isUser && (
                                                 <TableCell className="p-1">
                                                     <Checkbox
@@ -2576,7 +2576,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                         </div>
                         <div className="overflow-x-auto">
                             <Table>
-                                <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
                                     <TableRow className="hover:bg-transparent border-none">
                                         <TableHead className="w-12">Use</TableHead>
                                         <TableHead className="w-24">ID</TableHead>
@@ -2597,7 +2597,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             </TableCell>
                                         </TableRow>
                                     ) : filteredReportExceptions.map((exception) => (
-                                        <TableRow key={exception.id} className="hover:bg-slate-50/80 transition-colors duration-200">
+                                        <TableRow key={exception.id} className="hover:bg-slate-100/50 transition-colors duration-200">
                                             <TableCell className="p-1">
                                                 <Checkbox
                                                     checked={exception.use_in_analysis !== false}

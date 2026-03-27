@@ -162,7 +162,7 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 px-4 md:px-0">
+    <div className="space-y-6 animate-in fade-in duration-500 px-4 md:px-0 bg-gradient-to-br from-slate-50 to-white min-h-screen">
             <Breadcrumb items={[
       { label: 'Projects', href: 'Projects' },
       { label: project.name }]
@@ -291,50 +291,50 @@ export default function ProjectDetail() {
                     <TabsList className="bg-slate-200/50 backdrop-blur-md rounded-full p-1.5 flex flex-nowrap overflow-x-auto scrollbar-hide h-auto gap-1 w-full sm:w-auto border border-slate-300/50 shadow-inner">
                         <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-white data-[state=active]:text-slate-950 data-[state=active]:ring-1 data-[state=active]:ring-slate-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Overview
                         </TabsTrigger>
                         <TabsTrigger
               value="shifts"
               disabled={isReadOnly}
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:ring-1 data-[state=active]:ring-blue-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Shifts {isReadOnly && '🔒'}
                         </TabsTrigger>
                         <TabsTrigger
               value="punches"
               disabled={isReadOnly}
-              className="data-[state=active]:bg-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:ring-1 data-[state=active]:ring-cyan-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Punches {isReadOnly && '🔒'}
                         </TabsTrigger>
                         <TabsTrigger
               value="exceptions"
               disabled={isReadOnly}
-              className="data-[state=active]:bg-amber-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:ring-1 data-[state=active]:ring-amber-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Exceptions {isReadOnly && '🔒'}
                         </TabsTrigger>
                         {isAlMaraghiMotors &&
             <TabsTrigger
               value="overtime"
-              className="data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 data-[state=active]:ring-1 data-[state=active]:ring-orange-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                                 Adjustments
                             </TabsTrigger>
             }
                         <TabsTrigger
               value="report"
-              className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:ring-1 data-[state=active]:ring-indigo-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Attendance {isReadOnly && '🔒'}
                         </TabsTrigger>
                         {isAlMaraghiMotors &&
             <TabsTrigger
               value="salary"
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+              className="data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:ring-1 data-[state=active]:ring-green-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                                 Salary
                             </TabsTrigger>
             }
                     </TabsList>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-2 sm:p-6 min-h-[400px]">
+                <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 ring-1 ring-slate-200 p-2 sm:p-6 min-h-[400px]">
                     <TabsContent value="overview">
                         {activeTab === 'overview' && <OverviewTab project={project} />}
                     </TabsContent>
