@@ -554,7 +554,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             }
         },
         onSuccess: () => {
+            // Updated invalidation to match query key structure in ReportDetailView
             queryClient.invalidateQueries(['results', project.id]);
+            queryClient.invalidateQueries(['results', analysisResult.report_run_id]);
+            queryClient.invalidateQueries(['exceptions', project.id]);
             toast.success((isUser && !isSupervisor) ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
             if (onSave) onSave();
             onClose();

@@ -161,10 +161,21 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 e.use_in_analysis !== false
             );
 
+            const dayOverrides = result.day_overrides ? JSON.parse(result.day_overrides) : {};
+
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const currentDay = new Date(d);
                 const dateStr = currentDay.toISOString().split('T')[0];
                 const dayOfWeek = currentDay.getDay();
+
+                // Respect manual day overrides
+                const dayOverride = dayOverrides[dateStr];
+                if (dayOverride) {
+                    // If manually set to a specific type, skip detection as it's already audited
+                    if (['OFF', 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'ANNUAL_LEAVE'].includes(dayOverride.type)) {
+                        continue;
+                    }
+                }
 
                 // Skip weekly off days
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) continue;
@@ -177,7 +188,12 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 });
                 if (hasException) continue;
 
-                const shift = resolveShift(dateStr, currentDay, employeeShifts, employeeExceptions);
+                let shift = null;
+                if (dayOverride?.shiftOverride) {
+                    shift = dayOverride.shiftOverride;
+                } else {
+                    shift = resolveShift(dateStr, currentDay, employeeShifts, employeeExceptions);
+                }
                 if (!shift) continue;
 
                 const nextDayObj = new Date(currentDay);
@@ -389,10 +405,21 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 e.use_in_analysis !== false
             );
 
+            const dayOverrides = result.day_overrides ? JSON.parse(result.day_overrides) : {};
+
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                 const currentDay = new Date(d);
                 const dateStr = currentDay.toISOString().split('T')[0];
                 const dayOfWeek = currentDay.getDay();
+
+                // Respect manual day overrides
+                const dayOverride = dayOverrides[dateStr];
+                if (dayOverride) {
+                    // If manually set to a specific type, skip detection as it's already audited
+                    if (['OFF', 'SICK_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'ANNUAL_LEAVE'].includes(dayOverride.type)) {
+                        continue;
+                    }
+                }
 
                 // FIX 1: Skip weekly off days
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) continue;
@@ -405,7 +432,12 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                 });
                 if (hasException) continue;
 
-                const shift = resolveShift(dateStr, currentDay, employeeShifts, employeeExceptions);
+                let shift = null;
+                if (dayOverride?.shiftOverride) {
+                    shift = dayOverride.shiftOverride;
+                } else {
+                    shift = resolveShift(dateStr, currentDay, employeeShifts, employeeExceptions);
+                }
                 if (!shift) continue;
 
                 const nextDayObj = new Date(currentDay);
