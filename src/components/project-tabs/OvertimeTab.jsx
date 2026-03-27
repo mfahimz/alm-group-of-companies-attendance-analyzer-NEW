@@ -395,12 +395,20 @@ export default function OvertimeTab({ project }) {
      * Filters active recurring adjustments for a specific employee within the project period.
      */
     const getEmployeeRecurring = (empId, hrmsId, category) => {
-        return (recurringAdjustments || []).filter(ra => 
-            (ra.employee_id && (String(ra.employee_id) === String(empId) || String(ra.employee_id) === String(hrmsId))) &&
-            ra.category === category &&
-            ra.start_date <= project.date_to &&
-            (!ra.end_date || ra.end_date >= project.date_from)
-        );
+        return (recurringAdjustments || []).filter(ra => {
+            const isEmployee = ra.employee_id && (String(ra.employee_id) === String(empId) || String(ra.employee_id) === String(hrmsId));
+            if (!isEmployee) return false;
+            
+            // Period check
+            const isInPeriod = ra.start_date <= project.date_to && (!ra.end_date || ra.end_date >= project.date_from);
+            if (!isInPeriod) return false;
+
+            // Category match (with allowance -> incentive mapping)
+            if (ra.category === category) return true;
+            if (category === 'incentive' && ra.category === 'allowance') return true;
+            
+            return false;
+        });
     };
     const handleChange = (attendanceId, field, value) => {
         setEditableData(prev => ({

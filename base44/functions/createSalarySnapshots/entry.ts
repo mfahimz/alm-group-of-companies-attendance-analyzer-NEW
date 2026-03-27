@@ -1271,7 +1271,18 @@ Deno.serve(async (req) => {
          * Returns both the numeric sum (for calculation) and the JSON entries (for snapshot storage).
          */
         const resolveAdjustments = (attendanceId: any, hrmsId: any, manualRecord: any, allRecurring: any[], projectFrom: string, projectTo: string) => {
-            const categories = ['bonus', 'incentive', 'otherDeduction', 'advanceSalaryDeduction', 'open_leave_salary', 'variable_salary'];
+            const categories = ['bonus', 'incentive', 'allowance', 'otherDeduction', 'advanceSalaryDeduction', 'open_leave_salary', 'variable_salary'];
+    
+    // Map categories to OvertimeData field names if they differ
+    const categoryToField = {
+        'bonus': 'bonus',
+        'incentive': 'incentive',
+        'allowance': 'incentive', // Map allowance to incentive for now as most similar
+        'otherDeduction': 'otherDeduction',
+        'advanceSalaryDeduction': 'advanceSalaryDeduction',
+        'open_leave_salary': 'open_leave_salary',
+        'variable_salary': 'variable_salary'
+    };
             const result: Record<string, any> = {};
 
             // Filter recurring adjustments for this employee and period
@@ -1282,49 +1293,61 @@ Deno.serve(async (req) => {
             );
 
             categories.forEach(cat => {
-                let entries = [];
-                const dbValue = manualRecord ? manualRecord[cat] : null;
+                const targetField = categoryToField[cat as keyof typeof categoryToField] || cat;
+                const fieldEntriesKey = `${targetField}_entries`;
+                
+                if (!result[fieldEntriesKey]) result[fieldEntriesKey] = [];
+                
+                const dbValue = manualRecord ? manualRecord[targetField] : null;
 
                 // 1. Load manual entries (handle both JSON array string and numeric legacy)
-                if (dbValue) {
+                if (dbValue && result[fieldEntriesKey].length === 0) {
                     if (typeof dbValue === 'string' && (dbValue.trim().startsWith('[') || dbValue.trim().startsWith('{'))) {
                         try {
                             const parsed = JSON.parse(dbValue);
                             // Filter out existing (Recurring) entries to avoid double-counting on recalculation
-                            if (Array.isArray(parsed)) entries = parsed.filter(e => !e.desc?.includes('(Recurring)'));
+                            if (Array.isArray(parsed)) result[fieldEntriesKey] = parsed.filter((e: any) => !e.desc?.includes('(Recurring)'));
                             else {
                                 const num = parseFloat(dbValue);
-                                if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                                if (!isNaN(num) && num !== 0) result[fieldEntriesKey] = [{ amount: num, desc: '' }];
                             }
                         } catch (e) {
                             const num = parseFloat(dbValue);
-                            if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                            if (!isNaN(num) && num !== 0) result[fieldEntriesKey] = [{ amount: num, desc: '' }];
                         }
                     } else {
                         const num = parseFloat(dbValue);
-                        if (!isNaN(num) && num !== 0) entries = [{ amount: num, desc: '' }];
+                        if (!isNaN(num) && num !== 0) result[fieldEntriesKey] = [{ amount: num, desc: '' }];
                     }
                 }
 
                 // 2. Add matching recurring entries
                 const categoryRecurring = employeeRecurring.filter(ra => ra.category === cat);
                 categoryRecurring.forEach(ra => {
-                    entries.push({
+                    result[fieldEntriesKey].push({
                         amount: ra.amount || 0,
                         desc: `${ra.label || ra.category} (Recurring)`
                     });
                 });
+            });
 
-                // 3. Compute final sum and format for storage
-                const sum = entries.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-                result[cat] = {
+            // 3. Compute final sums and format for storage
+            const finalResult: Record<string, any> = {};
+            const uniqueTargetFields = [...new Set(Object.values(categoryToField))];
+            
+            uniqueTargetFields.forEach(field => {
+                const entries = result[`${field}_entries`] || [];
+                const sum = entries.reduce((s: number, e: any) => s + (parseFloat(e.amount) || 0), 0);
+                
+                finalResult[field] = {
                     sum,
-                    // If multiple entries or recurring items, store as JSON; otherwise use numeric sum for backward compatibility
-                    value: entries.length > 1 || categoryRecurring.length > 0 
+                    value: entries.length > 1 || entries.some((e: any) => e.desc?.includes('(Recurring)'))
                         ? JSON.stringify(entries) 
                         : (entries.length === 1 ? entries[0].amount : 0)
                 };
             });
+
+            return finalResult;
 
             return result;
         };

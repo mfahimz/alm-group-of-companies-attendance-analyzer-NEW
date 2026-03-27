@@ -19,6 +19,7 @@ import EmployeeProfile from './pages/EmployeeProfile';
 import Salaries from './pages/Salaries';
 import SalaryIncrements from './pages/SalaryIncrements';
 import SalaryReportDetail from './pages/SalaryReportDetail';
+import SalaryAdjustments from './pages/SalaryAdjustments';
 import ReportDetail from './pages/ReportDetail';
 import Users from './pages/Users';
 import UserProfile from './pages/UserProfile';
@@ -63,6 +64,7 @@ function App() {
           <Route path="/salaryincrements" element={<W name="SalaryIncrements"><SalaryIncrements /></W>} />
           <Route path="/salaryreportdetail" element={<W name="SalaryReportDetail"><SalaryReportDetail /></W>} />
           <Route path="/reportdetail" element={<W name="ReportDetail"><ReportDetail /></W>} />
+          <Route path="/salaryadjustments" element={<W name="SalaryAdjustments"><SalaryAdjustments /></W>} />
           <Route path="/users" element={<W name="Users"><Users /></W>} />
           <Route path="/userprofile" element={<W name="UserProfile"><UserProfile /></W>} />
           <Route path="/rulessettings" element={<W name="RulesSettings"><RulesSettings /></W>} />

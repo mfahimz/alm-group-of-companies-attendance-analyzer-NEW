@@ -18,6 +18,10 @@
       "type": "number",
       "description": "Adjustment amount in AED"
     },
+    "label": {
+      "type": "string",
+      "description": "Optional custom label for the adjustment (e.g. Housing Allowance, Performance Bonus)"
+    },
     "description": {
       "type": "string",
       "description": "Reason or description for this recurring adjustment"

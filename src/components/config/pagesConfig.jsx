@@ -147,6 +147,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'assistant_gm', 'hr_manager']
     },
+    SalaryAdjustments: {
+        name: 'SalaryAdjustments',
+        title: 'Recurring Adjustments',
+        icon: DollarSign,
+        category: 'HRManagement',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo', 'hr_manager']
+    },
     CompanyManagement: {
         name: 'CompanyManagement',
         title: 'Company Management',
