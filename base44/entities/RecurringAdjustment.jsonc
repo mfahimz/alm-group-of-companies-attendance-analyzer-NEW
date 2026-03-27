@@ -1,0 +1,49 @@
+{
+  "name": "RecurringAdjustment",
+  "type": "object",
+  "properties": {
+    "employee_id": {
+      "type": "string",
+      "description": "Reference to Employee HRMS ID"
+    },
+    "company": {
+      "type": "string",
+      "description": "Company this adjustment belongs to"
+    },
+    "category": {
+      "type": "string",
+      "description": "Adjustment category (e.g., bonus, incentive, otherDeduction, advanceSalaryDeduction, open_leave_salary, variable_salary)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Adjustment amount in AED"
+    },
+    "description": {
+      "type": "string",
+      "description": "Reason or description for this recurring adjustment"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date from which this adjustment becomes active"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Optional end date after which this adjustment is no longer applied"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this recurring adjustment is currently active"
+    }
+  },
+  "required": [
+    "employee_id",
+    "company",
+    "category",
+    "amount",
+    "description",
+    "start_date"
+  ]
+}
