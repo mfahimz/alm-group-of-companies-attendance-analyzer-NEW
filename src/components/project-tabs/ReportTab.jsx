@@ -318,47 +318,20 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 subStatus: `Checking ${uniqueEmployeeIds.length} employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
             });
 
-            const batchSize = 10;
-            let offset = 0;
-            let isComplete = false;
-            let reportRunId = null;
-            let totalProcessed = 0;
+            // Single call to backend - processes all employees at once
+            // No chunking needed - backend handles pagination and rate limiting internally
+            const response = await base44.functions.invoke('runAnalysis', {
+                project_id: project.id,
+                date_from: dateFrom,
+                date_to: dateTo,
+                report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`
+            });
 
-            while (!isComplete) {
-                const response = await base44.functions.invoke('runAnalysis', {
-                    project_id: project.id,
-                    date_from: dateFrom,
-                    date_to: dateTo,
-                    report_name: reportName.trim() || `Report - ${new Date().toLocaleDateString()}`,
-                    _existing_report_run_id: reportRunId,
-                    _chunk_offset: offset,
-                    _chunk_size: batchSize
-                });
-
-                if (response.data.success) {
-                    reportRunId = response.data.report_run_id;
-                    isComplete = response.data.is_complete;
-                    offset += batchSize;
-                    totalProcessed += response.data.processed_count;
-
-                    const percentage = Math.round(25 + Math.min(offset / uniqueEmployeeIds.length, 1) * 50);
-
-                    // Step 3: Processing results iteration
-                    setAnalysisProgress({ 
-                        current: percentage, 
-                        total: 100, 
-                        status: 'Calculating attendance summary...',
-                        step: 'Finalizing Results',
-                        subStatus: `Analyzed ${Math.min(offset, uniqueEmployeeIds.length)} of ${uniqueEmployeeIds.length} employees`
-                    });
-
-                    if (!isComplete) {
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    }
-                } else {
-                    throw new Error(response.data.error || 'Analysis chunk failed');
-                }
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Analysis failed');
             }
+
+            const totalProcessed = response.data.processed_count;
 
             // Step 4: Complete
             setAnalysisProgress({ 
