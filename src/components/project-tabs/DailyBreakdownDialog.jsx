@@ -4,7 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Edit, Loader2 } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 /**
  * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
@@ -17,9 +18,9 @@ export default function DailyBreakdownDialog({
     onOpenChange,
     selectedEmployee,
     enrichedResults,
-    punches,
-    shifts,
-    exceptions,
+    punches: parentPunches,
+    shifts: parentShifts,
+    exceptions: parentExceptions,
     employees,
     reportRun,
     project,
@@ -32,6 +33,51 @@ export default function DailyBreakdownDialog({
     const queryClient = useQueryClient();
     const includeSeconds = true; // Unified
     const isFinalized = reportRun.is_final || project.status === 'closed';
+
+    // FAST LOAD: Fetch data for just THIS employee directly, bypassing slow project-wide paginated fetch.
+    // Falls back to parent data if available (already cached from a prior load).
+    const attendanceIdStr = selectedEmployee ? String(selectedEmployee.attendance_id) : null;
+
+    const { data: selfPunches = [], isFetched: selfPunchesFetched } = useQuery({
+        queryKey: ['employeePunches', project.id, attendanceIdStr],
+        queryFn: () => base44.entities.Punch.filter({ project_id: project.id, attendance_id: attendanceIdStr }, null, 500),
+        enabled: open && !!attendanceIdStr && parentPunches.length === 0,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false
+    });
+
+    const { data: selfShifts = [], isFetched: selfShiftsFetched } = useQuery({
+        queryKey: ['employeeShifts', project.id, attendanceIdStr],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id, attendance_id: attendanceIdStr }, null, 200),
+        enabled: open && !!attendanceIdStr && parentShifts.length === 0,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false
+    });
+
+    const { data: selfExceptions = [], isFetched: selfExceptionsFetched } = useQuery({
+        queryKey: ['employeeExceptions', project.id, attendanceIdStr],
+        queryFn: async () => {
+            // Fetch employee-specific + ALL-type exceptions
+            const [personal, global] = await Promise.all([
+                base44.entities.Exception.filter({ project_id: project.id, attendance_id: attendanceIdStr }, null, 500),
+                base44.entities.Exception.filter({ project_id: project.id, attendance_id: 'ALL' }, null, 200)
+            ]);
+            return [...personal, ...global];
+        },
+        enabled: open && !!attendanceIdStr && parentExceptions.length === 0,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false
+    });
+
+    // Use parent data if available (already cached), otherwise use self-fetched data
+    const punches = parentPunches.length > 0 ? parentPunches : selfPunches;
+    const shifts = parentShifts.length > 0 ? parentShifts : selfShifts;
+    const exceptions = parentExceptions.length > 0 ? parentExceptions : selfExceptions;
+
+    const dataReady = parentPunches.length > 0 || (selfPunchesFetched && selfShiftsFetched && selfExceptionsFetched);
 
     const isWithinMidnightBuffer = (timestampRaw) => {
         const parsed = parseTime(timestampRaw, includeSeconds);
@@ -735,7 +781,7 @@ export default function DailyBreakdownDialog({
                         </DialogTitle>
                     </DialogHeader>
                     <div className="mt-4">
-                        {punches.length === 0 && shifts.length === 0 ? (
+                        {!dataReady ? (
                             <div className="flex items-center justify-center py-12 gap-3 text-slate-500">
                                 <Loader2 className="w-5 h-5 animate-spin" />
                                 <span>Loading attendance data...</span>
