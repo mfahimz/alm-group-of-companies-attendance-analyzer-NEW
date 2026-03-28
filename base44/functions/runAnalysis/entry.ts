@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
  * Backend function to run attendance analysis for a project
@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Fetch all required data
-        const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
+        const [punchesRaw, shiftsRaw, exceptionsRaw, allEmployeesRaw, rulesData, projectEmployeesRaw, ramadanSchedulesRaw] = await Promise.all([
             base44.asServiceRole.entities.Punch.filter({ project_id }),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
             base44.asServiceRole.entities.Exception.filter({ project_id }),
@@ -77,6 +77,16 @@ Deno.serve(async (req: Request) => {
             base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }),
             base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true })
         ]);
+
+        // CRITICAL: Ensure all fetched data are arrays (SDK may return non-array on error/pagination)
+        const punches = Array.isArray(punchesRaw) ? punchesRaw : [];
+        const shifts = Array.isArray(shiftsRaw) ? shiftsRaw : [];
+        const exceptions = Array.isArray(exceptionsRaw) ? exceptionsRaw : [];
+        const allEmployees = Array.isArray(allEmployeesRaw) ? allEmployeesRaw : [];
+        const projectEmployees = Array.isArray(projectEmployeesRaw) ? projectEmployeesRaw : [];
+        const ramadanSchedules = Array.isArray(ramadanSchedulesRaw) ? ramadanSchedulesRaw : [];
+
+        console.log('[runAnalysis] Data types - punches:', typeof punchesRaw, Array.isArray(punchesRaw), ', shifts:', typeof shiftsRaw, Array.isArray(shiftsRaw), ', exceptions:', typeof exceptionsRaw, Array.isArray(exceptionsRaw));
 
         console.log('[runAnalysis] All employees fetched:', allEmployees.length);
 
