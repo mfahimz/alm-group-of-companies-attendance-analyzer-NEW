@@ -997,7 +997,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 half_absence_count: halfAbsenceCount, sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
                 annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
                 early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
-                approved_minutes: result.approved_minutes || 0, deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                approved_minutes: (() => { const aId = String(result.attendance_id); const sd = new Date(reportRun.date_from); const ed = new Date(reportRun.date_to); let live = 0; exceptions.filter(ex => ex.type === 'ALLOWED_MINUTES' && String(ex.attendance_id) === aId && ex.use_in_analysis !== false && ex.is_custom_type !== true).forEach(ex => { const ef = new Date(ex.date_from); const et = new Date(ex.date_to); if (ef <= ed && et >= sd) live += (ex.allowed_minutes || 0); }); return live > 0 ? live : (result.approved_minutes || 0); })(), deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
                 ramadan_gift_minutes: giftMins,
                 effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - giftMins),
                 grace_minutes: graceMinutes, has_no_punches: hasNoPunches
