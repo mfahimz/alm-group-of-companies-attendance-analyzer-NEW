@@ -12,8 +12,6 @@ import {
     Shield,
     BarChart3,
     Palette,
-    Brain,
-    BookOpen,
     Code,
     ScanLine
 } from 'lucide-react';
@@ -232,16 +230,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
-    AIPayrollInsights: {
-        name: 'AIPayrollInsights',
-        title: 'AI Payroll Insights',
-        icon: Brain,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager']
-    },
+
 
     // Hidden Pages (No navigation)
     ProjectDetail: {
@@ -294,16 +283,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor']
     },
-    AppDocumentation: {
-        name: 'AppDocumentation',
-        title: 'Application Documentation',
-        icon: BookOpen,
-        category: 'Developer',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
+
 
 };
 

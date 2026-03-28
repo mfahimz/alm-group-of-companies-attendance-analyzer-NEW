@@ -1,4 +1,4 @@
-// Cache bust 2026-03-26T14:00 - force rebuild
+// Cache bust 2026-03-28T16:00 - force rebuild after cleanup
 import './App.css'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -37,7 +37,7 @@ import MaintenanceSettings from './pages/MaintenanceSettings';
 import Maintenance from './pages/Maintenance';
 
 import ResumeScanner from './pages/ResumeScanner';
-import AppDocumentation from './pages/AppDocumentation';
+
 import WorkingDaysCalendar from './pages/WorkingDaysCalendar';
 
 const W = ({ name, children }) => <Layout currentPageName={name}>{children}</Layout>;
@@ -76,7 +76,7 @@ function App() {
           <Route path="/maintenance" element={<Maintenance />} />
 
           <Route path="/resumescanner" element={<W name="ResumeScanner"><ResumeScanner /></W>} />
-          <Route path="/appdocumentation" element={<W name="AppDocumentation"><AppDocumentation /></W>} />
+
           <Route path="/workingdayscalendar" element={<W name="WorkingDaysCalendar"><WorkingDaysCalendar /></W>} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>

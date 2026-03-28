@@ -48,7 +48,7 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import AIPayrollInsights from './pages/AIPayrollInsights';
+
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import CompanyBranding from './pages/CompanyBranding';
 import CompanyManagement from './pages/CompanyManagement';
@@ -78,7 +78,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "AIPayrollInsights": AIPayrollInsights,
+
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "CompanyBranding": CompanyBranding,
     "CompanyManagement": CompanyManagement,
