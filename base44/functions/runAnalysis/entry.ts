@@ -78,25 +78,38 @@ Deno.serve(async (req: Request) => {
             base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100)
         ]);
 
-        // CRITICAL: Ensure all fetched data are arrays (SDK may return non-array on error/pagination)
-        const punches = Array.isArray(punchesRaw) ? punchesRaw : [];
-        const shifts = Array.isArray(shiftsRaw) ? shiftsRaw : [];
-        const exceptions = Array.isArray(exceptionsRaw) ? exceptionsRaw : [];
-        const allEmployees = Array.isArray(allEmployeesRaw) ? allEmployeesRaw : [];
-        const projectEmployees = Array.isArray(projectEmployeesRaw) ? projectEmployeesRaw : [];
-        const ramadanSchedules = Array.isArray(ramadanSchedulesRaw) ? ramadanSchedulesRaw : [];
+        // CRITICAL FIX: SDK sometimes returns JSON string instead of parsed array for large datasets.
+        // Safely coerce each result to an array, parsing JSON strings when needed.
+        const safeArray = (raw, label) => {
+            if (Array.isArray(raw)) return raw;
+            if (typeof raw === 'string') {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) {
+                        console.warn(`[runAnalysis] ${label}: SDK returned JSON string instead of array (${parsed.length} items). Parsed successfully.`);
+                        return parsed;
+                    }
+                } catch (e) {
+                    console.error(`[runAnalysis] ${label}: Failed to parse string response:`, e.message);
+                }
+            }
+            console.error(`[runAnalysis] ${label}: Unexpected type ${typeof raw}, defaulting to empty array`);
+            return [];
+        };
 
-        console.log('[runAnalysis] Data fetch results - punches:', punches.length, '(raw type:', typeof punchesRaw, 'isArray:', Array.isArray(punchesRaw), '), shifts:', shifts.length, '(raw type:', typeof shiftsRaw, 'isArray:', Array.isArray(shiftsRaw), ')');
+        const punches = safeArray(punchesRaw, 'Punches');
+        const shifts = safeArray(shiftsRaw, 'Shifts');
+        const exceptions = safeArray(exceptionsRaw, 'Exceptions');
+        const allEmployees = safeArray(allEmployeesRaw, 'Employees');
+        const projectEmployees = safeArray(projectEmployeesRaw, 'ProjectEmployees');
+        const ramadanSchedules = safeArray(ramadanSchedulesRaw, 'RamadanSchedules');
 
-        // CRITICAL GUARD: If punches or shifts failed to load as arrays, abort with clear error
-        // Running analysis with 0 punches would mark all employees as LOP which is catastrophically wrong
-        if (!Array.isArray(punchesRaw)) {
-            console.error('[runAnalysis] FATAL: Punches returned non-array! Type:', typeof punchesRaw, 'Value:', String(punchesRaw).substring(0, 200));
-            return Response.json({ error: 'Failed to load punch data. The dataset may be too large. Please try running with chunked mode or contact support.' }, { status: 500 });
-        }
-        if (!Array.isArray(shiftsRaw)) {
-            console.error('[runAnalysis] FATAL: Shifts returned non-array! Type:', typeof shiftsRaw, 'Value:', String(shiftsRaw).substring(0, 200));
-            return Response.json({ error: 'Failed to load shift data. Please try again.' }, { status: 500 });
+        console.log('[runAnalysis] Data fetch results - punches:', punches.length, ', shifts:', shifts.length, ', exceptions:', exceptions.length, ', employees:', allEmployees.length);
+
+        // CRITICAL GUARD: If punches loaded as 0 but we expected data, abort
+        if (punches.length === 0 && shifts.length === 0) {
+            console.error('[runAnalysis] FATAL: Both punches and shifts are empty. Raw types - punches:', typeof punchesRaw, ', shifts:', typeof shiftsRaw);
+            return Response.json({ error: 'Failed to load punch/shift data. Please try again or use chunked analysis mode.' }, { status: 500 });
         }
 
         console.log('[runAnalysis] All employees fetched:', allEmployees.length);
