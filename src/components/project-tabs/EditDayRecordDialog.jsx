@@ -435,6 +435,26 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         }));
         }, [formData.shiftOverride.enabled, formData.shiftOverride.am_start, formData.shiftOverride.am_end, formData.shiftOverride.pm_start, formData.shiftOverride.pm_end, dayRecord]);
 
+    // Retry helper with exponential backoff for rate-limited API calls
+    const retryWithBackoff = async (fn, maxRetries = 4, baseDelay = 1500) => {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await fn();
+            } catch (error) {
+                const isRateLimit = error?.status === 429 || error?.response?.status === 429 ||
+                    error?.message?.includes('rate limit') || error?.message?.includes('429') ||
+                    error?.message?.includes('Too Many');
+                if (isRateLimit && attempt < maxRetries) {
+                    const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
+                    console.warn(`Rate limited (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(delay)}ms...`);
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+                throw error;
+            }
+        }
+    };
+
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
             const [day, month, year] = dayRecord.date.split('/');
@@ -442,9 +462,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             // Both users and admins store edits in day_overrides
             // Exceptions are only created when "Save Report" is clicked
-            const latestResults = await base44.entities.AnalysisResult.filter({ 
-                id: analysisResult.id 
-            });
+            const latestResults = await retryWithBackoff(() =>
+                base44.entities.AnalysisResult.filter({ id: analysisResult.id })
+            );
             const latestResult = latestResults[0] || analysisResult;
 
             let overrides = {};
@@ -491,57 +511,67 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 updatePayload.abnormal_dates = updatedTotals.abnormal_dates;
             }
 
-            console.log('🔧 EditDayRecord Update Payload:', JSON.stringify(updatePayload, null, 2));
-            console.log('🔧 Result ID:', analysisResult.id);
-            console.log('🔧 Analysis Result attendance_id type:', typeof analysisResult.attendance_id, analysisResult.attendance_id);
+            await retryWithBackoff(() =>
+                base44.entities.AnalysisResult.update(analysisResult.id, updatePayload)
+            );
 
-            await base44.entities.AnalysisResult.update(analysisResult.id, updatePayload);
+            // Fire backend recalc and sick leave creation in parallel where possible
+            const parallelTasks = [];
 
             // Trigger backend recalculation of this employee's totals from raw data
-            try {
-                await base44.functions.invoke('recalcEmployeeTotals', {
-                    analysis_result_id: analysisResult.id
-                });
-            } catch (recalcErr) {
-                console.warn('Backend recalc failed, using local calculation:', recalcErr);
-            }
+            parallelTasks.push(
+                retryWithBackoff(() =>
+                    base44.functions.invoke('recalcEmployeeTotals', {
+                        analysis_result_id: analysisResult.id
+                    })
+                ).catch(recalcErr => {
+                    console.warn('Backend recalc failed, using local calculation:', recalcErr);
+                })
+            );
 
             // If admin sets SICK_LEAVE, also create an actual Exception record
             if (data.type === 'SICK_LEAVE') {
-                const [day, month, year] = dayRecord.date.split('/');
-                const exceptionDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                parallelTasks.push((async () => {
+                    const [day, month, year] = dayRecord.date.split('/');
+                    const exceptionDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-                // Check if a SICK_LEAVE exception already exists for this date/employee
-                const existingSickLeave = await base44.entities.Exception.filter({
-                    project_id: project.id,
-                    attendance_id: String(attendanceId),
-                    type: 'SICK_LEAVE'
-                });
+                    const existingSickLeave = await retryWithBackoff(() =>
+                        base44.entities.Exception.filter({
+                            project_id: project.id,
+                            attendance_id: String(attendanceId),
+                            type: 'SICK_LEAVE'
+                        })
+                    );
 
-                const alreadyHasSickLeave = existingSickLeave.some(ex => {
-                    const exFrom = new Date(ex.date_from);
-                    const exTo = new Date(ex.date_to);
-                    const targetDate = new Date(exceptionDateStr);
-                    return targetDate >= exFrom && targetDate <= exTo;
-                });
-
-                if (!alreadyHasSickLeave) {
-                    await base44.entities.Exception.create({
-                        project_id: project.id,
-                        attendance_id: String(attendanceId),
-                        date_from: exceptionDateStr,
-                        date_to: exceptionDateStr,
-                        type: 'SICK_LEAVE',
-                        details: data.details || 'Admin override from report',
-                        use_in_analysis: true,
-                        approval_status: 'approved',
-                        created_from_report: true,
-                        report_run_id: analysisResult.report_run_id
+                    const alreadyHasSickLeave = existingSickLeave.some(ex => {
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        const targetDate = new Date(exceptionDateStr);
+                        return targetDate >= exFrom && targetDate <= exTo;
                     });
-                }
+
+                    if (!alreadyHasSickLeave) {
+                        await retryWithBackoff(() =>
+                            base44.entities.Exception.create({
+                                project_id: project.id,
+                                attendance_id: String(attendanceId),
+                                date_from: exceptionDateStr,
+                                date_to: exceptionDateStr,
+                                type: 'SICK_LEAVE',
+                                details: data.details || 'Admin override from report',
+                                use_in_analysis: true,
+                                approval_status: 'approved',
+                                created_from_report: true,
+                                report_run_id: analysisResult.report_run_id
+                            })
+                        );
+                    }
+                })());
             }
 
-            // Log the edit to audit trail
+            await Promise.all(parallelTasks);
+
+            // Log the edit to audit trail (fire-and-forget, no need to block on this)
             const changes = [];
             if (data.type) changes.push(`Status: ${data.type}`);
             if (data.lateMinutes !== data.originalLateMinutes) {
@@ -557,8 +587,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 changes.push('Shift Override Applied');
             }
             
-            try {
-                await base44.functions.invoke('logAudit', {
+            // Fire-and-forget audit log - don't block or fail the save
+            retryWithBackoff(() =>
+                base44.functions.invoke('logAudit', {
                     action: 'UPDATE',
                     entity_type: 'DailyBreakdown',
                     entity_id: analysisResult.id,
@@ -577,10 +608,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     },
                     details: `Daily breakdown edited: ${changes.join(', ')}`,
                     company: project.company
-                });
-            } catch (e) {
-                console.error('Failed to log audit:', e);
-            }
+                })
+            ).catch(e => console.error('Failed to log audit:', e));
         },
         onSuccess: () => {
             // Updated invalidation to match query key structure in ReportDetailView
