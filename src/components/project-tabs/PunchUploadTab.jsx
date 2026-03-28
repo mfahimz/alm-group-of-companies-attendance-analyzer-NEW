@@ -173,74 +173,73 @@ export default function PunchUploadTab({ project }) {
                     
                     let timestamp_raw = '';
                     let punch_date = '';
-                    
-                    // Al Maraghi Automotive format: ID, name, timestamp (3 columns)
-                    // Supports: M/D/YYYY H:MM:SS AM/PM format with seconds
-                    if (project.company === 'Al Maraghi Automotive' && values.length >= 3) {
-                        timestamp_raw = values[2].trim();
 
-                        // Extract date from timestamp (M/D/YYYY or MM/DD/YYYY HH:MM:SS AM/PM)
-                        const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                        if (dateMatch) {
-                            const [, month, day, year] = dateMatch;
-                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        }
+                    // Universal Identify: Find date/time content across columns (supports 2, 3, or 4+ column formats)
+                    if (values.length >= 4 && (values[2].includes('/') || values[2].includes('-') || (values[2] && !isNaN(values[2])))) {
+                        // Likely Date + Time in separate columns (e.g., Naser Mohsin format)
+                        timestamp_raw = `${values[2]} ${values[3]}`;
+                    } else if (values.length >= 3 && (values[2].includes('/') || values[2].includes('-') || (values[2] && !isNaN(values[2])))) {
+                        // Likely Format: ID, Name, Timestamp
+                        timestamp_raw = values[2];
+                    } else {
+                        // Default Format: ID, Timestamp
+                        timestamp_raw = values[1] || '';
                     }
-                    // Naser Mohsin Auto Parts format: ID, FirstName, Date, Time (4 columns)
-                    // Date format: DD/MM/YYYY (Day/Month/Year)
-                    else if (project.company === 'Naser Mohsin Auto Parts' && values.length >= 4) {
-                        let dateStr = values[2].trim();
-                        let timeStr = values[3].trim();
+
+                    // Universal Parser: Strict DD/MM/YYYY for strings, safe Excel date handling
+                    const processUniversalDate = (val) => {
+                        if (!val) return '';
                         
-                        // Parse date - expecting DD/MM/YYYY format (Day/Month/Year)
-                        let day, month, year;
+                        // 1. Handle actual Date objects (safety for future reader changes)
+                        if (val instanceof Date) {
+                            return val.toISOString().split('T')[0];
+                        }
                         
-                        // Check if date is in YYYY-MM-DD format
-                        const isoDateMatch = dateStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-                        if (isoDateMatch) {
-                            [, year, month, day] = isoDateMatch;
-                        } else {
-                            // Parse as DD/MM/YYYY (Naser Mohsin format - Day/Month/Year)
-                            const ddmmyyyyMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                            if (ddmmyyyyMatch) {
-                                [, day, month, year] = ddmmyyyyMatch;
+                        const str = String(val).trim();
+                        
+                        // 2. Handle Excel Serial Numbers (e.g., 45292 -> 2024-01-01)
+                        // Dates in Excel are typically > 30000 (after year 1982)
+                        if (str && !isNaN(str) && parseFloat(str) > 30000 && !str.includes(':') && !str.includes('/') && !str.includes('-')) {
+                            const excelDate = new Date(Math.round((parseFloat(str) - 25569) * 86400 * 1000));
+                            return excelDate.toISOString().split('T')[0];
+                        }
+
+                        // 3. Strictly interpret all text dates as DD/MM/YYYY
+                        const ddmmyyyyMatch = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                        if (ddmmyyyyMatch) {
+                            const [, day, month, year] = ddmmyyyyMatch;
+                            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+
+                        // 4. Fallback for ISO format (YYYY-MM-DD) if present
+                        const isoMatch = str.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                        if (isoMatch) {
+                            const [, year, month, day] = isoMatch;
+                            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                        }
+
+                        return '';
+                    };
+
+                    punch_date = processUniversalDate(timestamp_raw);
+
+                    // Re-format timestamp_raw for display consistency if it contained time or was a serial
+                    if (timestamp_raw && timestamp_raw.includes(':')) {
+                        const timePart = timestamp_raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(\s*[AP]M)?/i);
+                        if (timePart) {
+                            let timeStr = timePart[0];
+                            if (!timePart[4]) timeStr = convertTo12Hour(timeStr);
+                            
+                            // Reconstruct display raw timestamp as DD/MM/YYYY HH:MM AM/PM
+                            if (punch_date) {
+                                const [y, m, d] = punch_date.split('-');
+                                timestamp_raw = `${d}/${m}/${y} ${timeStr}`;
                             }
                         }
-                        
-                        // Keep DD/MM/YYYY for display
-                        if (day && month && year) {
-                            dateStr = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
-                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        }
-                        
-                        // Convert time to AM/PM format
-                        if (!timeStr.match(/AM|PM/i)) {
-                            timeStr = convertTo12Hour(timeStr);
-                        }
-                        
-                        // Combine date and time
-                        timestamp_raw = `${dateStr} ${timeStr}`;
-                    }
-                    // Standard format: ID, timestamp (or ID, name, timestamp)
-                    else {
-                        // Detect which column is the timestamp by checking for date pattern
-                        if (values[1].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                            // Format: ID, timestamp
-                            timestamp_raw = values[1];
-                        } else if (values.length >= 3 && values[2].match(/\d{1,2}\/\d{1,2}\/\d{4}/)) {
-                            // Format: ID, name, timestamp
-                            timestamp_raw = values[2];
-                        } else {
-                            // Fallback to second column
-                            timestamp_raw = values[1];
-                        }
-
-                        // Extract date from timestamp (D/M/YYYY or DD/MM/YYYY HH:MM AM/PM)
-                        const dateMatch = timestamp_raw.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-                        if (dateMatch) {
-                            const [, day, month, year] = dateMatch;
-                            punch_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-                        }
+                    } else if (punch_date) {
+                        // Date only - use DD/MM/YYYY for display
+                        const [y, m, d] = punch_date.split('-');
+                        timestamp_raw = `${d}/${m}/${y}`;
                     }
 
                     // Check if employee exists
