@@ -67,15 +67,15 @@ Deno.serve(async (req: Request) => {
             console.warn('[runAnalysis] Could not resolve company_id, name-based check used');
         }
 
-        // Fetch all required data
+        // Fetch all required data with explicit pagination limits
         const [punchesRaw, shiftsRaw, exceptionsRaw, allEmployeesRaw, rulesData, projectEmployeesRaw, ramadanSchedulesRaw] = await Promise.all([
-            base44.asServiceRole.entities.Punch.filter({ project_id }),
-            base44.asServiceRole.entities.ShiftTiming.filter({ project_id }),
-            base44.asServiceRole.entities.Exception.filter({ project_id }),
-            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }),
+            base44.asServiceRole.entities.Punch.filter({ project_id }, null, 100000),
+            base44.asServiceRole.entities.ShiftTiming.filter({ project_id }, null, 10000),
+            base44.asServiceRole.entities.Exception.filter({ project_id }, null, 10000),
+            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
-            base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }),
-            base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true })
+            base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }, null, 5000),
+            base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100)
         ]);
 
         // CRITICAL: Ensure all fetched data are arrays (SDK may return non-array on error/pagination)
@@ -86,7 +86,18 @@ Deno.serve(async (req: Request) => {
         const projectEmployees = Array.isArray(projectEmployeesRaw) ? projectEmployeesRaw : [];
         const ramadanSchedules = Array.isArray(ramadanSchedulesRaw) ? ramadanSchedulesRaw : [];
 
-        console.log('[runAnalysis] Data types - punches:', typeof punchesRaw, Array.isArray(punchesRaw), ', shifts:', typeof shiftsRaw, Array.isArray(shiftsRaw), ', exceptions:', typeof exceptionsRaw, Array.isArray(exceptionsRaw));
+        console.log('[runAnalysis] Data fetch results - punches:', punches.length, '(raw type:', typeof punchesRaw, 'isArray:', Array.isArray(punchesRaw), '), shifts:', shifts.length, '(raw type:', typeof shiftsRaw, 'isArray:', Array.isArray(shiftsRaw), ')');
+
+        // CRITICAL GUARD: If punches or shifts failed to load as arrays, abort with clear error
+        // Running analysis with 0 punches would mark all employees as LOP which is catastrophically wrong
+        if (!Array.isArray(punchesRaw)) {
+            console.error('[runAnalysis] FATAL: Punches returned non-array! Type:', typeof punchesRaw, 'Value:', String(punchesRaw).substring(0, 200));
+            return Response.json({ error: 'Failed to load punch data. The dataset may be too large. Please try running with chunked mode or contact support.' }, { status: 500 });
+        }
+        if (!Array.isArray(shiftsRaw)) {
+            console.error('[runAnalysis] FATAL: Shifts returned non-array! Type:', typeof shiftsRaw, 'Value:', String(shiftsRaw).substring(0, 200));
+            return Response.json({ error: 'Failed to load shift data. Please try again.' }, { status: 500 });
+        }
 
         console.log('[runAnalysis] All employees fetched:', allEmployees.length);
 
