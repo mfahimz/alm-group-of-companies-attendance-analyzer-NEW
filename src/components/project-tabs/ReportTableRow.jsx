@@ -81,18 +81,20 @@ export default function ReportTableRow({
                 />
             </td>
             {/* LOP-adjacent off day column */}
-            <td className="p-2 align-middle">
-                {result.lop_adjacent_weekly_off_count > 0 ? (
-                    <span
-                        className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-xs font-bold rounded cursor-help"
-                        title={`${result.lop_adjacent_weekly_off_count} off day(s) (weekly off or holiday) adjacent to LOP also counted as LOP.\nDates: ${result.lop_adjacent_weekly_off_dates || 'N/A'}`}
-                    >
-                        +{result.lop_adjacent_weekly_off_count}
-                    </span>
-                ) : (
-                    <span className="text-slate-300">-</span>
-                )}
-            </td>
+            {project.company === 'Al Maraghi Motors' && (
+                <td className="p-2 align-middle">
+                    {result.lop_adjacent_weekly_off_count > 0 ? (
+                        <span
+                            className="px-1.5 py-0.5 bg-rose-100 text-rose-700 text-xs font-bold rounded cursor-help"
+                            title={`${result.lop_adjacent_weekly_off_count} off day(s) (weekly off or holiday) adjacent to LOP also counted as LOP.\nDates: ${result.lop_adjacent_weekly_off_dates || 'N/A'}`}
+                        >
+                            +{result.lop_adjacent_weekly_off_count}
+                        </span>
+                    ) : (
+                        <span className="text-slate-300">-</span>
+                    )}
+                </td>
+            )}
             <td className="p-2 align-middle">
                 <span className={`${result.half_absence_count > 0 ? 'text-amber-600 font-medium' : ''}`}>
                     {Math.max(0, result.half_absence_count || 0)}

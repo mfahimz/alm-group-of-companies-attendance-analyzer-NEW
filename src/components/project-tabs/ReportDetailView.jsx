@@ -65,6 +65,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user'; const isAdmin = userRole === 'admin'; const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo'; const isHRManager = userRole === 'hr_manager'; const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
+    const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
 
     // LAZY LOADING: Raw data (punches/shifts/exceptions) only loaded on-demand
     // when user opens daily breakdown, detection panel, or edits a day.
@@ -1109,6 +1110,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 'Annual Leave',
                 'Sick Leave',
                 'LOP Days',
+                ...(isAlMaraghiMotors ? ['+Weekly Off LOP'] : []),
                 'Half Days',
                 'Late (Hours)',
                 'Early Checkout (Hours)',
@@ -1121,8 +1123,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             ];
 
             const rows = filteredResults.map(r => {
-                // CRITICAL FIX: For finalized reports, use STORED values directly from AnalysisResult
-                // For non-finalized reports, use the recalculated values from enrichedResults
+                // ...existing code...
                 const deductible = (r.effective_deductible_minutes ?? r.deductible_minutes) || 0;
                 const late = r.late_minutes || 0;
                 const early = r.early_checkout_minutes || 0;
@@ -1137,10 +1138,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     Math.max(0, (r.manual_annual_leave_count ?? r.annual_leave_count ?? 0)),
                     Math.max(0, (r.manual_sick_leave_count ?? r.sick_leave_count ?? 0)),
                     Math.max(0, (r.manual_full_absence_count ?? r.full_absence_count) || 0),
+                ];
+
+                if (isAlMaraghiMotors) {
+                    baseRow.push(r.lop_adjacent_weekly_off_count || 0);
+                }
+
+                baseRow.push(
                     Math.max(0, r.half_absence_count || 0),
                     minutesToHours(Math.max(0, late)),
                     minutesToHours(Math.max(0, early))
-                ];
+                );
 
                 // Add approved minutes only if company allows it
                 if (project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive') {
@@ -1615,9 +1623,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                     <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         LOP Days
                                     </SortableTableHead>
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50 text-rose-600 text-[11px]" title="Weekly off days adjacent to LOP, counted as additional LOP">
-                                        +Weekly Off LOP
-                                    </th>
+                                    {isAlMaraghiMotors && (
+                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50 text-rose-600 text-[11px]" title="Weekly off days adjacent to LOP, counted as additional LOP">
+                                            +Weekly Off LOP
+                                        </th>
+                                    )}
                                     <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
                                         Half Days
                                     </SortableTableHead>

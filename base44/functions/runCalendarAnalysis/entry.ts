@@ -1401,7 +1401,7 @@ Deno.serve(async (req: Request) => {
             // RULE 3 & 4: Days within Annual Leave or Sick Leave range are 
             //             PROTECTED and exempt from LOP-adjacent conversion.
             // ================================================================
-            {
+            if (isAlMaraghiMotors) {
                 const allDatesInRange = [];
                 for (let dl = new Date(startDate); dl <= endDate; dl = new Date(dl.setDate(dl.getDate() + 1))) {
                     allDatesInRange.push(toDateStr(dl));
