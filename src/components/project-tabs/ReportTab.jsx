@@ -276,7 +276,12 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             const runs = await base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date', 5000);
             console.log('[ReportTab] Fetched', runs.length, 'report runs');
             return runs;
-        }
+        },
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     React.useEffect(() => {
@@ -632,13 +637,15 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const { data: reportResults = {} } = useQuery({
         queryKey: ['reportResults', project.id, reportRunIds],
         queryFn: async () => {
-            // Fetch results only for displayed reports - use paginated fetch to avoid SDK truncation
+            // Fetch results only for displayed reports with delays between each to avoid rate limiting
             const resultsByReport = {};
-            for (const run of reportRuns) {
-                const results = await fetchAllRecords(base44.entities.AnalysisResult, { 
+            for (let i = 0; i < reportRuns.length; i++) {
+                const run = reportRuns[i];
+                // Use single page fetch (limit 500) instead of full paginated fetch for list view
+                const results = await base44.entities.AnalysisResult.filter({ 
                     project_id: project.id,
                     report_run_id: run.id 
-                });
+                }, null, 500);
                 
                 // Filter for department heads
                 const filteredForDeptHead = isDepartmentHead && deptHeadVerification?.verified
@@ -649,10 +656,19 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     : results;
                 
                 resultsByReport[run.id] = filteredForDeptHead;
+                // Add delay between report fetches to avoid rate limiting
+                if (i < reportRuns.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
             }
             return resultsByReport;
         },
-        enabled: reportRuns.length > 0
+        enabled: reportRuns.length > 0,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Find the finalized report

@@ -12,7 +12,7 @@
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_RETRIES = 6;
-const BASE_DELAY_MS = 3000;
+const BASE_DELAY_MS = 4000;
 
 // ========================================================
 // GLOBAL CONCURRENCY LIMITER
@@ -90,7 +90,7 @@ export async function fetchAllRecords(entity, query, sortField = null, pageSize 
             if (page.length < currentPageSize) break;
 
             // Delay between pages to avoid hitting rate limits
-            await new Promise(r => setTimeout(r, 350));
+            await new Promise(r => setTimeout(r, 600));
         }
 
         return allItems;

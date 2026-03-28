@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import useDetectionAnalysis, { extractTime } from './useDetectionAnalysis';
 import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, ScanLine, Zap } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
+import DetectionPanel from './DetectionPanel';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from "@/components/ui/progress";
@@ -50,13 +51,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
     const [giftMinutesOverrides, setGiftMinutesOverrides] = useState({});
     
-    // NEW DETECTION PANEL STATE
-    const [showDetectionPanel, setShowDetectionPanel] = useState(false);
-    const [activeDetectionTab, setActiveDetectionTab] = React.useState('mismatch');
-    const [dismissedMismatchKeys, setDismissedMismatchKeys] = useState(new Set());
-    const [dismissedNoMatchKeys, setDismissedNoMatchKeys] = useState(new Set());
-    const [showDismissed, setShowDismissed] = useState(false);
-    const [expandedEmployees, setExpandedEmployees] = useState({});
+    // Detection panel state managed in DetectionPanel component
 
     const queryClient = useQueryClient();
 
@@ -70,9 +65,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user'; const isAdmin = userRole === 'admin'; const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo'; const isHRManager = userRole === 'hr_manager'; const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
-    const { data: punches = [] } = useQuery({ queryKey: ['punches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
-    const { data: shifts = [] } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
-    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
+    // SEQUENTIAL LOADING: Chain paginated fetches to avoid rate limiting
+    const { data: punches = [], isFetched: punchesDone } = useQuery({ queryKey: ['punches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
+    const { data: shifts = [], isFetched: shiftsDone } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: punchesDone });
+    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: shiftsDone });
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
@@ -86,6 +82,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
             return results;
         },
+        enabled: punchesDone,
         staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -104,6 +101,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => fetchAllRecords(base44.entities.Employee, { company: project.company }),
+        enabled: shiftsDone,
         staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -204,27 +202,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
     const MIDNIGHT_BUFFER_MINUTES = 120;
 
-    // Persist dismissed record keys from database exceptions of type DISMISSED_MISMATCH
-    React.useEffect(() => {
-        const mismatchKeys = new Set();
-        const noMatchKeys = new Set();
-        
-        // Filter for DISMISSED_MISMATCH exceptions for the current project
-        exceptions.forEach(ex => {
-            if (ex.type === 'DISMISSED_MISMATCH' && String(ex.project_id) === String(project.id)) {
-                // Key format matches the UI: attendance_id-date
-                const key = String(ex.attendance_id) + '-' + ex.date_from;
-                if (ex.notes === 'mismatch') {
-                    mismatchKeys.add(key);
-                } else if (ex.notes === 'no_match') {
-                    noMatchKeys.add(key);
-                }
-            }
-        });
-
-        setDismissedMismatchKeys(mismatchKeys);
-        setDismissedNoMatchKeys(noMatchKeys);
-    }, [exceptions, project.id]);
+    // Dismissed mismatch state now managed inside DetectionPanel component
 
     const formatTime = (timeStr) => {
         if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
@@ -2063,471 +2041,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </CardContent>
             </Card>
 
-            {/* 
-                SHIFT MISMATCH ANALYSIS SECTION
-                Moved to the top of the report output for better visibility.
-                This panel provides live auditing of punch-to-shift binding issues.
-            */}
-            <div className="flex gap-4 items-center mb-6">
-                <Button
-                    className={`w-fit font-bold border-2 transition-all ${showDetectionPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                    onClick={() => setShowDetectionPanel(!showDetectionPanel)}
-                >
-                    <ScanLine className="w-4 h-4 mr-2" />
-                    {showDetectionPanel ? 'Hide Shift Mismatch Analysis' : 'Show Shift Mismatch Analysis'}
-                    <div className="ml-3 flex gap-2">
-                        {shiftMismatchDetections.length > 0 && (
-                            <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px]">{shiftMismatchDetections.length} Mismatches</span>
-                        )}
-                        {noMatchDetections.length > 0 && (
-                            <span className="bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px]">{noMatchDetections.length} Unbound</span>
-                        )}
-                    </div>
-                </Button>
-
-                {showDetectionPanel && (
-                    <Button
-                        onClick={handleExportMismatch}
-                        variant="outline"
-                        className="border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold"
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export Mismatch
-                    </Button>
-                )}
-            </div>
-
-            {showDetectionPanel && (
-                    <Card className="border shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="flex border-b bg-slate-50/50">
-                            <button 
-                                className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'mismatch' ? 'border-amber-500 text-amber-600 bg-amber-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                                onClick={() => setActiveDetectionTab('mismatch')}
-                            >
-                                Shift Mismatch Detections ({shiftMismatchDetections.filter(d => !dismissedMismatchKeys.has(String(d.attendance_id) + '-' + d.date)).length}) {/* Filtered count to exclude dismissed mismatch records with consistent key format */}
-                            </button>
-                            <button 
-                                className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeDetectionTab === 'no-match' ? 'border-rose-500 text-rose-600 bg-rose-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                                onClick={() => setActiveDetectionTab('no-match')}
-                            >
-                                No Match Detections ({noMatchDetections.filter(d => !dismissedNoMatchKeys.has(String(d.attendance_id) + '-' + d.date)).length}) {/* Filtered count to exclude dismissed no-match records with consistent key format */}
-                            </button>
-                        </div>
-                        
-                        <div className="p-4 max-h-[450px] overflow-y-auto bg-white">
-                            {/* Dismissed Toggle Checkbox (Change 1) */}
-                            <div className="flex justify-end mb-2">
-                                <label className="flex items-center gap-2 text-[10px] font-bold text-slate-500 cursor-pointer hover:text-slate-700">
-                                    <input 
-                                        type="checkbox" 
-                                        className="w-3 h-3 accent-indigo-600" 
-                                        checked={showDismissed} 
-                                        onChange={(e) => setShowDismissed(e.target.checked)} 
-                                    />
-                                    Show Dismissed Records
-                                </label>
-                            </div>
-
-                            {activeDetectionTab === 'mismatch' ? (
-                                <div className="space-y-4">
-                                    {/* Top Offenders Summary Bar - Shift Mismatch (User Requested Red Theme) */}
-                                    {(() => {
-                                        if (shiftMismatchDetections.length === 0) return null;
-                                        
-                                        // Group and count flagged days per employee from the filtered detection array (excluding dismissed records)
-                                        const counts = {};
-                                        shiftMismatchDetections
-                                            .filter(d => !dismissedMismatchKeys.has(String(d.attendance_id) + '-' + d.date)) // Filter out records that are in the dismissed keys set with consistent key format
-                                            .forEach(d => {
-                                            const aid = String(d.attendance_id);
-                                            if (!counts[aid]) {
-                                                counts[aid] = { name: d.name, count: 0 };
-                                            }
-                                            counts[aid].count++;
-                                        });
-                                        
-                                        // Convert to array and sort by count descending, then take top 5
-                                        const topOffenders = Object.values(counts)
-                                            .sort((a, b) => b.count - a.count)
-                                            .slice(0, 5);
-                                            
-                                        return (
-                                            <div className="flex flex-wrap gap-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                                                <div className="w-full text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1">
-                                                    Top Offenders (Flagged Days)
-                                                </div>
-                                                {topOffenders.map((offender, idx) => (
-                                                    <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-rose-50 border border-rose-100 rounded-md shadow-sm">
-                                                        <span className="text-[11px] font-bold text-rose-700">{offender.name}</span>
-                                                        <span className="bg-rose-200 text-rose-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                                                            {offender.count}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
-                                    <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-lg">
-                                        <div className="mt-0.5 text-amber-600 font-bold">ⓘ</div>
-                                        <p className="text-xs text-amber-800 leading-relaxed">
-                                            <strong>Detection Rule:</strong> Flags days where ALL recorded punches fall more than <strong>180 minutes</strong> outside the allocated shift start and end times. Zero-punch days and days with existing exceptions are automatically excluded.
-                                        </p>
-                                    </div>
-                                    <table className="w-full text-xs border-separate border-spacing-0">
-                                        <thead>
-                                            <tr className="text-left text-slate-400 border-b uppercase tracking-wider font-bold">
-                                                <th className="pb-2 pl-2">Date / Severity</th>
-                                                <th className="pb-2">Punch Details</th>
-                                                <th className="pb-2">Likely Worked Shift</th>
-                                                <th className="pb-2 text-right pr-2">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {shiftMismatchDetections.length === 0 ? (
-                                                <tr><td colSpan="4" className="py-8 text-center text-slate-400 italic">No shift mismatch detections found.</td></tr>
-                                            ) : (
-                                                (() => {
-                                                    // Group by employee for Change 3
-                                                    const groups = {};
-                                                    shiftMismatchDetections.forEach(d => {
-                                                        const key = String(d.attendance_id) + '-' + d.date; // Use consistent String format for key
-                                                        const isDismissed = dismissedMismatchKeys.has(key);
-                                                        if (isDismissed && !showDismissed) return;
-                                                        
-                                                        if (!groups[d.attendance_id]) {
-                                                            groups[d.attendance_id] = { name: d.name, rows: [] };
-                                                        }
-                                                        groups[d.attendance_id].rows.push({ ...d, key, isDismissed });
-                                                    });
-
-                                                    return Object.entries(groups).map(([attId, group]) => {
-                                                        const isExpanded = expandedEmployees[attId] !== false; // Default true
-                                                        return (
-                                                            <React.Fragment key={attId}>
-                                                                {/* Group Header (Change 3) */}
-                                                                <tr 
-                                                                    className="bg-slate-50/80 cursor-pointer hover:bg-slate-100 sticky z-[5]" 
-                                                                    onClick={() => setExpandedEmployees(prev => ({ ...prev, [attId]: !isExpanded }))}
-                                                                >
-                                                                    <td colSpan="4" className="py-2 px-2 border-y border-slate-200">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
-                                                                            <span className="font-bold text-slate-700">{group.name}</span>
-                                                                            <span className="text-[10px] text-slate-400 font-mono">({attId})</span>
-                                                                            <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px] ml-auto mr-2">{group.rows.length} flagged days</span>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                                {isExpanded && group.rows.map((d) => {
-                                                                    // Severity Styling (Change 2)
-                                                                    const isCritical = d.maxDeviation > 300;
-                                                                    const isWarning = d.maxDeviation >= 180 && d.maxDeviation <= 300;
-                                                                    const bgStyle = d.isDismissed ? 'bg-slate-50' : (isCritical ? 'bg-red-50/50' : (isWarning ? 'bg-amber-50/50' : ''));
-                                                                    const borderStyle = d.isDismissed ? 'border-l-slate-300' : (isCritical ? 'border-l-red-500 border-l-4' : (isWarning ? 'border-l-amber-500 border-l-4' : ''));
-                                                                    const opacityStyle = d.isDismissed ? 'opacity-40 grayscale' : '';
-
-                                                                    return (
-                                                                        <tr key={d.key} className={`${bgStyle} ${borderStyle} ${opacityStyle} hover:bg-slate-100/50 transition-all`}>
-                                                                            <td className="py-3 pl-2">
-                                                                                <div className="font-medium text-slate-900">{d.displayDate}</div>
-                                                                                <div className={`text-[10px] font-bold ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>
-                                                                                    {d.maxDeviation} min off
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="py-3">
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {d.punches.map((p, idx) => (
-                                                                                        <span key={idx} className="flex items-center gap-1 bg-white border px-1.5 py-0.5 rounded text-[10px] text-slate-600">
-                                                                                            {extractTime(p.raw)}
-                                                                                            {p.isPrev && (
-                                                                                                <span className="ml-1 text-[10px]" title="Previous Day">🌙</span>
-                                                                                            )}
-                                                                                        </span>
-                                                                                    ))}
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="py-3">
-                                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${d.likelyWorkedShift === 'No alternate shift found' ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                                                                    {d.likelyWorkedShift}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td className="py-3 text-right pr-2">
-                                                                                <div className="flex gap-1 justify-end">
-                                                                                    {/* Dismiss / Undo Dismiss Button with Persistence */}
-                                                                                    <Button 
-                                                                                        size="xs" 
-                                                                                        variant="ghost" 
-                                                                                        className="h-7 text-[10px] text-slate-400 hover:text-slate-600"
-                                                                                        onClick={async () => {
-                                                                                            if (d.isDismissed) {
-                                                                                                // Find and delete the existing DISMISSED_MISMATCH exception
-                                                                                                const existingEx = exceptions.find(ex => 
-                                                                                                    ex.type === 'DISMISSED_MISMATCH' && 
-                                                                                                    String(ex.attendance_id) === String(d.attendance_id) && 
-                                                                                                    ex.date_from === d.date &&
-                                                                                                    ex.notes === 'mismatch'
-                                                                                                );
-                                                                                                if (existingEx) {
-                                                                                                    await base44.entities.Exception.delete(existingEx.id);
-                                                                                                    toast.success("Dismissed record restored");
-                                                                                                }
-                                                                                            } else {
-                                                                                                // Create a new DISMISSED_MISMATCH exception for persistence
-                                                                                                await base44.entities.Exception.create({
-                                                                                                    type: 'DISMISSED_MISMATCH',
-                                                                                                    attendance_id: d.attendance_id,
-                                                                                                    project_id: project.id,
-                                                                                                    date_from: d.date,
-                                                                                                    date_to: d.date,
-                                                                                                    notes: 'mismatch'
-                                                                                                });
-                                                                                                toast.success("Record dismissed");
-                                                                                            }
-
-                                                                                            // Invalidate queries to refresh the UI
-                                                                                            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
-                                                                                            
-                                                                                            // Update local state immediately for better UX
-                                                                                            const next = new Set([...dismissedMismatchKeys]);
-                                                                                            if (d.isDismissed) next.delete(d.key); else next.add(d.key);
-                                                                                            setDismissedMismatchKeys(next);
-                                                                                        }}
-                                                                                    >
-                                                                                        {d.isDismissed ? 'Undo Dismiss' : 'Dismiss'}
-                                                                                    </Button>
-                                                                                    <Button 
-                                                                                        size="sm" 
-                                                                                        variant="outline" 
-                                                                                        className="h-7 text-[10px] text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                                                                                        onClick={() => {
-                                                                                            const matchingResult = results.find(r => String(r.attendance_id) === String(d.attendance_id));
-                                                                                            setSelectedEmployee(matchingResult || d.rawResult);
-                                                                                            setEditingDay({
-                                                                                                date: d.displayDate,
-                                                                                                dateStr: d.date,
-                                                                                                status: 'Present', 
-                                                                                                abnormal: false,
-                                                                                                shift: 'Mismatch Detected'
-                                                                                            });
-                                                                                        }}
-                                                                                    >
-                                                                                        Edit
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    );
-                                                                })}
-                                                            </React.Fragment>
-                                                        );
-                                                    });
-                                                })()
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {/* Top Offenders Summary Bar - No Match (User Requested Amber Theme) */}
-                                    {(() => {
-                                        if (noMatchDetections.length === 0) return null;
-                                        
-                                        // Group and count flagged days per employee from the filtered detection array (excluding dismissed records)
-                                        const counts = {};
-                                        noMatchDetections
-                                            .filter(d => !dismissedNoMatchKeys.has(String(d.attendance_id) + '-' + d.date)) // Filter out records that are in the dismissed keys set with consistent key format
-                                            .forEach(d => {
-                                            const aid = String(d.attendance_id);
-                                            if (!counts[aid]) {
-                                                counts[aid] = { name: d.name, count: 0 };
-                                            }
-                                            counts[aid].count++;
-                                        });
-                                        
-                                        // Convert to array and sort by count descending, then take top 5
-                                        const topOffenders = Object.values(counts)
-                                            .sort((a, b) => b.count - a.count)
-                                            .slice(0, 5);
-                                            
-                                        return (
-                                            <div className="flex flex-wrap gap-2 mb-2 animate-in fade-in slide-in-from-top-1 duration-300">
-                                                <div className="w-full text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1">
-                                                    Top Offenders (Flagged Days)
-                                                </div>
-                                                {topOffenders.map((offender, idx) => (
-                                                    <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-amber-50 border border-amber-100 rounded-md shadow-sm">
-                                                        <span className="text-[11px] font-bold text-amber-700">{offender.name}</span>
-                                                        <span className="bg-amber-200 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-                                                            {offender.count}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
-                                    <div className="flex items-start gap-3 p-3 bg-rose-50 border border-rose-100 rounded-lg">
-                                        <div className="mt-0.5 text-rose-600 font-bold">ⓘ</div>
-                                        <p className="text-xs text-rose-800 leading-relaxed">
-                                            <strong>Detection Rule:</strong> Flags days containing at least one punch that cannot be bound to any shift point (AM Start, AM End, PM Start, PM End) within 180 minutes.
-                                        </p>
-                                    </div>
-                                    <table className="w-full text-xs border-separate border-spacing-0">
-                                        <thead>
-                                            <tr className="text-left text-slate-400 border-b uppercase tracking-wider font-bold">
-                                                <th className="pb-2 pl-2">Date / Severity</th>
-                                                <th className="pb-2">Binding Status</th>
-                                                <th className="pb-2 text-right pr-2">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {noMatchDetections.length === 0 ? (
-                                                <tr><td colSpan="3" className="py-8 text-center text-slate-400 italic">No unbound punch detections found.</td></tr>
-                                            ) : (
-                                                (() => {
-                                                    // Group by employee for Change 3
-                                                    const groups = {};
-                                                    noMatchDetections.forEach(d => {
-                                                        const key = String(d.attendance_id) + '-' + d.date; // Use consistent String format for key
-                                                        const isDismissed = dismissedNoMatchKeys.has(key);
-                                                        if (isDismissed && !showDismissed) return;
-                                                        
-                                                        if (!groups[d.attendance_id]) {
-                                                            groups[d.attendance_id] = { name: d.name, rows: [] };
-                                                        }
-                                                        groups[d.attendance_id].rows.push({ ...d, key, isDismissed });
-                                                    });
-
-                                                    return Object.entries(groups).map(([attId, group]) => {
-                                                        const isExpanded = expandedEmployees[attId] !== false; // Default true
-                                                        return (
-                                                            <React.Fragment key={attId}>
-                                                                {/* Group Header (Change 3) */}
-                                                                <tr 
-                                                                    className="bg-slate-50/80 cursor-pointer hover:bg-slate-100 sticky z-[5]" 
-                                                                    onClick={() => setExpandedEmployees(prev => ({ ...prev, [attId]: !isExpanded }))}
-                                                                >
-                                                                    <td colSpan="3" className="py-2 px-2 border-y border-slate-200">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`}>▶</span>
-                                                                            <span className="font-bold text-slate-700">{group.name}</span>
-                                                                            <span className="text-[10px] text-slate-400 font-mono">({attId})</span>
-                                                                            <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px] ml-auto mr-2">{group.rows.length} flagged days</span>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                                {isExpanded && group.rows.map((d) => {
-                                                                    // Severity Styling (Change 2)
-                                                                    const isCritical = d.maxDeviation > 300;
-                                                                    const isWarning = d.maxDeviation >= 180 && d.maxDeviation <= 300;
-                                                                    const bgStyle = d.isDismissed ? 'bg-slate-50' : (isCritical ? 'bg-red-50/50' : (isWarning ? 'bg-amber-50/50' : ''));
-                                                                    const borderStyle = d.isDismissed ? 'border-l-slate-300' : (isCritical ? 'border-l-red-500 border-l-4' : (isWarning ? 'border-l-amber-500 border-l-4' : ''));
-                                                                    const opacityStyle = d.isDismissed ? 'opacity-40 grayscale' : '';
-
-                                                                    return (
-                                                                        <tr key={d.key} className={`${bgStyle} ${borderStyle} ${opacityStyle} hover:bg-slate-100/50 transition-all`}>
-                                                                            <td className="py-3 pl-2 w-[180px]">
-                                                                                <div className="font-medium text-slate-900">{d.displayDate}</div>
-                                                                                <div className={`text-[10px] font-bold ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>
-                                                                                    {d.maxDeviation} min deviation
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="py-3">
-                                                                                <div className="flex flex-wrap gap-1">
-                                                                                    {d.noMatchPunches.map((p, idx) => (
-                                                                                        <span key={idx} className={`flex items-center gap-1 border px-1.5 py-0.5 rounded text-[10px] ${p.matched ? 'bg-white text-slate-400' : 'bg-rose-50 border-rose-200 text-rose-700 font-bold'}`}>
-                                                                                            {extractTime(p.raw)}
-                                                                                            {/* User Modification: Show nearest shift point and distance for unbound punches */}
-                                                                                            {!p.matched && p.nearestShiftPoint && (
-                                                                                                <span className="text-slate-400 font-normal border-l pl-1 ml-0.5 border-rose-200">
-                                                                                                    {p.nearestShiftPoint} {p.minutesAway}m
-                                                                                                </span>
-                                                                                            )}
-                                                                                            {p.isPrev && (
-                                                                                                <span className="ml-1 text-[10px]" title="Previous Day">🌙</span>
-                                                                                            )}
-                                                                                        </span>
-                                                                                    ))}
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="py-3 text-right pr-2">
-                                                                                <div className="flex gap-1 justify-end">
-                                                                                    {/* Dismiss / Undo Dismiss Button with Persistence */}
-                                                                                    <Button 
-                                                                                        size="xs" 
-                                                                                        variant="ghost" 
-                                                                                        className="h-7 text-[10px] text-slate-400 hover:text-slate-600"
-                                                                                        onClick={async () => {
-                                                                                            if (d.isDismissed) {
-                                                                                                // Find and delete the existing DISMISSED_MISMATCH exception
-                                                                                                const existingEx = exceptions.find(ex => 
-                                                                                                    ex.type === 'DISMISSED_MISMATCH' && 
-                                                                                                    String(ex.attendance_id) === String(d.attendance_id) && 
-                                                                                                    ex.date_from === d.date &&
-                                                                                                    ex.notes === 'no_match'
-                                                                                                );
-                                                                                                if (existingEx) {
-                                                                                                    await base44.entities.Exception.delete(existingEx.id);
-                                                                                                    toast.success("Dismissed record restored");
-                                                                                                }
-                                                                                            } else {
-                                                                                                // Create a new DISMISSED_MISMATCH exception for persistence
-                                                                                                await base44.entities.Exception.create({
-                                                                                                    type: 'DISMISSED_MISMATCH',
-                                                                                                    attendance_id: d.attendance_id,
-                                                                                                    project_id: project.id,
-                                                                                                    date_from: d.date,
-                                                                                                    date_to: d.date,
-                                                                                                    notes: 'no_match'
-                                                                                                });
-                                                                                                toast.success("Record dismissed");
-                                                                                            }
-
-                                                                                            // Invalidate queries to refresh the UI
-                                                                                            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
-                                                                                            
-                                                                                            // Update local state immediately for better UX
-                                                                                            const next = new Set([...dismissedNoMatchKeys]);
-                                                                                            if (d.isDismissed) next.delete(d.key); else next.add(d.key);
-                                                                                            setDismissedNoMatchKeys(next);
-                                                                                        }}
-                                                                                    >
-                                                                                        {d.isDismissed ? 'Undo Dismiss' : 'Dismiss'}
-                                                                                    </Button>
-                                                                                    <Button 
-                                                                                        size="sm" 
-                                                                                        variant="outline" 
-                                                                                        className="h-7 text-[10px] text-rose-600 border-rose-200 hover:bg-rose-50"
-                                                                                        onClick={() => {
-                                                                                            const matchingResult = results.find(r => String(r.attendance_id) === String(attId));
-                                                                                            setSelectedEmployee(matchingResult || d.rawResult);
-                                                                                            setEditingDay({
-                                                                                                date: d.displayDate,
-                                                                                                dateStr: d.date,
-                                                                                                status: 'Present',
-                                                                                                abnormal: false,
-                                                                                                shift: 'Binding Error'
-                                                                                            });
-                                                                                        }}
-                                                                                    >
-                                                                                        Fix Entry
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    );
-                                                                })}
-                                                            </React.Fragment>
-                                                        );
-                                                    });
-                                                })()
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                )}
+            <DetectionPanel
+                shiftMismatchDetections={shiftMismatchDetections}
+                noMatchDetections={noMatchDetections}
+                exceptions={exceptions}
+                project={project}
+                results={results}
+                setSelectedEmployee={setSelectedEmployee}
+                setEditingDay={setEditingDay}
+                handleExportMismatch={handleExportMismatch}
+            />
             
             <Card className="border-0 shadow-sm">
                 <CardHeader>
