@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { fetchAllRecords } from '../utils/paginatedFetch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,19 +77,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
         queryFn: async () => {
-            // Primary: fetch by report_run_id
-            const results = await base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 5000);
-
-            // Fallback for closed projects: if no results found by report_run_id,
-            // try fetching by project_id (covers cases where finalized results stored under a different run id)
+            const results = await fetchAllRecords(base44.entities.AnalysisResult, { report_run_id: reportRun.id });
             if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
-                const byProject = await base44.entities.AnalysisResult.filter({ project_id: project.id }, null, 5000);
-                // Filter to only results that belong to this specific report_run_id if possible
+                const byProject = await fetchAllRecords(base44.entities.AnalysisResult, { project_id: project.id });
                 const matchingRun = byProject.filter(r => r.report_run_id === reportRun.id);
                 if (matchingRun.length > 0) return matchingRun;
                 if (byProject.length > 0) return byProject;
             }
-
             return results;
         },
         staleTime: 30 * 60 * 1000,

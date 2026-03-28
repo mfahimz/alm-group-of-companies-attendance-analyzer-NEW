@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { fetchAllRecords } from '../utils/paginatedFetch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,10 +54,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
 
-    // Fetch data needed for analysis
+    // Fetch data needed for analysis - use paginated fetch to avoid SDK truncation
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
-        queryFn: () => base44.entities.Punch.filter({ project_id: project.id }),
+        queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }),
         staleTime: 10 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -66,7 +67,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const { data: shifts = [] } = useQuery({
         queryKey: ['shifts', project.id],
-        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
+        queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }),
         staleTime: 10 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -76,7 +77,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const { data: exceptions = [] } = useQuery({
         queryKey: ['exceptions', project.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
+        queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }),
         staleTime: 10 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -498,16 +499,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const deleteReportMutation = useMutation({
         mutationFn: async (reportRunId) => {
-            // Fetch all associated data for this report
+            // Fetch all associated data for this report - use paginated fetch
             const [resultsToDelete, snapshotsToDelete] = await Promise.all([
-                base44.entities.AnalysisResult.filter({ 
+                fetchAllRecords(base44.entities.AnalysisResult, { 
                     project_id: project.id, 
                     report_run_id: reportRunId 
-                }, null, 5000),
-                base44.entities.SalarySnapshot.filter({
+                }),
+                fetchAllRecords(base44.entities.SalarySnapshot, {
                     project_id: project.id,
                     report_run_id: reportRunId
-                }, null, 5000)
+                })
             ]);
             
             // Delete in batches of 5 with delays to avoid rate limiting
@@ -657,10 +658,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             // Verify that snapshots count matches total employees
             // ============================================================
             console.log('[ReportTab] 🔍 Running post-finalization snapshot count verification...');
-            const finalSnapshots = await base44.entities.SalarySnapshot.filter({
+            const finalSnapshots = await fetchAllRecords(base44.entities.SalarySnapshot, {
                 project_id: project.id,
                 report_run_id: reportRunId
-            }, null, 5000);
+            });
             
             console.log(`[ReportTab] ============================================`);
             console.log(`[ReportTab] POST-FINALIZATION VERIFICATION:`);
@@ -781,13 +782,13 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const { data: reportResults = {} } = useQuery({
         queryKey: ['reportResults', project.id, reportRunIds],
         queryFn: async () => {
-            // Fetch results only for displayed reports
+            // Fetch results only for displayed reports - use paginated fetch to avoid SDK truncation
             const resultsByReport = {};
             for (const run of reportRuns) {
-                const results = await base44.entities.AnalysisResult.filter({ 
+                const results = await fetchAllRecords(base44.entities.AnalysisResult, { 
                     project_id: project.id,
                     report_run_id: run.id 
-                }, null, 5000);
+                });
                 
                 // Filter for department heads
                 const filteredForDeptHead = isDepartmentHead && deptHeadVerification?.verified
