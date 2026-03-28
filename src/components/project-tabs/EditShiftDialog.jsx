@@ -162,7 +162,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <Label>Punch In *</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="8:00 AM"
                                     value={formData.am_start}
                                     onChange={(e) => setFormData({ ...formData, am_start: e.target.value })}
@@ -171,7 +171,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             </div>
                             <div>
                                 <Label>Punch Out *</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="5:00 PM"
                                     value={formData.pm_end}
                                     onChange={(e) => setFormData({ ...formData, pm_end: e.target.value })}
@@ -183,7 +183,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <Label>AM Start *</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="8:00 AM"
                                     value={formData.am_start}
                                     onChange={(e) => setFormData({ ...formData, am_start: e.target.value })}
@@ -192,7 +192,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             </div>
                             <div>
                                 <Label>AM End *</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="12:00 PM"
                                     value={formData.am_end}
                                     onChange={(e) => setFormData({ ...formData, am_end: e.target.value })}
@@ -201,7 +201,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             </div>
                             <div>
                                 <Label>PM Start *</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="1:00 PM"
                                     value={formData.pm_start}
                                     onChange={(e) => setFormData({ ...formData, pm_start: e.target.value })}
@@ -210,7 +210,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             </div>
                             <div>
                                 <Label>PM End *</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="5:00 PM"
                                     value={formData.pm_end}
                                     onChange={(e) => setFormData({ ...formData, pm_end: e.target.value })}
@@ -227,7 +227,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             variant="ghost"
                             size="sm"
                             onClick={handleReset}
-                            className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 h-7"
+                            className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-slate-50 transition-all duration-200 h-7"
                         >
                             Reset to Original
                         </Button>
@@ -254,7 +254,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                                 value={formData.applicable_days}
                                 onValueChange={(value) => setFormData({ ...formData, applicable_days: value })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="border-slate-200 hover:bg-slate-50 transition-all duration-200 focus:ring-indigo-100">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -269,7 +269,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                         <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateMutation.isPending}>
                             {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                         </Button>
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button type="button" variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={onClose}>
                             Cancel
                         </Button>
                     </div>

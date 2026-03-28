@@ -128,7 +128,7 @@ function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1">
                                             <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Amount</Label>
-                                            <Input 
+                                            <Input className="border-slate-200 focus:ring-indigo-100" 
                                                 type="number" 
                                                 value={entry.amount} 
                                                 onChange={(e) => handleEntryChange(idx, 'amount', e.target.value)}
@@ -147,7 +147,7 @@ function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
                                     </div>
                                     <div>
                                         <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Description</Label>
-                                        <Input 
+                                        <Input className="border-slate-200 focus:ring-indigo-100" 
                                             value={entry.desc} 
                                             onChange={(e) => handleEntryChange(idx, 'desc', e.target.value)}
                                             className="h-8 text-xs bg-white"
@@ -874,7 +874,7 @@ export default function OvertimeTab({ project }) {
                         <Button
                             onClick={handleSyncToChecklist}
                             disabled={isSyncing || isSaving}
-                            className="bg-indigo-600 hover:bg-indigo-700 shadow-md"
+                            className="bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all duration-200"
                         >
                             {isSyncing ? (
                                 <>
@@ -891,7 +891,7 @@ export default function OvertimeTab({ project }) {
                         <Button
                             variant="outline"
                             onClick={handleExportTemplate}
-                            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                            className="border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-200"
                         >
                             <Download className="w-4 h-4 mr-2" />
                             Export Template
@@ -905,7 +905,7 @@ export default function OvertimeTab({ project }) {
                             />
                             <Button
                                 variant="outline"
-                                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                                className="border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-200"
                                 asChild
                             >
                                 <span>
@@ -917,7 +917,7 @@ export default function OvertimeTab({ project }) {
                         <Button
                             onClick={handleSave}
                             disabled={isSaving || Object.keys(editableData).length === 0}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200"
                         >
                             <Save className="w-4 h-4 mr-2" />
                             {isSaving ? 'Saving...' : 'Save Changes'}
@@ -940,7 +940,7 @@ export default function OvertimeTab({ project }) {
                             placeholder="Search by name, ID, or department..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
                         />
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
@@ -1027,7 +1027,7 @@ export default function OvertimeTab({ project }) {
                             <Button
                                 onClick={handleSaveAdjustments}
                                 disabled={!canEditAdjustments || isSavingAdjustments || Object.keys(editableAdjustments).length === 0}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200"
                             >
                                 <Save className="w-4 h-4 mr-2" />
                                 {isSavingAdjustments ? 'Saving...' : 'Save Adjustments'}
@@ -1050,7 +1050,7 @@ export default function OvertimeTab({ project }) {
                                 placeholder="Search by name, ID, or department..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
                             />
                         </div>
                         <p className="text-sm text-slate-500 mt-2">

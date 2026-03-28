@@ -213,6 +213,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="e.g. October Week 1"
+                            className="border-slate-200 focus:ring-indigo-100"
                         />
                     </div>
 
@@ -230,6 +231,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                         <div>
                             <Label htmlFor="date_from">Start Date *</Label>
                             <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                id="date_from"
                                type="date"
                                value={formData.date_from}
@@ -243,6 +245,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                             <div>
                             <Label htmlFor="date_to">End Date *</Label>
                             <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                id="date_to"
                                type="date"
                                value={formData.date_to}
@@ -280,6 +283,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                                    <div>
                                        <Label className="text-xs">Ramadan From</Label>
                                        <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                            type="date"
                                            value={ramadanDateRange.from}
                                            onChange={(e) => setRamadanDateRange({ ...ramadanDateRange, from: e.target.value })}
@@ -291,6 +295,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                                    <div>
                                        <Label className="text-xs">Ramadan To</Label>
                                        <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                            type="date"
                                            value={ramadanDateRange.to}
                                            onChange={(e) => setRamadanDateRange({ ...ramadanDateRange, to: e.target.value })}
@@ -310,7 +315,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="w-full justify-start"
+                                className="w-full justify-start border-slate-200 hover:bg-slate-50 transition-all duration-200"
                                 onClick={() => setShowEmployeeDialog(true)}
                             >
                                 <Users className="w-4 h-4 mr-2" />
@@ -353,6 +358,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                             <div>
                                 <Label htmlFor="gift_from" className="text-xs">Gift Minutes From *</Label>
                                 <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                     id="gift_from"
                                     type="date"
                                     value={formData.gift_minutes_date_from}
@@ -365,6 +371,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                             <div>
                                 <Label htmlFor="gift_to" className="text-xs">Gift Minutes To *</Label>
                                 <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                     id="gift_to"
                                     type="date"
                                     value={formData.gift_minutes_date_to}
@@ -385,7 +392,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                                 value={formData.weekly_off_override}
                                 onValueChange={(value) => setFormData({ ...formData, weekly_off_override: value })}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                     <SelectValue placeholder="Use employee settings" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -410,6 +417,7 @@ export default function CreateProjectDialog({ open, onClose }) {
                         <div>
                             <Label htmlFor="salary_calculation_days">Salary Calculation Days</Label>
                             <Input
+                               className="border-slate-200 focus:ring-indigo-100"
                                 id="salary_calculation_days"
                                 type="number"
                                 min="1"
@@ -439,12 +447,12 @@ export default function CreateProjectDialog({ open, onClose }) {
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button type="button" variant="outline" onClick={onClose} className="border-slate-200 hover:bg-slate-50 transition-all duration-200">
                             Cancel
                         </Button>
                         <Button 
                             type="submit" 
-                            className="bg-indigo-600 hover:bg-indigo-700"
+                            className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200"
                             disabled={createMutation.isPending}
                         >
                             {createMutation.isPending ? 'Creating...' : 'Create Project'}

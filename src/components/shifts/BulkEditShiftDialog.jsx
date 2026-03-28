@@ -119,7 +119,7 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                             />
                             <div className="flex-1">
                                 <Label>AM Start</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="8:00 AM"
                                     value={updates.am_start.value}
                                     onChange={(e) => setUpdates(prev => ({
@@ -141,7 +141,7 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                             />
                             <div className="flex-1">
                                 <Label>AM End</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="12:00 PM"
                                     value={updates.am_end.value}
                                     onChange={(e) => setUpdates(prev => ({
@@ -163,7 +163,7 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                             />
                             <div className="flex-1">
                                 <Label>PM Start</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="1:00 PM"
                                     value={updates.pm_start.value}
                                     onChange={(e) => setUpdates(prev => ({
@@ -185,7 +185,7 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                             />
                             <div className="flex-1">
                                 <Label>PM End</Label>
-                                <Input
+                                <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="5:00 PM"
                                     value={updates.pm_end.value}
                                     onChange={(e) => setUpdates(prev => ({
@@ -237,7 +237,7 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                         >
                             {bulkUpdateMutation.isPending ? 'Updating...' : 'Update All'}
                         </Button>
-                        <Button variant="outline" onClick={onClose}>
+                        <Button variant="ghost" className="hover:bg-slate-50 transition-all duration-200" onClick={onClose}>
                             Cancel
                         </Button>
                     </div>

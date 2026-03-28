@@ -19,11 +19,11 @@ export function GraceMinutesDialog({ editingGraceMinutes, onClose, onSave, isPen
                         type="number"
                         defaultValue={editingGraceMinutes?.grace_minutes ?? 15}
                         id="grace-minutes-input"
-                        className="mt-2"
+                        className="border-slate-200 focus:ring-indigo-100 mt-2"
                     />
                 </div>
                 <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={onClose}>Cancel</Button>
                     <Button onClick={() => {
                         const val = document.getElementById('grace-minutes-input').value;
                         onSave({ id: editingGraceMinutes.id, grace_minutes: parseInt(val) });
@@ -63,7 +63,7 @@ export function SaveConfirmationDialog({ open, onClose, onConfirm, hasEdits, isU
                     )}
                 </div>
                 <div className="flex justify-end gap-3">
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={onClose}>Cancel</Button>
                     <Button onClick={onConfirm} className="bg-green-600 hover:bg-green-700">
                         Confirm & Save
                     </Button>

@@ -48,11 +48,8 @@
  * The mainPage value must match a key in the PAGES object exactly.
  */
 import AIPayrollInsights from './pages/AIPayrollInsights';
-import AgentsDocumentation from './pages/AgentsDocumentation';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import AuditLogs from './pages/AuditLogs';
-import BusinessDocumentation from './pages/BusinessDocumentation';
-import criticalFinalizationRules from './pages/CRITICAL_FINALIZATION_RULES';
 import CompanyBranding from './pages/CompanyBranding';
 import CompanyManagement from './pages/CompanyManagement';
 import CompanySelection from './pages/CompanySelection';
@@ -69,7 +66,6 @@ import Maintenance from './pages/Maintenance';
 import MaintenanceSettings from './pages/MaintenanceSettings';
 import ProjectDetail from './pages/ProjectDetail';
 import Projects from './pages/Projects';
-import reportArchitecture from './pages/REPORT_ARCHITECTURE';
 import RamadanSchedules from './pages/RamadanSchedules';
 import ReportDetail from './pages/ReportDetail';
 import ResumeScanner from './pages/ResumeScanner';
@@ -77,7 +73,6 @@ import RulesSettings from './pages/RulesSettings';
 import Salaries from './pages/Salaries';
 import SalaryIncrements from './pages/SalaryIncrements';
 import SalaryReportDetail from './pages/SalaryReportDetail';
-import TechnicalDocumentation from './pages/TechnicalDocumentation';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
 import SoftwareDoc from './pages/SoftwareDoc';
@@ -87,11 +82,8 @@ import __Layout from './Layout.jsx';
 
 export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
-    "AgentsDocumentation": AgentsDocumentation,
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "AuditLogs": AuditLogs,
-    "BusinessDocumentation": BusinessDocumentation,
-    "CRITICAL_FINALIZATION_RULES": criticalFinalizationRules,
     "CompanyBranding": CompanyBranding,
     "CompanyManagement": CompanyManagement,
     "CompanySelection": CompanySelection,
@@ -108,7 +100,6 @@ export const PAGES = {
     "MaintenanceSettings": MaintenanceSettings,
     "ProjectDetail": ProjectDetail,
     "Projects": Projects,
-    "REPORT_ARCHITECTURE": reportArchitecture,
     "RamadanSchedules": RamadanSchedules,
     "ReportDetail": ReportDetail,
     "ResumeScanner": ResumeScanner,
@@ -116,7 +107,6 @@ export const PAGES = {
     "Salaries": Salaries,
     "SalaryIncrements": SalaryIncrements,
     "SalaryReportDetail": SalaryReportDetail,
-    "TechnicalDocumentation": TechnicalDocumentation,
     "UserProfile": UserProfile,
     "Users": Users,
     "SoftwareDoc": SoftwareDoc,

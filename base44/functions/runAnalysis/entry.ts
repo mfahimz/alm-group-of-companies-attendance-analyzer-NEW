@@ -401,75 +401,49 @@ Deno.serve(async (req: Request) => {
          */
 
 
-        // MIDNIGHT BUFFER: Helper to check if a punch timestamp falls within the midnight buffer window
-        // (i.e., between 12:00 AM and 02:00 AM = 120 minutes after midnight)
-        // This is specifically extended to 2 hours for Ramadan night shifts crossover support.
-        const MIDNIGHT_BUFFER_MINUTES = 120;
-        const isWithinMidnightBuffer = (timestampRaw) => {
+        /**
+         * UNIVERSAL 3:00 AM MIDNIGHT ROLLBACK (RULE 1-180)
+         * All punches between 12:00 AM and 03:00 AM are attributed to the previous day 
+         * UNLESS the employee's shift for that day explicitly starts in that window.
+         */
+        const MIDNIGHT_BUFFER_MINUTES = 180;
+
+        const isWithinMidnightBuffer = (timestampRaw: string) => {
             const parsed = parseTime(timestampRaw);
             if (!parsed) return false;
             const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
             return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
         };
 
-        const filterMultiplePunches = (punchList, shift, includeSeconds = false) => {
-            if (punchList.length <= 1) return punchList;
+        const shiftStartsNearMidnight = (s: any) => {
+            if (!s) return false;
+            const tStart = parseTime(s.am_start);
+            if (!tStart) return false;
+            const minutes = tStart.getHours() * 60 + tStart.getMinutes();
+            return minutes <= MIDNIGHT_BUFFER_MINUTES;
+        };
 
+        const filterMultiplePunches = (punchList: any[], shift: any, includeSeconds = false) => {
+            if (punchList.length <= 1) return punchList;
             const punchesWithTime = punchList.map(p => ({
                 ...p,
                 time: parseTime(p.timestamp_raw)
             })).filter(p => p.time);
-
             if (punchesWithTime.length === 0) return punchList;
-
             const deduped = [];
             for (let i = 0; i < punchesWithTime.length; i++) {
                 const current = punchesWithTime[i];
                 const isDuplicate = deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10);
-                if (!isDuplicate) {
-                    deduped.push(current);
-                }
+                if (!isDuplicate) deduped.push(current);
             }
-
-            // Sort punches - preserve the original order from dayPunches which already handles midnight crossover
-            const sortedPunches = deduped.sort((a, b) => {
+            return deduped.sort((a, b) => {
                 const aIdx = punchList.findIndex(p => p.id === a.id);
                 const bIdx = punchList.findIndex(p => p.id === b.id);
                 return aIdx - bIdx;
-            });
-            return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+            }).map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
         };
-
-        // Analyze employee function
-        const analyzeEmployee = async (attendance_id) => {
+        const analyzeEmployee = async (attendance_id: any) => {
             const attendanceIdStr = String(attendance_id);
-
-            // MIDNIGHT SHIFT FIX: Include punches from the day AFTER the project end date
-            // because shifts ending at/near midnight (e.g., 12:00 AM) will have punch-outs
-            // recorded on the next calendar day (e.g., 12:05 AM, 12:15 AM, 12:20 AM)
-            const dayAfterEnd = new Date(date_to);
-            dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
-            const dayAfterEndStr = toDateStr(dayAfterEnd);
-
-            // MIDNIGHT FIX: Include punches from 1 day BEFORE and 1 day AFTER the range
-            // - Day before: needed to check if previous day's shift ended near midnight
-            //   (those punches from 12:00-1:30 AM on the first day belong to the previous day)
-            // - Day after: needed to grab midnight crossover punch-outs from the last day
-            const dayBeforeStart = new Date(date_from);
-            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-            const dayBeforeStartStr = toDateStr(dayBeforeStart);
-
-            const employeePunches = punches.filter(p =>
-                String(p.attendance_id) === attendanceIdStr &&
-                p.punch_date >= dayBeforeStartStr &&
-                p.punch_date <= dayAfterEndStr
-            );
-
-            // Separate the core-range punches (used for main iteration) and overflow punches
-            const nextDayPunches = employeePunches.filter(p =>
-                p.punch_date === dayAfterEndStr
-            );
-
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
             const employeeExceptions = exceptions.filter(e => {
                 try {
@@ -480,9 +454,123 @@ Deno.serve(async (req: Request) => {
                     return false;
                 }
             });
-
             const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-            const includeSeconds = true; // Unified: always support high-precision parsing
+            const includeSeconds = true;
+
+            const isShiftEffective = (s: any, targetDate: Date) => {
+                if (!s.effective_from || !s.effective_to) return true;
+                const from = new Date(s.effective_from);
+                const to = new Date(s.effective_to);
+                const targetDay = new Date(targetDate);
+                targetDay.setHours(0, 0, 0, 0);
+                const fromDay = new Date(from);
+                fromDay.setHours(0, 0, 0, 0);
+                const toDay = new Date(to);
+                toDay.setHours(0, 0, 0, 0);
+                return targetDay >= fromDay && targetDay <= toDay;
+            };
+
+            const shiftStartsNearMidnight = (s: any) => {
+                if (!s) return false;
+                const tStart = parseTime(s.am_start);
+                if (!tStart) return false;
+                const minutes = tStart.getHours() * 60 + tStart.getMinutes();
+                return minutes <= MIDNIGHT_BUFFER_MINUTES;
+            };
+
+            const getShiftForDate = (dateStr: string, dateObj: Date) => {
+                const dateSpecificShifts = employeeShifts.filter((s: any) => s.date === dateStr && isShiftEffective(s, dateObj));
+                let s: any = null;
+                if (dateSpecificShifts.length > 0) {
+                    if (dateSpecificShifts.length === 1) {
+                        s = dateSpecificShifts[0];
+                    } else {
+                        const ramadanDateShifts = dateSpecificShifts.filter((ps: any) => ps.applicable_days?.includes('Ramadan'));
+                        if (ramadanDateShifts.length >= 2) {
+                            const dayShift = ramadanDateShifts.find((ps: any) => ps.applicable_days?.includes('Day') || ps.applicable_days?.includes('S1'));
+                            const nightShift = ramadanDateShifts.find((ps: any) => ps.applicable_days?.includes('Night') || ps.applicable_days?.includes('S2'));
+                            if (dayShift && nightShift) {
+                                s = { am_start: dayShift.am_start, am_end: dayShift.pm_end, pm_start: nightShift.am_start, pm_end: nightShift.pm_end, is_single_shift: false, _ramadan: true };
+                            }
+                        }
+                        if (!s) s = dateSpecificShifts.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+                    }
+                } else {
+                    for (const scheduleId in ramadanShiftsLookup) {
+                        const ramadanData = ramadanShiftsLookup[scheduleId];
+                        if (dateObj >= ramadanData.start && dateObj <= ramadanData.end) {
+                            const daysSinceStart = Math.floor((dateObj.getTime() - ramadanData.start) / (1000 * 60 * 60 * 24));
+                            let saturdays = 0;
+                            for (let i = 0; i < daysSinceStart; i++) {
+                                const checkD = new Date(ramadanData.start); checkD.setDate(checkD.getDate() + i);
+                                if (checkD.getUTCDay() === 6) saturdays++;
+                            }
+                            const weekNum = (saturdays % 2) === 0 ? 1 : 2;
+                            const weekData = weekNum === 1 ? ramadanData.week1 : ramadanData.week2;
+                            const empData = weekData[attendanceIdStr];
+                            if (empData) {
+                                const hasDay = empData.day_start && empData.day_end && empData.day_start !== '—';
+                                const hasNight = empData.night_start && empData.night_end && empData.night_start !== '—';
+                                if (hasDay && hasNight) {
+                                    s = { am_start: empData.day_start, am_end: empData.day_end, pm_start: empData.night_start, pm_end: empData.night_end, is_single_shift: false, _ramadan: true };
+                                } else if (hasDay) {
+                                    s = { am_start: empData.day_start, am_end: '—', pm_start: '—', pm_end: empData.day_end, is_single_shift: true, _ramadan: true };
+                                } else if (hasNight) {
+                                    s = { am_start: empData.night_start, am_end: '—', pm_start: '—', pm_end: empData.night_end, is_single_shift: true, _ramadan: true };
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (!s) {
+                        const dNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const dName = dNames[dateObj.getUTCDay()];
+                        const applicableShifts = employeeShifts.filter((ps: any) => !ps.date && isShiftEffective(ps, dateObj));
+                        for (const ps of applicableShifts) {
+                             if (ps.applicable_days && ps.applicable_days.toLowerCase().includes(dName.toLowerCase())) { s = ps; break; }
+                        }
+                        if (!s) {
+                            if (dateObj.getUTCDay() === 5) {
+                                s = employeeShifts.find((ps: any) => ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
+                                if (!s) s = employeeShifts.find((ps: any) => !ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
+                            } else {
+                                s = employeeShifts.find((ps: any) => !ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
+                            }
+                        }
+                    }
+                }
+                const matchingEx = employeeExceptions.filter((ex: any) => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return dateObj >= exFrom && dateObj <= exTo;
+                });
+                const dateEx = matchingEx.sort((a: any, b: any) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())[0];
+                if (dateEx && dateEx.type === 'SHIFT_OVERRIDE') {
+                    s = {
+                        am_start: dateEx.new_am_start,
+                        am_end: dateEx.new_am_end,
+                        pm_start: dateEx.new_pm_start,
+                        pm_end: dateEx.new_pm_end
+                    };
+                }
+                return s;
+            };
+
+            const dayAfterEnd = new Date(date_to);
+            dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+            const dayAfterEndStr = toDateStr(dayAfterEnd);
+
+            const dayBeforeStart = new Date(date_from);
+            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+            const dayBeforeStartStr = toDateStr(dayBeforeStart);
+
+            const employeePunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= dayBeforeStartStr &&
+                p.punch_date <= dayAfterEndStr
+            );
+
+            const nextDayPunches = employeePunches.filter(p => p.punch_date === dayAfterEndStr);
 
             console.log(`[runAnalysis] Employee ${attendanceIdStr}: carried_grace_minutes = ${employee?.carried_grace_minutes || 0}`);
 
@@ -623,13 +711,10 @@ Deno.serve(async (req: Request) => {
                 // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
                 // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
                 const dayOfWeek = currentDate.getUTCDay();
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDayName = dayNames[dayOfWeek];
 
                 let weeklyOffDay = null;
-                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
-                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
-                } else if (employee?.weekly_off) {
-                    weeklyOffDay = dayNameToNumber[employee.weekly_off];
-                }
 
                 // Check if this is employee's weekly off day - BEFORE any other processing
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
@@ -727,22 +812,6 @@ Deno.serve(async (req: Request) => {
                     }
                 }
 
-                const isShiftEffective = (s) => {
-                    if (!s.effective_from || !s.effective_to) return true;
-                    const from = new Date(s.effective_from);
-                    const to = new Date(s.effective_to);
-                    const currentDateOnly = new Date(currentDate);
-                    currentDateOnly.setHours(0, 0, 0, 0);
-                    const fromDateOnly = new Date(from);
-                    fromDateOnly.setHours(0, 0, 0, 0);
-                    const toDateOnly = new Date(to);
-                    toDateOnly.setHours(0, 0, 0, 0);
-                    return currentDateOnly >= fromDateOnly && currentDateOnly <= toDateOnly;
-                };
-
-                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                const currentDayName = dayNames[dayOfWeek];
-
                 // Check for ANNUAL_LEAVE - already counted as calendar days upfront
                 // Just skip this day if employee is on annual leave and didn't work
                 const annualLeaveException = employeeExceptions.find(ex => {
@@ -759,7 +828,7 @@ Deno.serve(async (req: Request) => {
 
                 if (annualLeaveException) {
                     // Check if employee worked on this day despite annual leave
-                    const dayPunchesForLeave = employeePunches.filter(p => p.punch_date === dateStr);
+                    const dayPunchesForLeave = employeePunches.filter((p: any) => p.punch_date === dateStr);
                     if (dayPunchesForLeave.length === 0) {
                         // Skip this day for attendance counting - annual leave already counted as calendar days upfront
                         // Decrement working days since this is a leave day (not a working day to count)
@@ -769,156 +838,7 @@ Deno.serve(async (req: Request) => {
                     }
                     // If employee worked, continue normal analysis
                 }
-                // SHIFT SELECTION PRIORITY LOGIC (TASK 2 CONSOLIDATION)
-                // The system must resolve which shift applies to a given employee on a given date.
-                // We strictly prioritize project-specific ShiftTiming records applied manually
-                // or via 'Apply Ramadan Shifts' button as the primary source of truth.
-                // ================================================================
-
-                let shift = null;
-                const dateSpecificShifts = employeeShifts.filter(s => s.date === dateStr && isShiftEffective(s));
-
-                if (dateSpecificShifts.length > 0) {
-                    // PRIORITY 1: Use project-applied date-specific records
-                    if (dateSpecificShifts.length === 1) {
-                        shift = dateSpecificShifts[0];
-                        console.log(`[runAnalysis] PROJECT SHIFT: Found specific record for ${attendanceIdStr} on ${dateStr}: "${shift.applicable_days}"`);
-                    } else {
-                        // MERGE LOGIC: If multiple records exist (e.g. legacy Ramadan day+night), merge them
-                        const ramadanDateShifts = dateSpecificShifts.filter(s =>
-                            String(s.applicable_days || '').includes('Ramadan')
-                        );
-
-                        if (ramadanDateShifts.length >= 2) {
-                            const dayShift = ramadanDateShifts.find(s =>
-                                s.applicable_days?.includes('Day') || s.applicable_days?.includes('S1')
-                            );
-                            const nightShift = ramadanDateShifts.find(s =>
-                                s.applicable_days?.includes('Night') || s.applicable_days?.includes('S2')
-                            );
-
-                            if (dayShift && nightShift) {
-                                shift = {
-                                    am_start: dayShift.am_start,
-                                    am_end: dayShift.pm_end,
-                                    pm_start: nightShift.am_start,
-                                    pm_end: nightShift.pm_end,
-                                    is_single_shift: false,
-                                    applicable_days: 'Ramadan Merged Shift',
-                                    _ramadan: true,
-                                    _merged: true
-                                };
-                                console.log(`[runAnalysis] PROJECT SHIFT: Merged day+night records for ${attendanceIdStr} on ${dateStr}`);
-                            }
-                        }
-
-                        if (!shift) {
-                            // Default to the most recent record if no mergeable Ramadan pair found
-                            shift = dateSpecificShifts.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
-                            console.log(`[runAnalysis] PROJECT SHIFT: Multiple records found for ${attendanceIdStr} on ${dateStr}, using most recent: "${shift.applicable_days}"`);
-                        }
-                    }
-                } else {
-                    // FALLBACK: Only if NO project-specific records exist, look for external logic/patterns
-
-                    // Fallback 1: Build from raw Ramadan schedule JSON
-                    for (const scheduleId in ramadanShiftsLookup) {
-                        const ramadanData = ramadanShiftsLookup[scheduleId];
-                        if (currentDate >= ramadanData.start && currentDate <= ramadanData.end) {
-                            const daysSinceStart = Math.floor((currentDate - ramadanData.start) / (1000 * 60 * 60 * 24));
-                            let saturdaysPassed = 0;
-
-                            for (let i = 0; i < daysSinceStart; i++) {
-                                const checkDate = new Date(ramadanData.start);
-                                checkDate.setDate(checkDate.getDate() + i);
-                                const checkDayOfWeek = checkDate.getUTCDay();
-                                if (checkDayOfWeek === 6) saturdaysPassed++;
-                            }
-
-                            const weekNumber = (saturdaysPassed % 2) === 0 ? 1 : 2;
-                            const weekData = weekNumber === 1 ? ramadanData.week1 : ramadanData.week2;
-                            const employeeShiftData = weekData[attendanceIdStr];
-
-                            if (employeeShiftData) {
-                                const hasDay = employeeShiftData.day_start && employeeShiftData.day_end && employeeShiftData.day_start !== '—' && employeeShiftData.day_end !== '—';
-                                const hasNight = employeeShiftData.night_start && employeeShiftData.night_end && employeeShiftData.night_start !== '—' && employeeShiftData.night_end !== '—';
-
-                                if (hasDay && hasNight) {
-                                    shift = {
-                                        am_start: employeeShiftData.day_start || '',
-                                        am_end: employeeShiftData.day_end || '',
-                                        pm_start: employeeShiftData.night_start || '',
-                                        pm_end: employeeShiftData.night_end || '',
-                                        is_single_shift: false,
-                                        _ramadan: true
-                                    };
-                                } else if (hasDay) {
-                                    shift = {
-                                        am_start: employeeShiftData.day_start || '',
-                                        am_end: '—',
-                                        pm_start: '—',
-                                        pm_end: employeeShiftData.day_end || '',
-                                        is_single_shift: true,
-                                        _ramadan: true
-                                    };
-                                } else if (hasNight) {
-                                    shift = {
-                                        am_start: employeeShiftData.night_start || '',
-                                        am_end: '—',
-                                        pm_start: '—',
-                                        pm_end: employeeShiftData.night_end || '',
-                                        is_single_shift: true,
-                                        _ramadan: true
-                                    };
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-
-                if (!shift) {
-                    // Fallback 2: Build from regular shifts (non-Ramadan)
-                    const nonRamadanDateShift = dateSpecificShifts.find(s =>
-                        !s.applicable_days || !s.applicable_days.includes('Ramadan')
-                    );
-                    shift = nonRamadanDateShift;
-                }
-
-                if (!shift) {
-                    const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
-
-                    // PRIORITY 3: A shift that explicitly matches the specific day of the week 
-                    // (e.g., applicable_days includes "Monday")
-                    for (const s of applicableShifts) {
-                        if (s.applicable_days) {
-                            try {
-                                const applicableDaysArray = JSON.parse(s.applicable_days);
-                                if (Array.isArray(applicableDaysArray) && applicableDaysArray.length > 0) {
-                                    if (applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
-                                        shift = s;
-                                        break;
-                                    }
-                                }
-                            } catch (e) {
-                                // Continue to next shift
-                            }
-                        }
-                    }
-
-                    if (!shift) {
-                        // PRIORITY 4: The general company shift logic
-                        // If it's a Friday, we check for a general Friday shift, otherwise we grab the first general shift
-                        if (dayOfWeek === 5) {
-                            shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s));
-                            if (!shift) {
-                                shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
-                            }
-                        } else {
-                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
-                        }
-                    }
-                }
+                let shift = getShiftForDate(dateStr, currentDate);
 
                 // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
 
@@ -935,144 +855,45 @@ Deno.serve(async (req: Request) => {
                                 pm_end: dateException.new_pm_end
                             };
                         }
-                    } catch (e) {
+                    } catch (e: any) {
+                        let errorMessageStr = e.message;
                         console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
                         // Continue with existing shift
                     }
                 }
 
                 // ================================================================
-                // SKIP_PUNCH LOGIC: Segmented skip with strict priority rules
+                // UNIVERSAL 3:00 AM MIDNIGHT ROLLBACK (CORE LOGIC)
                 // ================================================================
-                // 1. Find the active SKIP_PUNCH exception for this employee/date
-                // 2. Only apply if employee is WORKING (not on leave/holiday)
-                // 3. Segmented: AM_PUNCH_IN → zero late, PM_PUNCH_OUT → zero early, FULL_SKIP → both
-                // 4. 0-punch LOP saver: FULL_SKIP with 0 punches → Present (Skip Punch)
-                // ================================================================
-                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-                const isOnLeave = dateException && (
-                    dateException.type === 'SICK_LEAVE' || 
-                    dateException.type === 'ANNUAL_LEAVE' || 
-                    dateException.type === 'PUBLIC_HOLIDAY'
-                );
-                // "Working Employees Only" filter: SKIP_PUNCH only applies to people expected to work
-                const isNonWorkingStatus = isOnLeave || 
-                    (dateException && dateException.type === 'OFF');
-                
-                // ================================================================
-                // MIDNIGHT SHIFT HANDLING (TASK 3 AUDIT)
-                // If a shift ends at or near midnight (12:00 AM / 00:00), 
-                // the system must correctly include early-morning punches from the NEXT chronological day
-                // (e.g. 00:15 AM punch) because they belong to THIS date's shift.
-                // ================================================================
+                const currentShiftStartsEarly = shiftStartsNearMidnight(shift);
                 const nextDateObj = new Date(currentDate);
                 nextDateObj.setDate(nextDateObj.getDate() + 1);
                 const nextDateStr = toDateStr(nextDateObj);
 
-                // Check previous day's shift to see if IT ended near midnight
-                // If so, exclude early-morning punches that belong to the previous day
-                const prevDateObj = new Date(currentDate);
-                prevDateObj.setDate(prevDateObj.getDate() - 1);
-                const prevDateStr = toDateStr(prevDateObj);
-
-                let prevShiftEndsNearMidnight = false;
-                {
-                    // Check if previous day had a shift ending near midnight
-                    // NOTE: We check even if prevDateStr < date_from because the day BEFORE
-                    // the project start can still have a midnight-ending shift whose punch-out
-                    // bleeds into the first project day
-                    // IMPORTANT: Check ALL shift types - date-specific (including Ramadan) AND general shifts
-                    const prevDateShifts = employeeShifts.filter(s => s.date === prevDateStr);
-                    const prevGeneralShifts = employeeShifts.filter(s => !s.date);
-                    // Prefer date-specific shifts (which includes Ramadan shifts), fall back to general
-                    const prevShiftCandidates = prevDateShifts.length > 0 ? prevDateShifts : prevGeneralShifts;
-                    for (const ps of prevShiftCandidates) {
-                        // For single shifts, the end time is in pm_end
-                        // For combined shifts, pm_end is the night shift end
-                        const endTimeStr = ps.pm_end;
-                        const pEndTime = parseTime(endTimeStr, includeSeconds);
-                        if (pEndTime) {
-                            const pEndHour = pEndTime.getHours();
-                            const pEndMin = pEndTime.getMinutes();
-                            // Shift ends near midnight: 11 PM (hour 23) or any time in 12 AM hour (hour 0)
-                            if (pEndHour === 23 || pEndHour === 0) {
-                                prevShiftEndsNearMidnight = true;
-                                break;
-                            }
-                        }
+                let dayPunches = employeePunches.filter(p => {
+                    if (p.punch_date === dateStr) {
+                        return !isWithinMidnightBuffer(p.timestamp_raw) || currentShiftStartsEarly;
                     }
-                }
-
-                if (prevShiftEndsNearMidnight) {
-                    console.log(`[runAnalysis] MIDNIGHT DETECT: Employee ${attendanceIdStr}, Date ${dateStr}: Previous day (${prevDateStr}) shift ends near midnight → will exclude early AM punches`);
-                }
-
-                // Determine if this shift ends near midnight
-                // For single shifts: end time is in pm_end (am_start → pm_end)
-                // For combined shifts: end time is in pm_end (night shift end)
-                let shiftEndsNearMidnight = false;
-                if (shift) {
-                    const endTimeStr = shift.pm_end;
-                    const pmEndTime = parseTime(endTimeStr, includeSeconds);
-                    if (pmEndTime) {
-                        const endHour = pmEndTime.getHours();
-                        const endMinute = pmEndTime.getMinutes();
-                        // Shift ends near midnight if pm_end is in 11 PM hour (23) or 12 AM hour (0)
-                        if (endHour === 23 || endHour === 0) {
-                            shiftEndsNearMidnight = true;
-                        }
-                    }
-                }
-
-                // Get punches for this date
-                let dayPunches = employeePunches
-                    .filter(p => p.punch_date === dateStr);
-
-                // MIDNIGHT FIX: If PREVIOUS day's shift ended near midnight,
-                // exclude early-morning punches (12:00 AM - 02:00 AM) from THIS day's punches
-                // because those belong to the previous day's shift as punch-outs
-                if (prevShiftEndsNearMidnight) {
-                    const beforeFilter = dayPunches.length;
-                    dayPunches = dayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
-                    if (dayPunches.length < beforeFilter) {
-                        console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Excluded ${beforeFilter - dayPunches.length} early AM punch(es) that belong to prev day ${prevDateStr}`);
-                    }
-                }
-
-                // If shift ends near midnight, also grab early-morning punches from next day
-                // These are punch-outs that crossed midnight (e.g., 12:05 AM, 12:15 AM, 12:30 AM)
-                if (shiftEndsNearMidnight) {
-                    // Get punches from next day - check both main punches and next-day overflow
-                    const nextDayAllPunches = [
-                        ...employeePunches.filter(p => p.punch_date === nextDateStr),
-                        ...nextDayPunches.filter(p => p.punch_date === nextDateStr)
-                    ];
-
-                    // Deduplicate by punch id
-                    const seenIds = new Set(dayPunches.map(p => p.id));
-                    const uniqueNextDayPunches = nextDayAllPunches.filter(p => !seenIds.has(p.id));
-
-                    // Include next-day punches that are within 120 minutes of midnight
-                    // (i.e., punches between 12:00 AM and 02:00 AM)
-                    const midnightCrossoverPunches = uniqueNextDayPunches.filter(p => isWithinMidnightBuffer(p.timestamp_raw));
-
-                    if (midnightCrossoverPunches.length > 0) {
-                        console.log(`[runAnalysis] MIDNIGHT FIX: Employee ${attendanceIdStr}, Date ${dateStr}: Found ${midnightCrossoverPunches.length} crossover punch(es) from next day ${nextDateStr}`);
-                        dayPunches = [...dayPunches, ...midnightCrossoverPunches];
-                    }
-                }
-
-                dayPunches = dayPunches.sort((a, b) => {
-                    const timeA = parseTime(a.timestamp_raw);
-                    const timeB = parseTime(b.timestamp_raw);
-                    // For midnight crossover, punches from next day (hour 0) should sort AFTER today's punches
-                    // We adjust by adding 24h offset if the punch is from the next day
-                    const aIsNextDay = a.punch_date === nextDateStr;
-                    const bIsNextDay = b.punch_date === nextDateStr;
-                    const aTime = (timeA?.getTime() || 0) + (aIsNextDay ? 24 * 60 * 60 * 1000 : 0);
-                    const bTime = (timeB?.getTime() || 0) + (bIsNextDay ? 24 * 60 * 60 * 1000 : 0);
-                    return aTime - bTime;
+                    return false;
                 });
+
+                const nextDayShift = getShiftForDate(nextDateStr, nextDateObj);
+                const nextShiftStartsEarly = shiftStartsNearMidnight(nextDayShift);
+
+                const nextDayEarlyPunches = employeePunches.filter(p => {
+                    if (p.punch_date === nextDateStr) {
+                        return isWithinMidnightBuffer(p.timestamp_raw) && !nextShiftStartsEarly;
+                    }
+                    return false;
+                });
+
+                dayPunches = [...dayPunches, ...nextDayEarlyPunches].sort((a, b) => {
+                    if (a.punch_date !== b.punch_date) return a.punch_date < b.punch_date ? -1 : 1;
+                    const tA = parseTime(a.timestamp_raw)?.getTime() || 0;
+                    const tB = parseTime(b.timestamp_raw)?.getTime() || 0;
+                    return tA - tB;
+                });
+
 
                 let filteredPunches: any[] = filterMultiplePunches(dayPunches, shift, includeSeconds);
 
@@ -1086,6 +907,14 @@ Deno.serve(async (req: Request) => {
                 // ================================================================
                 // SKIP_PUNCH: Determine if skip applies and what type
                 // ================================================================
+                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                const isOnLeave = dateException && (
+                    dateException.type === 'SICK_LEAVE' || 
+                    dateException.type === 'ANNUAL_LEAVE' || 
+                    dateException.type === 'PUBLIC_HOLIDAY'
+                );
+                const isNonWorkingStatus = isOnLeave || (dateException && dateException.type === 'OFF');
+
                 let hasSkipPunchApplied = false;
                 let skipType = null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | 'FULL_SKIP'
                 let skipPunchForced0PunchPresent = false; // Tracks the "LOP Saver" case
@@ -1745,7 +1574,7 @@ Deno.serve(async (req: Request) => {
     } catch (error) {
         console.error('Run analysis error:', error);
         return Response.json({
-            error: error.message
+            error: (error as any).message
         }, { status: 500 });
     }
 });
