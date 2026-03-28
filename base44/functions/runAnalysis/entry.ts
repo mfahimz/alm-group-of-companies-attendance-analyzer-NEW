@@ -91,29 +91,41 @@ Deno.serve(async (req: Request) => {
         const fetchAllPages = async (entity, query, sortField = null) => {
             const allItems = [];
             let skip = 0;
-            let hasMore = true;
-            while (hasMore) {
-                const raw = await fetchWithRetry(() => entity.filter(query, sortField, PAGE_SIZE, skip));
+            let currentPageSize = PAGE_SIZE;
+            let consecutiveEmpty = 0;
+            while (consecutiveEmpty < 2) {
+                const raw = await fetchWithRetry(() => entity.filter(query, sortField, currentPageSize, skip));
                 let page = [];
                 if (Array.isArray(raw)) {
                     page = raw;
                 } else if (typeof raw === 'string') {
+                    // SDK returned a string — try parsing, if truncated reduce page size
                     try {
                         const parsed = JSON.parse(raw);
                         if (Array.isArray(parsed)) page = parsed;
                     } catch {
-                        console.error(`[runAnalysis] Paginated fetch: JSON parse failed at skip=${skip}, reducing page size`);
-                        const smallRaw = await fetchWithRetry(() => entity.filter(query, sortField, 50, skip));
-                        if (Array.isArray(smallRaw)) page = smallRaw;
-                        else {
-                            try { page = JSON.parse(smallRaw); } catch { page = []; hasMore = false; }
+                        // JSON truncated — reduce page size and retry THIS page
+                        if (currentPageSize > 25) {
+                            currentPageSize = Math.max(25, Math.floor(currentPageSize / 2));
+                            console.warn(`[runAnalysis] Paginated fetch: JSON truncated at skip=${skip}, reducing page to ${currentPageSize} and retrying`);
+                            continue; // retry same skip with smaller page
                         }
+                        console.error(`[runAnalysis] Paginated fetch: JSON still truncated at page size ${currentPageSize}, skip=${skip}. Skipping batch.`);
+                        skip += currentPageSize;
+                        continue;
                     }
                 }
+                if (page.length === 0) {
+                    consecutiveEmpty++;
+                    // Try one more time in case it was a transient issue
+                    skip += currentPageSize;
+                    continue;
+                }
+                consecutiveEmpty = 0;
                 allItems.push(...page);
                 skip += page.length;
-                hasMore = page.length >= PAGE_SIZE;
-                if (page.length === 0) hasMore = false;
+                // If we got fewer than requested, we've reached the end
+                if (page.length < currentPageSize) break;
             }
             return allItems;
         };
@@ -1333,8 +1345,19 @@ Deno.serve(async (req: Request) => {
                     const prevStatus = (dateStatusMap as Record<string, string>)[prevDateStr];
                     const nextStatus = (dateStatusMap as Record<string, string>)[nextDateStr];
 
-                    // Block is adjacent to LOP if any side is LOP (Manual or Punch-based)
-                    if (prevStatus === 'LOP' || nextStatus === 'LOP') {
+                    // CRITICAL FIX: Only convert weekly off to LOP if adjacent day is CONFIRMED LOP.
+                    // If adjacent day has no status (undefined/null = outside report range or unprocessed),
+                    // do NOT assume it's LOP — that causes false double deductions.
+                    const prevIsLOP = prevStatus === 'LOP';
+                    const nextIsLOP = nextStatus === 'LOP';
+
+                    if (!prevIsLOP && !nextIsLOP) {
+                        return; // No adjacent LOP — skip this block entirely
+                    }
+
+                    console.log(`[runAnalysis] LOP-adjacent check: Employee ${attendanceIdStr}, Block ${firstDateStr}-${lastDateStr}, prev=${prevDateStr}(${prevStatus || 'N/A'}), next=${nextDateStr}(${nextStatus || 'N/A'})`);
+
+                    if (prevIsLOP || nextIsLOP) {
                         for (const dateStr of block) {
                             // RULE 3 & 4: Check for PROTECTIVE LEAVE (Annual or Sick)
                             // This ensures days already covered by leave don't get double deduction.
