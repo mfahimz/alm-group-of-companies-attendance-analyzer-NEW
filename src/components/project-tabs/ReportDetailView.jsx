@@ -1876,7 +1876,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             {project.status !== 'closed' && (
                                 <>
                                     <Button
-                                        onClick={() => setShowSaveConfirmation(true)}
+                                        onClick={() => { loadRawData(); setShowSaveConfirmation(true); }}
                                         disabled={isSaving}
                                         className="bg-green-600 hover:bg-green-700"
                                     >
