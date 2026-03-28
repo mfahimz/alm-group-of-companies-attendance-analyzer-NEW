@@ -27,8 +27,7 @@ export const EXCEPTION_TYPES = [
     { 
         value: 'SICK_LEAVE', 
         label: 'Sick Leave', 
-        categories: ['general', 'filter', 'day_override'], 
-        adminOnly: true 
+        categories: ['general', 'filter', 'day_override'] 
     },
     { 
         value: 'ANNUAL_LEAVE', 
