@@ -222,8 +222,19 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
                 // Apply chronological sorting to the dailyBreakdownData path
                 return processedPunches.sort((a, b) => {
-                    const timeA = new Date(a.timestamp_raw).getTime();
-                    const timeB = new Date(b.timestamp_raw).getTime();
+                    const getISO = (p) => {
+                        const time = p.timestamp_raw?.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(\s*[AP]M)?/i);
+                        if (p.punch_date && time) {
+                            let [_, h, m, s, period] = time;
+                            let hr = parseInt(h);
+                            if (period?.toUpperCase().trim() === 'PM' && hr !== 12) hr += 12;
+                            if (period?.toUpperCase().trim() === 'AM' && hr === 12) hr = 0;
+                            return `${p.punch_date}T${String(hr).padStart(2, '0')}:${m.padStart(2, '0')}:${(s || '00').padStart(2, '0')}`;
+                        }
+                        return p.timestamp_raw;
+                    };
+                    const timeA = new Date(getISO(a)).getTime();
+                    const timeB = new Date(getISO(b)).getTime();
                     return (isNaN(timeA) || isNaN(timeB)) ? 0 : timeA - timeB;
                 });
             }
@@ -237,8 +248,19 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             return dateMatch;
         }).sort((a, b) => {
             try {
-                const timeA = new Date(a.timestamp_raw).getTime();
-                const timeB = new Date(b.timestamp_raw).getTime();
+                const getISO = (p) => {
+                    const time = p.timestamp_raw?.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(\s*[AP]M)?/i);
+                    if (p.punch_date && time) {
+                        let [_, h, m, s, period] = time;
+                        let hr = parseInt(h);
+                        if (period?.toUpperCase().trim() === 'PM' && hr !== 12) hr += 12;
+                        if (period?.toUpperCase().trim() === 'AM' && hr === 12) hr = 0;
+                        return `${p.punch_date}T${String(hr).padStart(2, '0')}:${m.padStart(2, '0')}:${(s || '00').padStart(2, '0')}`;
+                    }
+                    return p.timestamp_raw;
+                };
+                const timeA = new Date(getISO(a)).getTime();
+                const timeB = new Date(getISO(b)).getTime();
                 if (isNaN(timeA) || isNaN(timeB)) return 0;
                 return timeA - timeB;
             } catch {
@@ -750,36 +772,62 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             <p className="text-sm text-slate-500 italic">No punches recorded for this day</p>
                         ) : (
                             <div className="space-y-1">
-                                {dayPunches.map((punch, idx) => {
-                                    // Parse and strictly format the punch timestamp: DD/MM/YYYY hh:mm AM/PM
-                                    const pDate = new Date(punch.timestamp_raw);
-                                    let displayTime = punch.timestamp_raw;
-                                    
-                                    if (!isNaN(pDate.getTime())) {
-                                        const dPart = pDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
-                                        const tPart = pDate.toLocaleTimeString('en-US', { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit', 
-                                            hour12: true 
-                                        }); // hh:mm AM/PM
-                                        displayTime = `${dPart} ${tPart}`;
-                                    }
+                                {dayPunches
+                                    .slice()
+                                    .sort((a, b) => {
+                                        const getISO = (p) => {
+                                            if (!p.timestamp_raw) return '';
+                                            const time = p.timestamp_raw.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(\s*[AP]M)?/i);
+                                            if (p.punch_date && time) {
+                                                let [_, h, m, s, period] = time;
+                                                let hr = parseInt(h);
+                                                if (period?.toUpperCase().trim() === 'PM' && hr !== 12) hr += 12;
+                                                if (period?.toUpperCase().trim() === 'AM' && hr === 12) hr = 0;
+                                                return `${p.punch_date}T${String(hr).padStart(2, '0')}:${m.padStart(2, '0')}:${(s || '00').padStart(2, '0')}`;
+                                            }
+                                            return p.timestamp_raw;
+                                        };
+                                        return new Date(getISO(a)) - new Date(getISO(b));
+                                    })
+                                    .map((punch, idx) => {
+                                        // Parse and strictly format the punch timestamp: DD/MM/YYYY hh:mm AM/PM
+                                        // Construct Date object using safe ISO string (YYYY-MM-DDTHH:mm:ss) to prevent MM/DD swap bugs
+                                        let pDate = new Date(punch.timestamp_raw);
+                                        const timeMatch = punch.timestamp_raw?.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?(\s*[AP]M)?/i);
+                                        if (punch.punch_date && timeMatch) {
+                                            let [_, h, m, s, period] = timeMatch;
+                                            let hr = parseInt(h);
+                                            if (period?.toUpperCase().trim() === 'PM' && hr !== 12) hr += 12;
+                                            if (period?.toUpperCase().trim() === 'AM' && hr === 12) hr = 0;
+                                            pDate = new Date(`${punch.punch_date}T${String(hr).padStart(2, '0')}:${m.padStart(2, '0')}:${(s || '00').padStart(2, '0')}`);
+                                        }
 
-                                    // Identify if this punch belongs to the next calendar day (midnight crossover)
-                                    const isNextDay = punch.punch_date && dayRecord.dateStr && punch.punch_date !== dayRecord.dateStr;
+                                        let displayTime = punch.timestamp_raw;
+                                        if (!isNaN(pDate.getTime())) {
+                                            const dPart = pDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+                                            const tPart = pDate.toLocaleTimeString('en-US', { 
+                                                hour: '2-digit', 
+                                                minute: '2-digit', 
+                                                hour12: true 
+                                            }); // hh:mm AM/PM
+                                            displayTime = `${dPart} ${tPart}`;
+                                        }
 
-                                    return (
-                                        <div key={punch.id || idx} className="text-sm text-slate-700 flex items-center gap-2 py-0.5">
-                                            <span className="font-medium text-slate-400 w-5">{idx + 1}.</span>
-                                            <span className="tabular-nums">{displayTime}</span>
-                                            {isNextDay && (
-                                                <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider ml-auto flex items-center gap-1">
-                                                    Next Day 🌙
-                                                </span>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        // Identify if this punch belongs to the next calendar day (midnight crossover)
+                                        const isNextDay = punch.punch_date && dayRecord.dateStr && punch.punch_date !== dayRecord.dateStr;
+
+                                        return (
+                                            <div key={punch.id || idx} className="text-sm text-slate-700 flex items-center gap-2 py-0.5">
+                                                <span className="font-medium text-slate-400 w-5">{idx + 1}.</span>
+                                                <span className="tabular-nums">{displayTime}</span>
+                                                {isNextDay && (
+                                                    <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider ml-auto flex items-center gap-1">
+                                                        Next Day 🌙
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                             </div>
                         )}
                     </div>
