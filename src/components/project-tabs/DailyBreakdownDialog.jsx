@@ -250,8 +250,9 @@ export default function DailyBreakdownDialog({
             };
 
             // If this weekly off day was counted as LOP-adjacent, include it in breakdown with special flag
+            // Only show LOP-adjacent weekly off rows for Al Maraghi Motors (double deduction is exclusive to them)
             if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                if (lopAdjacentDates.has(dateStr)) {
+                if (lopAdjacentDates.has(dateStr) && project.company === 'Al Maraghi Motors') {
                     breakdown.push({
                         date: formatDate(dateStr),
                         dateStr,
