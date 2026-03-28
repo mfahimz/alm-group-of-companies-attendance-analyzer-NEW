@@ -11,8 +11,8 @@
  */
 
 const DEFAULT_PAGE_SIZE = 50;
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 2000;
+const MAX_RETRIES = 6;
+const BASE_DELAY_MS = 3000;
 
 // ========================================================
 // GLOBAL CONCURRENCY LIMITER
@@ -20,7 +20,7 @@ const BASE_DELAY_MS = 2000;
 // Additional calls wait in a queue until a slot opens.
 // This prevents React Query from firing 20+ API calls at once.
 // ========================================================
-const MAX_CONCURRENT = 3;
+const MAX_CONCURRENT = 2;
 let activeCount = 0;
 const waitQueue = [];
 
@@ -115,7 +115,7 @@ export async function fetchAllRecords(entity, query, sortField = null, pageSize 
             if (page.length < currentPageSize) break;
 
             // Delay between pages to avoid hitting rate limits
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise(r => setTimeout(r, 350));
         }
 
         return allItems;
