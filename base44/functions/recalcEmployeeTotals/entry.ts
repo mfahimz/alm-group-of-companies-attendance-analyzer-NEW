@@ -437,8 +437,18 @@ Deno.serve(async (req) => {
 
     const graceMinutes = result.grace_minutes ?? 15;
     const deductibleMinutes = Math.max(0, Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout) - graceMinutes);
-    const giftMinutes = result.ramadan_gift_minutes || 0;
-    const effectiveDeductible = Math.max(0, (result.manual_deductible_minutes ?? deductibleMinutes) - giftMinutes);
+    
+    // Dynamic Gift Minutes Calculation: Rules applied on RAW late + early (before Grace)
+    const rawMinutes = Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout);
+    let adjustedGift = result.ramadan_gift_minutes || 0;
+    
+    // Auto-adjust gift minutes if project has them enabled or if employee already has them
+    if (project.use_gift_minutes || adjustedGift > 0) {
+        adjustedGift = rawMinutes < 30 ? rawMinutes : 15;
+        if (rawMinutes === 0) adjustedGift = 0;
+    }
+    
+    const effectiveDeductible = Math.max(0, (result.manual_deductible_minutes ?? deductibleMinutes) - adjustedGift);
 
     // Update the AnalysisResult with recalculated values
     const updatePayload = {
@@ -452,6 +462,7 @@ Deno.serve(async (req) => {
         early_checkout_minutes: Math.max(0, totalEarlyCheckout),
         other_minutes: Math.max(0, totalOtherMinutes),
         deductible_minutes: deductibleMinutes,
+        ramadan_gift_minutes: adjustedGift,
         approved_minutes: approvedMinutes > 0 ? approvedMinutes : (result.approved_minutes || 0)
     };
 
@@ -461,7 +472,7 @@ Deno.serve(async (req) => {
         success: true,
         ...updatePayload,
         grace_minutes: graceMinutes,
-        ramadan_gift_minutes: giftMinutes,
+        ramadan_gift_minutes: adjustedGift,
         effective_deductible_minutes: effectiveDeductible
     });
 });

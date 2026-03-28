@@ -1278,9 +1278,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const handleCalculateAllGiftMinutes = () => {
         const updated = { ...giftMinutesOverrides };
         results.forEach(r => {
-            const rawDeductible = Math.max(0, r.manual_deductible_minutes ?? r.deductible_minutes ?? 0);
-            const calculated = rawDeductible < 30 ? rawDeductible : 15;
-            updated[r.id] = (rawDeductible > 0) ? calculated : 0;
+            const rawMinutes = Math.max(0, r.late_minutes ?? 0) + Math.max(0, r.early_checkout_minutes ?? 0);
+            const calculated = rawMinutes < 30 ? rawMinutes : 15;
+            updated[r.id] = (rawMinutes > 0) ? calculated : 0;
         });
         setGiftMinutesOverrides(updated);
         toast.info('Gift minutes recalculated for all employees (unsaved)');
