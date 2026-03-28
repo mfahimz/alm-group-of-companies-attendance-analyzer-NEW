@@ -49,7 +49,6 @@
  */
 import AIPayrollInsights from './pages/AIPayrollInsights';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
-import AuditLogs from './pages/AuditLogs';
 import CompanyBranding from './pages/CompanyBranding';
 import CompanyManagement from './pages/CompanyManagement';
 import CompanySelection from './pages/CompanySelection';
@@ -58,7 +57,6 @@ import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import EmployeeProfile from './pages/EmployeeProfile';
 import Employees from './pages/Employees';
-import FeatureRequests from './pages/FeatureRequests';
 import GraceMinutesManagement from './pages/GraceMinutesManagement';
 import HalfYearlyMinutesManagement from './pages/HalfYearlyMinutesManagement';
 import Home from './pages/Home';
@@ -75,15 +73,12 @@ import SalaryIncrements from './pages/SalaryIncrements';
 import SalaryReportDetail from './pages/SalaryReportDetail';
 import UserProfile from './pages/UserProfile';
 import Users from './pages/Users';
-import SoftwareDoc from './pages/SoftwareDoc';
-import ChangeTracker from './pages/developer/ChangeTracker';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "AIPayrollInsights": AIPayrollInsights,
     "AnnualLeaveManagement": AnnualLeaveManagement,
-    "AuditLogs": AuditLogs,
     "CompanyBranding": CompanyBranding,
     "CompanyManagement": CompanyManagement,
     "CompanySelection": CompanySelection,
@@ -92,7 +87,6 @@ export const PAGES = {
     "DepartmentHeadSettings": DepartmentHeadSettings,
     "EmployeeProfile": EmployeeProfile,
     "Employees": Employees,
-    "FeatureRequests": FeatureRequests,
     "GraceMinutesManagement": GraceMinutesManagement,
     "HalfYearlyMinutesManagement": HalfYearlyMinutesManagement,
     "Home": Home,
@@ -109,8 +103,6 @@ export const PAGES = {
     "SalaryReportDetail": SalaryReportDetail,
     "UserProfile": UserProfile,
     "Users": Users,
-    "SoftwareDoc": SoftwareDoc,
-    "ChangeTracker": ChangeTracker,
 }
 
 export const pagesConfig = {

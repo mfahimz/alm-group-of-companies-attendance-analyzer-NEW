@@ -9,21 +9,11 @@ import {
     UserCog,
     DollarSign,
     AlertCircle,
-    ClipboardCheck,
     Shield,
     BarChart3,
     Palette,
     Brain,
-    Code,
-    GitPullRequest,
-    BookText,
-    Lightbulb,
-    FileText,
-    ScanLine,
-    Terminal,
-    BookOpen,
-    Cpu,
-    Briefcase
+    BookOpen
 } from 'lucide-react';
 
 /**
@@ -250,28 +240,6 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager']
     },
-    AuditLogs: {
-        name: 'AuditLogs',
-        title: 'Audit Logs',
-        icon: FileText,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
-
-
-    ChangeTracker: {
-        name: 'ChangeTracker',
-        title: 'Developer Portal',
-        icon: Terminal,
-        category: 'Developer',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin']
-    },
 
     // Hidden Pages (No navigation)
     ProjectDetail: {
@@ -334,26 +302,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin']
     },
-    CalendarPeriods: {
-        name: 'CalendarPeriods',
-        title: 'Calendar Periods',
-        icon: Calendar,
-        category: 'Projects',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
-    },
-    CalendarPeriodDetail: {
-        name: 'CalendarPeriodDetail',
-        title: 'Calendar Period Detail',
-        icon: FolderKanban,
-        category: 'Projects',
-        showInNav: false,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
-    }
+
 };
 
 /**
