@@ -100,13 +100,23 @@ export const usePermissions = () => {
         if (pageName === 'ChangeTracker' && userRole === 'admin') return true;
         if (pageName === 'ResumeScanner' && (userRole === 'admin' || userRole === 'supervisor')) return true;
 
-        // ONLY show pages that exist in PagePermission entity
+        // Check PagePermission entity first
         const permission = pagePermissions.find(p => p.page_name === pageName);
-        if (!permission) return false; // No PagePermission record = hide from nav
+        
+        if (permission) {
+            // PagePermission record exists — use its allowed_roles
+            const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
+            return allowedRoles.includes(userRole);
+        }
 
-        // Check if user's role is in allowed_roles
-        const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-        return allowedRoles.includes(userRole);
+        // FALLBACK: If no PagePermission records loaded (rate limit / empty DB),
+        // use defaultRoles from pagesConfig to prevent total nav collapse
+        if (pagePermissions.length === 0 && pageConfig.defaultRoles) {
+            return pageConfig.defaultRoles.includes(userRole);
+        }
+
+        // PagePermission entity exists but this page has no record = hide from nav
+        return false;
     };
 
     // Check if user has specific permission (can be extended)
