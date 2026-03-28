@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Eye, Trash2, CheckCircle, Star, Save, Settings, AlertCircle, Play, Loader2, AlertTriangle, Info, XCircle } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, Star, Save, Settings, AlertCircle, Play, Loader2, AlertTriangle, Info, XCircle, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
     console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
@@ -35,6 +36,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const [reportName, setReportName] = React.useState('');
     const [dataQualityIssues, setDataQualityIssues] = React.useState([]);
     const [showQualityCheck, setShowQualityCheck] = React.useState(false);
+    
+    // Selection state for bulk actions
+    const [selectedIds, setSelectedIds] = React.useState([]);
 
 
 
@@ -352,283 +356,106 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         }
     }, [employeesError]);
 
-    const deleteReportMutation = useMutation({
-        mutationFn: async (reportRunId) => {
-            // Fetch all associated data for this report - use paginated fetch
-            const [resultsToDelete, snapshotsToDelete] = await Promise.all([
-                fetchAllRecords(base44.entities.AnalysisResult, { 
-                    project_id: project.id, 
-                    report_run_id: reportRunId 
-                }),
-                fetchAllRecords(base44.entities.SalarySnapshot, {
-                    project_id: project.id,
-                    report_run_id: reportRunId
-                })
-            ]);
+    const deleteReportsMutation = useMutation({
+        mutationFn: async (ids) => {
+            const reportRunIds = Array.isArray(ids) ? ids : [ids];
             
-            // Delete in batches of 5 with delays to avoid rate limiting
-            const BATCH_SIZE = 5;
-            const DELAY_MS = 200;
-            
-            const deleteInBatches = async (items, deleteFunc) => {
-                for (let i = 0; i < items.length; i += BATCH_SIZE) {
-                    const batch = items.slice(i, i + BATCH_SIZE);
-                    await Promise.all(batch.map(item => deleteFunc(item.id)));
-                    if (i + BATCH_SIZE < items.length) {
-                        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+            for (const reportRunId of reportRunIds) {
+                // Fetch all associated data for this report - use paginated fetch
+                const [resultsToDelete, snapshotsToDelete] = await Promise.all([
+                    fetchAllRecords(base44.entities.AnalysisResult, { 
+                        project_id: project.id, 
+                        report_run_id: reportRunId 
+                    }),
+                    fetchAllRecords(base44.entities.SalarySnapshot, {
+                        project_id: project.id,
+                        report_run_id: reportRunId
+                    })
+                ]);
+                
+                // Delete in batches of 5 with delays to avoid rate limiting
+                const BATCH_SIZE = 5;
+                const DELAY_MS = 200;
+                
+                const deleteInBatches = async (items, deleteFunc) => {
+                    for (let i = 0; i < items.length; i += BATCH_SIZE) {
+                        const batch = items.slice(i, i + BATCH_SIZE);
+                        await Promise.all(batch.map(item => deleteFunc(item.id)));
+                        if (i + BATCH_SIZE < items.length) {
+                            await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+                        }
                     }
+                };
+                
+                // Delete results first
+                if (resultsToDelete.length > 0) {
+                    await deleteInBatches(resultsToDelete, (id) => base44.entities.AnalysisResult.delete(id));
                 }
-            };
-            
-            // Delete results first
-            if (resultsToDelete.length > 0) {
-                await deleteInBatches(resultsToDelete, (id) => base44.entities.AnalysisResult.delete(id));
+                
+                // Then delete snapshots
+                if (snapshotsToDelete.length > 0) {
+                    await deleteInBatches(snapshotsToDelete, (id) => base44.entities.SalarySnapshot.delete(id));
+                }
+                
+                // Finally, delete the report run itself
+                await base44.entities.ReportRun.delete(reportRunId);
             }
-            
-            // Then delete snapshots
-            if (snapshotsToDelete.length > 0) {
-                await deleteInBatches(snapshotsToDelete, (id) => base44.entities.SalarySnapshot.delete(id));
-            }
-            
-            // Finally, delete the report run itself
-            await base44.entities.ReportRun.delete(reportRunId);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id] });
             queryClient.invalidateQueries({ queryKey: ['reportResults', project.id] });
             queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id] });
-            toast.success('Report and associated salary data deleted successfully');
+            setSelectedIds([]); // Clear selection after deletion
+            toast.success('Selected report(s) and associated data deleted successfully');
         },
         onError: (error) => {
             console.error('[ReportTab] Delete error:', error);
-            toast.error('Failed to delete report: ' + (error.message || 'Unknown error'));
+            toast.error('Failed to delete report(s): ' + (error.message || 'Unknown error'));
         }
     });
 
-    const markFinalMutation = useMutation({
-        mutationFn: async (reportRunId) => {
-            console.log('[ReportTab] mutationFn started for report:', reportRunId);
-            
-            // STEP 1: Update progress dialog
-            setProgressDialog({
-                open: true,
-                current: 0,
-                total: 0,
-                currentEmployee: 'Validating report data...',
-                status: 'Please wait...'
-            });
-
-            // STEP 2: Mark report as final (backend only marks, doesn't create snapshots)
-            console.log('[ReportTab] Calling markFinalReport backend...');
-            const markResult = await base44.functions.invoke('markFinalReport', {
-                project_id: project.id,
-                report_run_id: reportRunId
-            });
-
-            console.log('[ReportTab] markFinalReport result:', markResult.data);
-
-            if (markResult.data?.success === false) {
-                console.error('[ReportTab] Backend validation failed:', markResult.data?.error);
-                throw new Error(markResult.data?.error || 'Finalization failed');
-            }
-
-            // STEP 3: Create salary snapshots in batches with real progress
-            const BATCH_SIZE = 10;
-            let batchStart = 0;
-            let hasMore = true;
-            let totalEmployees = 0;
-            let loopIteration = 0;
-
-            console.log(`[ReportTab] ============================================`);
-            console.log(`[ReportTab] STARTING BATCH LOOP`);
-            console.log(`[ReportTab] ============================================`);
-
-            while (hasMore) {
-                loopIteration++;
-                console.log(`[ReportTab] ============================================`);
-                console.log(`[ReportTab] LOOP ITERATION #${loopIteration}`);
-                console.log(`[ReportTab] Batch start: ${batchStart}, Batch size: ${BATCH_SIZE}`);
-                console.log(`[ReportTab] Calling createSalarySnapshots...`);
-                
-                const batchResult = await base44.functions.invoke('createSalarySnapshots', {
-                    project_id: project.id,
-                    report_run_id: reportRunId,
-                    batch_mode: true,
-                    batch_start: batchStart,
-                    batch_size: BATCH_SIZE
-                });
-
-                console.log('[ReportTab] ============================================');
-                console.log('[ReportTab] BATCH RESULT RECEIVED:');
-                console.log(`[ReportTab]    batch_mode: ${batchResult.data?.batch_mode}`);
-                console.log(`[ReportTab]    batch_completed: ${batchResult.data?.batch_completed}`);
-                console.log(`[ReportTab]    current_position: ${batchResult.data?.current_position}`);
-                console.log(`[ReportTab]    total_employees: ${batchResult.data?.total_employees}`);
-                console.log(`[ReportTab]    has_more: ${batchResult.data?.has_more}`);
-                console.log('[ReportTab] ============================================');
-
-                if (batchResult.data?.batch_mode) {
-                    totalEmployees = batchResult.data.total_employees;
-                    const currentPos = batchResult.data.current_position;
-                    const currentBatch = batchResult.data.current_batch || [];
-                    hasMore = batchResult.data.has_more;
-
-                    const percentage = totalEmployees > 0 ? Math.round(currentPos/totalEmployees*100) : 0;
-                    console.log(`[ReportTab] 📊 Progress: ${currentPos}/${totalEmployees} (${percentage}%)`);
-                    console.log(`[ReportTab] 🔄 has_more=${hasMore}, will ${hasMore ? 'CONTINUE' : 'STOP'} looping`);
-                    
-                    setProgressDialog({
-                        open: true,
-                        current: currentPos,
-                        total: totalEmployees,
-                        currentEmployee: currentBatch.length > 0 
-                            ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
-                            : 'Processing...',
-                        status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
-                    });
-
-                    batchStart = currentPos;
-
-                    if (hasMore) {
-                        console.log(`[ReportTab] ⏳ Waiting 300ms before next batch...`);
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    } else {
-                        console.log(`[ReportTab] ✅ ALL BATCHES COMPLETE - Exiting loop`);
-                    }
-                } else {
-                    console.log('[ReportTab] ❌ ERROR: No batch_mode in result, stopping loop');
-                    console.log('[ReportTab] Full result:', JSON.stringify(batchResult.data, null, 2));
-                    hasMore = false;
-                }
-            }
-            
-            console.log(`[ReportTab] ============================================`);
-            console.log(`[ReportTab] BATCH LOOP FINISHED`);
-            console.log(`[ReportTab] Total iterations: ${loopIteration}`);
-            console.log(`[ReportTab] Total employees processed: ${batchStart}`);
-            console.log(`[ReportTab] ============================================`);
-            
-            // ============================================================
-            // POST-FINALIZATION INVARIANT CHECK
-            // Verify that snapshots count matches total employees
-            // ============================================================
-            console.log('[ReportTab] 🔍 Running post-finalization snapshot count verification...');
-            const finalSnapshots = await fetchAllRecords(base44.entities.SalarySnapshot, {
-                project_id: project.id,
-                report_run_id: reportRunId
-            });
-            
-            console.log(`[ReportTab] ============================================`);
-            console.log(`[ReportTab] POST-FINALIZATION VERIFICATION:`);
-            console.log(`[ReportTab]    Expected employees: ${totalEmployees}`);
-            console.log(`[ReportTab]    Actual snapshots: ${finalSnapshots.length}`);
-            console.log(`[ReportTab] ============================================`);
-            
-            if (finalSnapshots.length !== totalEmployees) {
-                const errorMsg = `INVARIANT VIOLATION: Expected ${totalEmployees} snapshots, but found ${finalSnapshots.length} in database`;
-                console.error(`[ReportTab] ❌ ${errorMsg}`);
-                throw new Error(errorMsg);
-            }
-            
-            console.log('[ReportTab] ✅ Snapshot count matches expected employee count');
-            console.log('[ReportTab] All snapshots created successfully');
-
-            return { reportRunId, result: markResult };
+    const renameReportMutation = useMutation({
+        mutationFn: async ({ id, newName }) => {
+            await base44.entities.ReportRun.update(id, { report_name: newName });
         },
-        onSuccess: async ({ reportRunId, result }) => {
-            console.log(`[ReportTab] ============================================`);
-            console.log(`[ReportTab] FINALIZATION SUCCESS HANDLER`);
-            console.log(`[ReportTab] Report run ID: ${reportRunId}`);
-            console.log(`[ReportTab] ============================================`);
-            
-            setProgressDialog(prev => ({
-                ...prev,
-                status: 'Refreshing data...',
-                currentEmployee: 'Please wait...'
-            }));
-
-            // Force refetch all relevant queries
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id, reportRunId], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['projects'], refetchType: 'all' })
-            ]);
-
-            // Wait a bit more to ensure snapshots are fully committed
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            console.log(`[ReportTab] ✅ Finalization complete - closing progress dialog`);
-            setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
-            toast.success('✅ Finalization complete! Salary snapshots created. Go to Salary Tab to generate reports.', {
-                duration: 6000
-            });
+        onSuccess: () => {
+            queryClient.invalidateQueries(['reportRuns', project.id]);
+            toast.success('Report renamed successfully');
         },
-        onError: async (error) => {
-            console.error('[ReportTab] ============================================');
-            console.error('[ReportTab] FINALIZATION ERROR HANDLER');
-            console.error('[ReportTab] Error:', error);
-            console.error('[ReportTab] ============================================');
-            
-            setProgressDialog({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
-
-            // CRITICAL: Invalidate queries on error to reflect backend rollback
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['salarySnapshots', project.id], refetchType: 'all' }),
-                queryClient.invalidateQueries({ queryKey: ['project', project.id], refetchType: 'all' })
-            ]);
-            
-            // Show detailed error message
-            const errorMsg = error?.response?.data?.error || error.message || 'Unknown error';
-            const actionRequired = error?.response?.data?.action_required;
-            
-            console.error('[ReportTab] Error details:', { errorMsg, actionRequired });
-            
-            if (actionRequired) {
-                toast.error(`${errorMsg}\n\nAction required: ${actionRequired}`, {
-                    duration: 10000
-                });
-            } else {
-                toast.error('Failed to mark report as final: ' + errorMsg, {
-                    duration: 5000
-                });
-            }
+        onError: (error) => {
+            toast.error('Failed to rename report: ' + error.message);
         }
     });
 
-    const handleDeleteReport = (reportRunId) => {
-        if (window.confirm('Delete this report? This will permanently remove all analysis results from this run.')) {
-            deleteReportMutation.mutate(reportRunId);
+    const handleRenameReport = (id, currentName) => {
+        const newName = window.prompt('Enter new report name:', currentName || '');
+        if (newName !== null && newName.trim() !== '') {
+            renameReportMutation.mutate({ id, newName: newName.trim() });
         }
     };
 
-    const handleMarkFinal = (reportRunId) => {
-        console.log('[ReportTab] handleMarkFinal called for report:', reportRunId);
-        console.log('[ReportTab] Mutation state:', { 
-            isPending: markFinalMutation.isPending, 
-            isIdle: markFinalMutation.isIdle 
-        });
-        
-        if (window.confirm('Mark this report as final for salary calculation? This will unmark any previously selected final report.')) {
-            console.log('[ReportTab] ✅ User confirmed finalization');
-            
-            // Show dialog IMMEDIATELY BEFORE mutation
-            setProgressDialog({
-                open: true,
-                current: 0,
-                total: 0,
-                currentEmployee: 'Starting finalization...',
-                status: 'Initializing...'
-            });
-            
-            console.log('[ReportTab] 🚀 Calling mutate()...');
-            markFinalMutation.mutate(reportRunId);
+    const handleBulkDelete = () => {
+        if (selectedIds.length === 0) return;
+        if (window.confirm(`Delete ${selectedIds.length} selected report(s)? This will permanently remove all associated analysis results.`)) {
+            deleteReportsMutation.mutate(selectedIds);
+        }
+    };
+
+    const toggleSelection = (id) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const toggleAllSelection = () => {
+        if (selectedIds.length === reportRuns.length) {
+            setSelectedIds([]);
         } else {
-            console.log('[ReportTab] ❌ User cancelled finalization');
+            setSelectedIds(reportRuns.map(r => r.id));
         }
     };
+
+
 
     // Use a query hook to fetch results for a specific report when displaying verification count
     // Memoize report run IDs to prevent infinite re-renders
@@ -989,7 +816,21 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
             <Card className="border-0 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Generated Reports</CardTitle>
+                    <div className="flex items-center gap-4">
+                        <CardTitle>Generated Reports</CardTitle>
+                        {selectedIds.length > 0 && isAdminOrSupervisor && (
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleBulkDelete}
+                                disabled={deleteReportsMutation.isPending}
+                                className="animate-in fade-in zoom-in duration-200"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete Selected ({selectedIds.length})
+                            </Button>
+                        )}
+                    </div>
                     {finalizedReport && isAdminOrSupervisor && (
                         <Button
                             variant="outline"
@@ -1033,6 +874,12 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             <Table>
                                 <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200">
                                     <TableRow className="hover:bg-transparent">
+                                        <TableHead className="w-[50px]">
+                                            <Checkbox 
+                                                checked={selectedIds.length === reportRuns.length && reportRuns.length > 0}
+                                                onCheckedChange={toggleAllSelection}
+                                            />
+                                        </TableHead>
                                         <TableHead>Report Name</TableHead>
                                         <TableHead>Generated On</TableHead>
                                         <TableHead>Period</TableHead>
@@ -1050,9 +897,25 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                             : (run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0);
                                         
                                         return (
-                                            <TableRow key={run.id} className="hover:bg-slate-50/80 transition-colors duration-200">
+                                            <TableRow key={run.id} className={`${selectedIds.includes(run.id) ? 'bg-slate-50' : ''} group hover:bg-slate-50/80 transition-colors duration-200`}>
+                                                <TableCell>
+                                                    <Checkbox 
+                                                        checked={selectedIds.includes(run.id)}
+                                                        onCheckedChange={() => toggleSelection(run.id)}
+                                                    />
+                                                </TableCell>
                                                 <TableCell className="font-medium">
-                                                    {run.report_name || 'Unnamed Report'}
+                                                    <div className="flex items-center gap-2">
+                                                        {run.report_name || 'Unnamed Report'}
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            onClick={() => handleRenameReport(run.id, run.report_name)}
+                                                        >
+                                                            <Pencil className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     {new Date(run.created_date).toLocaleString('en-US', {
@@ -1113,24 +976,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
                                                         </Link>
-                                                        {!run.is_final && isAdminOrSupervisor && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleMarkFinal(run.id)}
-                                                                disabled={markFinalMutation.isPending}
-                                                                className="border-emerald-200 hover:bg-emerald-50 text-emerald-700 transition-all duration-200"
-                                                            >
-                                                                <Star className="w-4 h-4 mr-2" />
-                                                                Finalize
-                                                            </Button>
-                                                        )}
                                                         {!isDepartmentHead && canDeleteReports && (
                                                             <Button 
                                                                 size="sm" 
                                                                 variant="ghost"
-                                                                onClick={() => handleDeleteReport(run.id)}
-                                                                disabled={deleteReportMutation.isPending}
+                                                                onClick={() => {
+                                                                    if (window.confirm('Delete this report? This will permanently remove all analysis results from this run.')) {
+                                                                        deleteReportsMutation.mutate(run.id);
+                                                                    }
+                                                                }}
+                                                                disabled={deleteReportsMutation.isPending}
                                                                 title="Delete report"
                                                             >
                                                                 <Trash2 className="w-4 h-4 text-red-600" />

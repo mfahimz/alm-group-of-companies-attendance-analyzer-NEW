@@ -7,20 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Table components used by DailyBreakdownDialog (extracted)
 import useDetectionAnalysis, { extractTime } from './useDetectionAnalysis';
-import { Download, Search, Eye, Edit, Save, Filter, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, ScanLine, Zap } from 'lucide-react';
+import { Download, Search, Save, Filter, Loader2, CheckCircle, Zap } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import DetectionPanel from './DetectionPanel';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
-import InlineEditableCell from './InlineEditableCell';
-import GiftMinutesCellWidget from './GiftMinutesCell';
 import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from './ReportDetailDialogs';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
-import DeductibleCell from './DeductibleCell';
 import ReportTableRow from './ReportTableRow';
 import * as XLSX from 'xlsx';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
@@ -1416,6 +1411,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="space-y-1">
+                            {reportRun.report_name && (
+                                <h2 className="text-xl font-bold text-slate-900">{reportRun.report_name}</h2>
+                            )}
                             <p className="text-sm text-slate-600">
                                 Period: <span className="font-medium text-slate-900">{new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}</span>
                             </p>

@@ -98,7 +98,7 @@ export default function ReportDetailPage() {
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900">
-                            Report: {formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - {formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}
+                            {reportRun.report_name || `Report: ${formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - ${formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}`}
                         </h1>
                         <p className="text-sm text-slate-600 mt-1">
                             Generated on {formatInUAE(reportRun.created_date, 'MM/dd/yyyy hh:mm a')}
