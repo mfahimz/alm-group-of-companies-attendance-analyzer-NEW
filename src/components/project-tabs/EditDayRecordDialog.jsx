@@ -497,6 +497,15 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
             await base44.entities.AnalysisResult.update(analysisResult.id, updatePayload);
 
+            // Trigger backend recalculation of this employee's totals from raw data
+            try {
+                await base44.functions.invoke('recalcEmployeeTotals', {
+                    analysis_result_id: analysisResult.id
+                });
+            } catch (recalcErr) {
+                console.warn('Backend recalc failed, using local calculation:', recalcErr);
+            }
+
             // If admin sets SICK_LEAVE, also create an actual Exception record
             if (data.type === 'SICK_LEAVE') {
                 const [day, month, year] = dayRecord.date.split('/');

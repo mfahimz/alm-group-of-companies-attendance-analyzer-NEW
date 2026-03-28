@@ -65,10 +65,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user'; const isAdmin = userRole === 'admin'; const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo'; const isHRManager = userRole === 'hr_manager'; const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
-    // SEQUENTIAL LOADING: Chain paginated fetches to avoid rate limiting
-    const { data: punches = [], isFetched: punchesDone } = useQuery({ queryKey: ['punches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
-    const { data: shifts = [], isFetched: shiftsDone } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: punchesDone });
-    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: shiftsDone });
+
+    // LAZY LOADING: Raw data (punches/shifts/exceptions) only loaded on-demand
+    // when user opens daily breakdown, detection panel, or edits a day.
+    // The summary table uses STORED AnalysisResult values (no client-side recalculation).
+    const [rawDataRequested, setRawDataRequested] = useState(false);
+
+    const { data: punches = [], isFetched: punchesDone } = useQuery({ queryKey: ['punches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested });
+    const { data: shifts = [], isFetched: shiftsDone } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested && punchesDone });
+    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested && shiftsDone });
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
@@ -82,7 +87,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
             return results;
         },
-        enabled: punchesDone,
         staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -101,7 +105,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
         queryFn: () => fetchAllRecords(base44.entities.Employee, { company: project.company }),
-        enabled: shiftsDone,
         staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -896,92 +899,44 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
      */
     const showGiftMinutesColumn = (project?.use_gift_minutes || hasAnyGiftMinutes);
 
-    // For FINALIZED reports: use stored AnalysisResult values (immutable).
-    // For NON-FINALIZED reports: recalculate from punches/shifts/exceptions + day_overrides
-    // so the summary table matches the daily breakdown the user sees.
+    // ALWAYS use stored AnalysisResult values for the summary table.
+    // No client-side recalculation from raw punch data.
+    // When user edits a day, the backend recalcEmployeeTotals function recalculates and updates the stored values.
     const baseEnrichedResults = React.useMemo(() => {
-        const isFinalized = reportRun.is_final || project.status === 'closed';
-
         return results.map(result => {
             const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
 
-            const employeePunches = punches.filter(p =>
-                String(p.attendance_id) === String(result.attendance_id) &&
-                p.punch_date >= reportRun.date_from &&
-                p.punch_date <= reportRun.date_to
-            );
-            const hasNoPunches = employeePunches.length === 0;
-
-            if (isFinalized) {
-                // FINALIZED: Use stored values AS-IS — never recalculate
-                const storedDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? null;
-
-                // If stored deductible is null/missing but we have late+early data, compute it
-                // This handles the case where results were fetched from wrong report run via fallback
-                const lateMin = result.late_minutes || 0;
-                const earlyMin = result.early_checkout_minutes || 0;
-                const graceMin = result.grace_minutes ?? 15;
-                const approvedMin = result.approved_minutes || 0;
-                const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
-
-                const effectiveDeductible = storedDeductible !== null
-                    ? storedDeductible
-                    : computedDeductible;
-
-                return {
-                    ...result,
-                    name: employee?.name || 'Unknown',
-                    working_days: result.working_days || 0,
-                    present_days: result.manual_present_days ?? result.present_days ?? 0,
-                    full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
-                    half_absence_count: result.half_absence_count || 0,
-                    sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
-                    annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
-                    late_minutes: lateMin,
-                    early_checkout_minutes: earlyMin,
-                    other_minutes: result.other_minutes || 0,
-                    approved_minutes: approvedMin,
-                    deductible_minutes: effectiveDeductible,
-                    ramadan_gift_minutes: Math.max(0, result.ramadan_gift_minutes || 0),
-                    // effective = raw deductible (after grace) minus ramadan gift
-                    effective_deductible_minutes: Math.max(0, effectiveDeductible - Math.max(0, result.ramadan_gift_minutes || 0)),
-                    grace_minutes: graceMin,
-                    has_no_punches: hasNoPunches
-                };
-            }
-
-            // NON-FINALIZED: Recalculate from live punch data + day_overrides
-            const {
-                totalLateMinutes,
-                totalEarlyCheckout,
-                totalOtherMinutes,
-                workingDays,
-                presentDays,
-                fullAbsenceCount,
-                halfAbsenceCount,
-                sickLeaveCount,
-                annualLeaveCount
-            } = calculateEmployeeTotals(result, reportRun.date_from, reportRun.date_to);
-
-            // Deductible: (late + early) - grace. Approved minutes already applied per-day in punch calc.
-            const graceMinutes = result.grace_minutes ?? 15;
-            const dynamicDeductible = Math.max(0, Math.max(0, totalLateMinutes) + Math.max(0, totalEarlyCheckout) - graceMinutes);
-
-            const giftMins = giftMinutesOverrides[result.id] || 0;
+            // Use stored values for ALL reports (both finalized and non-finalized)
+            const lateMin = result.late_minutes || 0;
+            const earlyMin = result.early_checkout_minutes || 0;
+            const graceMin = result.grace_minutes ?? 15;
+            const approvedMin = result.approved_minutes || 0;
+            const storedDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? null;
+            const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
+            const effectiveDeductible = storedDeductible !== null ? storedDeductible : computedDeductible;
+            const giftMins = giftMinutesOverrides[result.id] || Math.max(0, result.ramadan_gift_minutes || 0);
 
             return {
-                ...result, name: employee?.name || 'Unknown', working_days: workingDays,
-                present_days: result.manual_present_days ?? presentDays, full_absence_count: result.manual_full_absence_count ?? fullAbsenceCount,
-                half_absence_count: halfAbsenceCount, sick_leave_count: result.manual_sick_leave_count ?? sickLeaveCount,
-                annual_leave_count: result.manual_annual_leave_count ?? annualLeaveCount, late_minutes: Math.max(0, totalLateMinutes),
-                early_checkout_minutes: Math.max(0, totalEarlyCheckout), other_minutes: Math.max(0, totalOtherMinutes),
-                approved_minutes: (() => { const aId = String(result.attendance_id); const sd = new Date(reportRun.date_from); const ed = new Date(reportRun.date_to); let live = 0; exceptions.filter(ex => ex.type === 'ALLOWED_MINUTES' && String(ex.attendance_id) === aId && ex.use_in_analysis !== false && ex.is_custom_type !== true).forEach(ex => { const ef = new Date(ex.date_from); const et = new Date(ex.date_to); if (ef <= ed && et >= sd) live += (ex.allowed_minutes || 0); }); return live > 0 ? live : (result.approved_minutes || 0); })(), deductible_minutes: result.manual_deductible_minutes ?? dynamicDeductible,
+                ...result,
+                name: employee?.name || 'Unknown',
+                working_days: result.working_days || 0,
+                present_days: result.manual_present_days ?? result.present_days ?? 0,
+                full_absence_count: result.manual_full_absence_count ?? result.full_absence_count ?? 0,
+                half_absence_count: result.half_absence_count || 0,
+                sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
+                annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
+                late_minutes: lateMin,
+                early_checkout_minutes: earlyMin,
+                other_minutes: result.other_minutes || 0,
+                approved_minutes: approvedMin,
+                deductible_minutes: effectiveDeductible,
                 ramadan_gift_minutes: giftMins,
-                effective_deductible_minutes: Math.max(0, (result.manual_deductible_minutes ?? dynamicDeductible) - giftMins),
-                grace_minutes: graceMinutes, has_no_punches: hasNoPunches
+                effective_deductible_minutes: Math.max(0, effectiveDeductible - giftMins),
+                grace_minutes: graceMin,
+                has_no_punches: false // Will be determined when raw data is loaded
             };
         });
-    }, [results, employees, punches, shifts, exceptions, reportRun, project, giftMinutesOverrides]);
+    }, [results, employees, reportRun, project, giftMinutesOverrides]);
 
     // Add verification state separately to avoid expensive recalculations
     const enrichedResults = React.useMemo(() => {
@@ -1047,10 +1002,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // This block identifies problematic records based on punch data vs shift configuration.
     // ==========================================================================================
 
-    // Detection analysis hook (extracted to reduce file size)
+    // Detection analysis hook - only runs when raw data is loaded
     const { shiftMismatchDetections, noMatchDetections, localParseTime, localIsWithinMidnightBuffer } = useDetectionAnalysis({
         results, employees, punches, shifts, exceptions, reportRun, project
     });
+
+    // Trigger raw data loading when user needs it
+    const loadRawData = React.useCallback(() => {
+        if (!rawDataRequested) setRawDataRequested(true);
+    }, [rawDataRequested]);
 
     const updateVerificationMutation = useMutation({
         mutationFn: (verifiedList) => base44.entities.ReportRun.update(reportRun.id, {
@@ -1716,6 +1676,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const showDailyBreakdown = (result) => {
+        loadRawData(); // Trigger lazy load of punches/shifts/exceptions
         setSelectedEmployee(result);
         setShowBreakdown(true);
     };
@@ -1738,7 +1699,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             await base44.entities.AnalysisResult.update(id, { [field]: value });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results', reportRun.id, project.id]);
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
             toast.success('Value updated - will be used in salary calculation');
         },
         onError: () => { toast.error('Failed to update value'); },
@@ -2050,6 +2011,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 setSelectedEmployee={setSelectedEmployee}
                 setEditingDay={setEditingDay}
                 handleExportMismatch={handleExportMismatch}
+                onRequestRawData={loadRawData}
+                rawDataLoaded={rawDataRequested && punchesDone && shiftsDone}
             />
             
             <Card className="border-0 shadow-sm">

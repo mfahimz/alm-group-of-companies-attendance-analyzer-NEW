@@ -9,7 +9,8 @@ import { extractTime } from './useDetectionAnalysis';
 
 export default function DetectionPanel({
     shiftMismatchDetections, noMatchDetections, exceptions, project, results,
-    setSelectedEmployee, setEditingDay, handleExportMismatch
+    setSelectedEmployee, setEditingDay, handleExportMismatch,
+    onRequestRawData, rawDataLoaded
 }) {
     const [showPanel, setShowPanel] = useState(false);
     const [activeTab, setActiveTab] = useState('mismatch');
@@ -144,7 +145,7 @@ export default function DetectionPanel({
     return (
         <>
             <div className="flex gap-4 items-center mb-6">
-                <Button className={`w-fit font-bold border-2 transition-all ${showPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`} onClick={() => setShowPanel(!showPanel)}>
+                <Button className={`w-fit font-bold border-2 transition-all ${showPanel ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`} onClick={() => { if (!showPanel && onRequestRawData) onRequestRawData(); setShowPanel(!showPanel); }}>
                     <ScanLine className="w-4 h-4 mr-2" />
                     {showPanel ? 'Hide Shift Mismatch Analysis' : 'Show Shift Mismatch Analysis'}
                     <div className="ml-3 flex gap-2">
