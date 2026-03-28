@@ -7,10 +7,10 @@ import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient } from '@tanstack/react-query';
 
 /**
- * Midnight buffer: punches between 12:00 AM and 02:00 AM (120 min after midnight).
- * Extended to 2 hours for Ramadan night shifts crossover support.
+ * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
+ * Now UNIVERSAL: moved into the previous day unless the current day has an early shift start.
  */
-const MIDNIGHT_BUFFER_MINUTES = 120;
+const MIDNIGHT_BUFFER_MINUTES = 180;
 
 export default function DailyBreakdownDialog({
     open,
@@ -42,10 +42,8 @@ export default function DailyBreakdownDialog({
 
     const formatDate = (dateStr) => {
         const date = new Date(dateStr);
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        if (isNaN(date.getTime())) return dateStr;
+        return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
     };
 
     const extractTime = (ts) => {
@@ -146,8 +144,60 @@ export default function DailyBreakdownDialog({
             const shiftStartsNearMidnight = (s) => {
                 const tStart = parseTime(s?.am_start, includeSeconds);
                 if (!tStart) return false;
-                const h = tStart.getHours();
-                return h === 23 || h === 0 || h === 1 || h === 2;
+                const minutes = tStart.getHours() * 60 + tStart.getMinutes();
+                return minutes <= MIDNIGHT_BUFFER_MINUTES;
+            };
+
+            const getShiftForDate = (targetDateStr, targetDateObj) => {
+                const dayName = dayNames[targetDateObj.getDay()];
+                let s = employeeShifts.find(sh => sh.date === targetDateStr && checkShiftEffective(sh, targetDateObj));
+
+                if (!s) {
+                    const applicableShifts = employeeShifts.filter(sh => !sh.date && checkShiftEffective(sh, targetDateObj));
+                    for (const sh of applicableShifts) {
+                        if (sh.applicable_days) {
+                            try {
+                                const arr = JSON.parse(sh.applicable_days);
+                                if (Array.isArray(arr) && arr.some(day => day.toLowerCase().trim() === dayName.toLowerCase())) {
+                                    s = sh; break;
+                                }
+                            } catch {
+                                if (sh.applicable_days.toLowerCase().includes(dayName.toLowerCase())) {
+                                    s = sh; break;
+                                }
+                            }
+                        }
+                    }
+                    if (!s) {
+                        if (targetDateObj.getDay() === 5) {
+                            s = employeeShifts.find(sh => sh.is_friday_shift && !sh.date && checkShiftEffective(sh, targetDateObj));
+                            if (!s) s = employeeShifts.find(sh => !sh.is_friday_shift && !sh.date && checkShiftEffective(sh, targetDateObj));
+                        } else {
+                            s = employeeShifts.find(sh => !sh.is_friday_shift && !sh.date && checkShiftEffective(sh, targetDateObj));
+                        }
+                    }
+                }
+
+                // Exception check
+                const targetMatchingExceptions = employeeExceptions.filter(ex => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return targetDateObj >= exFrom && targetDateObj <= exTo;
+                });
+                const targetDateEx = targetMatchingExceptions.length > 0
+                    ? targetMatchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                    : null;
+
+                if (targetDateEx && targetDateEx.type === 'SHIFT_OVERRIDE') {
+                    const isFriday = targetDateObj.getDay() === 5;
+                    if (targetDateEx.include_friday || !isFriday) {
+                        s = {
+                            am_start: targetDateEx.new_am_start, am_end: targetDateEx.new_am_end,
+                            pm_start: targetDateEx.new_pm_start, pm_end: targetDateEx.new_pm_end
+                        };
+                    }
+                }
+                return s;
             };
 
             // If this weekly off day was counted as LOP-adjacent, include it in breakdown with special flag
@@ -273,9 +323,10 @@ export default function DailyBreakdownDialog({
                 }
             }
 
-            // MIDNIGHT FIX: Exclude early AM punches that belong to previous day
-            // We now exclude UNCONDITIONALLY if prev ended near midnight OR today doesn't start near midnight
-            if (prevShiftEndsNearMidnight || !shiftStartsNearMidnight(shift)) {
+            // MIDNIGHT FIX: Universal Rollback
+            // Exclude early AM punches that belong to previous day
+            // We now exclude UNCONDITIONALLY if today's shift doesn't start in this window.
+            if (!shiftStartsNearMidnight(shift)) {
                 rawDayPunches = rawDayPunches.filter(p => !isWithinMidnightBuffer(p.timestamp_raw));
             }
 
@@ -289,8 +340,10 @@ export default function DailyBreakdownDialog({
                 }
             }
 
-            // MIDNIGHT FIX: Grab crossover punches from next day
-            if (shiftEndsNearMidnight) {
+            // MIDNIGHT FIX: Universal Forward-Inclusion
+            // Grab crossover punches from next day if next day doesn't start near midnight
+            const nextDayShift = getShiftForDate(nextDateStr, nextDateObj);
+            if (!shiftStartsNearMidnight(nextDayShift)) {
                 const nextDayPunches = allEmployeePunchesExtended
                     .filter(p => p.punch_date === nextDateStr)
                     .filter(p => isWithinMidnightBuffer(p.timestamp_raw));

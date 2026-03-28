@@ -351,7 +351,7 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                         attendance_id: employeeAttendanceId,
                         name: displayName,
                         date: dateStr,
-                        displayDate: currentDay.toLocaleDateString(),
+                        displayDate: currentDay.toLocaleDateString('en-GB'),
                         punches: dayPunches.map(p => ({ raw: p.timestamp_raw, isPrev: localIsWithinMidnightBuffer(p.timestamp_raw) })),
                         rawResult: result,
                         likelyWorkedShift,
@@ -570,7 +570,7 @@ export default function useDetectionAnalysis({ results, employees, punches, shif
                         attendance_id: employeeAttendanceId,
                         name: displayName,
                         date: dateStr,
-                        displayDate: currentDay.toLocaleDateString(),
+                        displayDate: currentDay.toLocaleDateString('en-GB'),
                         noMatchPunches: matches.map(m => {
                             let nearestShiftPoint = null;
                             let minutesAway = null;

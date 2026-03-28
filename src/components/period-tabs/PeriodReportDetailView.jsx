@@ -1150,7 +1150,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                         attendance_id: employeeAttendanceId,
                         name: result.name,
                         date: dateStr,
-                        displayDate: currentDay.toLocaleDateString(),
+                        displayDate: currentDay.toLocaleDateString('en-GB'),
                         punches: dayPunches.map(p => extractTime(p['timestamp_raw'])).join(', '),
                         rawResult: result
                     });
@@ -1293,7 +1293,7 @@ export default function PeriodReportDetailView({ reportRun, calendarPeriod, isDe
                         attendance_id: employeeAttendanceId,
                         name: result.name,
                         date: dateStr,
-                        displayDate: currentDay.toLocaleDateString(),
+                        displayDate: currentDay.toLocaleDateString('en-GB'),
                         noMatchPunches: noMatches.map(m => extractTime(m.punch['timestamp_raw'])).join(', '),
                         rawResult: result
                     });

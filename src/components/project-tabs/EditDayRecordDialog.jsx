@@ -105,17 +105,14 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             const date = new Date(timestampRaw);
             if (isNaN(date.getTime())) return timestampRaw;
 
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-
+            const dateStr = date.toLocaleDateString('en-GB'); // Strictly DD/MM/YYYY
             let hours = date.getHours();
             const minutes = String(date.getMinutes()).padStart(2, '0');
             const ampm = hours >= 12 ? 'PM' : 'AM';
             hours = hours % 12;
             hours = hours ? hours : 12; // the hour '0' should be '12'
             
-            return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`;
+            return `${dateStr} ${hours}:${minutes} ${ampm}`;
         } catch (e) {
             return timestampRaw;
         }
@@ -704,7 +701,15 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Edit Day Record: {dayRecord.date}</DialogTitle>
+                    <DialogTitle>Edit Day Record: {(() => {
+                        if (typeof dayRecord?.date === 'string' && dayRecord.date.includes('/')) {
+                            const parts = dayRecord.date.split('/');
+                            if (parts.length === 3) {
+                                return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+                            }
+                        }
+                        return dayRecord?.date;
+                    })()}</DialogTitle>
                     <p className="text-sm text-slate-500 mt-1">
                         {(isUser && !isSupervisor) 
                             ? 'Your changes will be submitted for admin approval' 
