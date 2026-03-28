@@ -70,9 +70,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
     const isUser = userRole === 'user'; const isAdmin = userRole === 'admin'; const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo'; const isHRManager = userRole === 'hr_manager'; const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
-    const { data: punches = [] } = useQuery({ queryKey: ['punches', project.id], queryFn: () => base44.entities.Punch.filter({ project_id: project.id }, null, 50000), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
-    const { data: shifts = [] } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }, null, 5000), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
-    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => base44.entities.Exception.filter({ project_id: project.id }, null, 5000), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
+    const { data: punches = [] } = useQuery({ queryKey: ['punches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
+    const { data: shifts = [] } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
+    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false });
 
     const { data: allResults = [] } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
@@ -103,8 +103,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const { data: allEmployees = [] } = useQuery({
         queryKey: ['employees', project.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company }),
-        staleTime: 30 * 60 * 1000, // Cache for 30 minutes
+        queryFn: () => fetchAllRecords(base44.entities.Employee, { company: project.company }),
+        staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
