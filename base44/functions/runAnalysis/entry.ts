@@ -69,14 +69,31 @@ Deno.serve(async (req: Request) => {
 
         // PAGINATED FETCH HELPER: SDK truncates large responses at ~64KB.
         // We must fetch in pages of 200 records to avoid truncation.
+        // Includes retry with backoff for rate limit (429) errors.
         const PAGE_SIZE = 200;
+        const fetchWithRetry = async (fn, maxRetries = 4) => {
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                try {
+                    return await fn();
+                } catch (e) {
+                    const status = e?.status || e?.response?.status || 0;
+                    if (status === 429 && attempt < maxRetries) {
+                        const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+                        console.warn(`[runAnalysis] Rate limited, retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+                        await new Promise(r => setTimeout(r, delay));
+                        continue;
+                    }
+                    throw e;
+                }
+            }
+        };
+
         const fetchAllPages = async (entity, query, sortField = null) => {
             const allItems = [];
             let skip = 0;
             let hasMore = true;
             while (hasMore) {
-                const raw = await entity.filter(query, sortField, PAGE_SIZE, skip);
-                // SDK may return truncated string for even PAGE_SIZE items — try to parse
+                const raw = await fetchWithRetry(() => entity.filter(query, sortField, PAGE_SIZE, skip));
                 let page = [];
                 if (Array.isArray(raw)) {
                     page = raw;
@@ -86,8 +103,7 @@ Deno.serve(async (req: Request) => {
                         if (Array.isArray(parsed)) page = parsed;
                     } catch {
                         console.error(`[runAnalysis] Paginated fetch: JSON parse failed at skip=${skip}, reducing page size`);
-                        // Try smaller page
-                        const smallRaw = await entity.filter(query, sortField, 50, skip);
+                        const smallRaw = await fetchWithRetry(() => entity.filter(query, sortField, 50, skip));
                         if (Array.isArray(smallRaw)) page = smallRaw;
                         else {
                             try { page = JSON.parse(smallRaw); } catch { page = []; hasMore = false; }
@@ -102,17 +118,19 @@ Deno.serve(async (req: Request) => {
             return allItems;
         };
 
-        console.log('[runAnalysis] Fetching data with pagination (page size:', PAGE_SIZE, ')...');
-
-        // Fetch large datasets with pagination, small ones directly
-        const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
-            fetchAllPages(base44.asServiceRole.entities.Punch, { project_id }),
-            fetchAllPages(base44.asServiceRole.entities.ShiftTiming, { project_id }),
+        // Fetch data SEQUENTIALLY to avoid rate limiting.
+        // Large entities (punches, shifts) are fetched one at a time.
+        console.log('[runAnalysis] Fetching punches...');
+        const punches = await fetchAllPages(base44.asServiceRole.entities.Punch, { project_id });
+        console.log('[runAnalysis] Fetching shifts...');
+        const shifts = await fetchAllPages(base44.asServiceRole.entities.ShiftTiming, { project_id });
+        console.log('[runAnalysis] Fetching exceptions, employees, rules, etc...');
+        const [exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
             fetchAllPages(base44.asServiceRole.entities.Exception, { project_id }),
             fetchAllPages(base44.asServiceRole.entities.Employee, { company: project.company, active: true }),
-            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
+            fetchWithRetry(() => base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })),
             fetchAllPages(base44.asServiceRole.entities.ProjectEmployee, { project_id }),
-            base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100)
+            fetchWithRetry(() => base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100))
         ]);
 
         // Ensure rulesData and ramadanSchedules are arrays
