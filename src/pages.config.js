@@ -47,7 +47,7 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import AIPayrollInsights from './pages/AIPayrollInsights';
+
 import AgentsDocumentation from './pages/AgentsDocumentation';
 import AnnualLeaveManagement from './pages/AnnualLeaveManagement';
 import AuditLogs from './pages/AuditLogs';
@@ -86,7 +86,7 @@ import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "AIPayrollInsights": AIPayrollInsights,
+
     "AgentsDocumentation": AgentsDocumentation,
     "AnnualLeaveManagement": AnnualLeaveManagement,
     "AuditLogs": AuditLogs,

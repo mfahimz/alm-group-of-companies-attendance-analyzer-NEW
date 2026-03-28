@@ -240,16 +240,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'ceo']
     },
-    AIPayrollInsights: {
-        name: 'AIPayrollInsights',
-        title: 'AI Payroll Insights',
-        icon: Brain,
-        category: 'Admin',
-        showInNav: true,
-        requiresAuth: true,
-        availableToAll: false,
-        defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager']
-    },
+
     AuditLogs: {
         name: 'AuditLogs',
         title: 'Audit Logs',

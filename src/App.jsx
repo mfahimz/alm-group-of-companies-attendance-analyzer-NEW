@@ -35,7 +35,7 @@ import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import MaintenanceSettings from './pages/MaintenanceSettings';
 import Maintenance from './pages/Maintenance';
-import AIPayrollInsights from './pages/AIPayrollInsights';
+
 import ResumeScanner from './pages/ResumeScanner';
 import AuditLogs from './pages/AuditLogs';
 import FeatureRequests from './pages/FeatureRequests';
@@ -79,7 +79,7 @@ function App() {
           <Route path="/departmentheadsettings" element={<W name="DepartmentHeadSettings"><DepartmentHeadSettings /></W>} />
           <Route path="/maintenancesettings" element={<W name="MaintenanceSettings"><MaintenanceSettings /></W>} />
           <Route path="/maintenance" element={<Maintenance />} />
-          <Route path="/aipayrollinsights" element={<W name="AIPayrollInsights"><AIPayrollInsights /></W>} />
+
           <Route path="/resumescanner" element={<W name="ResumeScanner"><ResumeScanner /></W>} />
           <Route path="/auditlogs" element={<W name="AuditLogs"><AuditLogs /></W>} />
           <Route path="/featurerequests" element={<W name="FeatureRequests"><FeatureRequests /></W>} />
