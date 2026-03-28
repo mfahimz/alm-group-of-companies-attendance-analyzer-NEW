@@ -81,9 +81,24 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const parseTime = (timeStr) => {
         try {
-            if (!timeStr || timeStr === '—') return null;
+            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
             
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            // Priority 1: Format with seconds and AM/PM
+            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                const minutes = parseInt(timeMatch[2]);
+                const seconds = parseInt(timeMatch[3]);
+                const period = timeMatch[4].toUpperCase();
+                if (period === 'PM' && hours !== 12) hours += 12;
+                if (period === 'AM' && hours === 12) hours = 0;
+                const date = new Date();
+                date.setHours(hours, minutes, seconds, 0);
+                return date;
+            }
+
+            // Priority 2: Standard AM/PM
+            timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
             if (timeMatch) {
                 let hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
@@ -97,13 +112,31 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 return date;
             }
             
+            // Priority 3: 24-hour with optional seconds
             timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
             if (timeMatch) {
                 const hours = parseInt(timeMatch[1]);
                 const minutes = parseInt(timeMatch[2]);
-                
+                const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
                 const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
+                date.setHours(hours, minutes, seconds, 0);
+                return date;
+            }
+
+            // Priority 4: timestamp_raw format like "1/16/2026 8:37" or "01/16/2026 08:37:00 AM"
+            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i);
+            if (dateTimeMatch) {
+                let hours = parseInt(dateTimeMatch[1]);
+                const minutes = parseInt(dateTimeMatch[2]);
+                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
+                const period = dateTimeMatch[4];
+                if (period) {
+                    const p = period.toUpperCase();
+                    if (p === 'PM' && hours !== 12) hours += 12;
+                    if (p === 'AM' && hours === 12) hours = 0;
+                }
+                const date = new Date();
+                date.setHours(hours, minutes, seconds, 0);
                 return date;
             }
             
