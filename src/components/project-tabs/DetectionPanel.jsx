@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ScanLine, Download } from 'lucide-react';
+import { ScanLine, Download, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -159,7 +159,15 @@ export default function DetectionPanel({
                     </Button>
                 )}
             </div>
-            {showPanel && (
+            {showPanel && !rawDataLoaded && (
+                <Card className="border shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-center py-12 gap-3 text-slate-500">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Loading punch and shift data for analysis...</span>
+                    </div>
+                </Card>
+            )}
+            {showPanel && rawDataLoaded && (
                 <Card className="border shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="flex border-b bg-slate-50/50">
                         <button className={`px-6 py-3 text-sm font-bold transition-all border-b-2 ${activeTab === 'mismatch' ? 'border-amber-500 text-amber-600 bg-amber-50/30' : 'border-transparent text-slate-500 hover:text-slate-700'}`} onClick={() => setActiveTab('mismatch')}>

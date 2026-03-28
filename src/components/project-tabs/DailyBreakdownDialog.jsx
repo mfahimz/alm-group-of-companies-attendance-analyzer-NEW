@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Edit } from 'lucide-react';
+import { Edit, Loader2 } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -735,6 +735,12 @@ export default function DailyBreakdownDialog({
                         </DialogTitle>
                     </DialogHeader>
                     <div className="mt-4">
+                        {punches.length === 0 && shifts.length === 0 ? (
+                            <div className="flex items-center justify-center py-12 gap-3 text-slate-500">
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <span>Loading attendance data...</span>
+                            </div>
+                        ) : (
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -869,8 +875,9 @@ export default function DailyBreakdownDialog({
                                 ))}
                             </TableBody>
                         </Table>
-                    </div>
-                </DialogContent>
+                        )}
+                        </div>
+                        </DialogContent>
             </Dialog>
 
             <EditDayRecordDialog
