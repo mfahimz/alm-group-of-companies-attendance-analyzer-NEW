@@ -67,48 +67,63 @@ Deno.serve(async (req: Request) => {
             console.warn('[runAnalysis] Could not resolve company_id, name-based check used');
         }
 
-        // Fetch all required data with explicit pagination limits
-        const [punchesRaw, shiftsRaw, exceptionsRaw, allEmployeesRaw, rulesData, projectEmployeesRaw, ramadanSchedulesRaw] = await Promise.all([
-            base44.asServiceRole.entities.Punch.filter({ project_id }, null, 100000),
-            base44.asServiceRole.entities.ShiftTiming.filter({ project_id }, null, 10000),
-            base44.asServiceRole.entities.Exception.filter({ project_id }, null, 10000),
-            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
+        // PAGINATED FETCH HELPER: SDK truncates large responses at ~64KB.
+        // We must fetch in pages of 200 records to avoid truncation.
+        const PAGE_SIZE = 200;
+        const fetchAllPages = async (entity, query, sortField = null) => {
+            const allItems = [];
+            let skip = 0;
+            let hasMore = true;
+            while (hasMore) {
+                const raw = await entity.filter(query, sortField, PAGE_SIZE, skip);
+                // SDK may return truncated string for even PAGE_SIZE items — try to parse
+                let page = [];
+                if (Array.isArray(raw)) {
+                    page = raw;
+                } else if (typeof raw === 'string') {
+                    try {
+                        const parsed = JSON.parse(raw);
+                        if (Array.isArray(parsed)) page = parsed;
+                    } catch {
+                        console.error(`[runAnalysis] Paginated fetch: JSON parse failed at skip=${skip}, reducing page size`);
+                        // Try smaller page
+                        const smallRaw = await entity.filter(query, sortField, 50, skip);
+                        if (Array.isArray(smallRaw)) page = smallRaw;
+                        else {
+                            try { page = JSON.parse(smallRaw); } catch { page = []; hasMore = false; }
+                        }
+                    }
+                }
+                allItems.push(...page);
+                skip += page.length;
+                hasMore = page.length >= PAGE_SIZE;
+                if (page.length === 0) hasMore = false;
+            }
+            return allItems;
+        };
+
+        console.log('[runAnalysis] Fetching data with pagination (page size:', PAGE_SIZE, ')...');
+
+        // Fetch large datasets with pagination, small ones directly
+        const [punches, shifts, exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
+            fetchAllPages(base44.asServiceRole.entities.Punch, { project_id }),
+            fetchAllPages(base44.asServiceRole.entities.ShiftTiming, { project_id }),
+            fetchAllPages(base44.asServiceRole.entities.Exception, { project_id }),
+            fetchAllPages(base44.asServiceRole.entities.Employee, { company: project.company, active: true }),
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }),
-            base44.asServiceRole.entities.ProjectEmployee.filter({ project_id }, null, 5000),
+            fetchAllPages(base44.asServiceRole.entities.ProjectEmployee, { project_id }),
             base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100)
         ]);
 
-        // CRITICAL FIX: SDK sometimes returns JSON string instead of parsed array for large datasets.
-        // Safely coerce each result to an array, parsing JSON strings when needed.
-        const safeArray = (raw, label) => {
-            if (Array.isArray(raw)) return raw;
-            if (typeof raw === 'string') {
-                try {
-                    const parsed = JSON.parse(raw);
-                    if (Array.isArray(parsed)) {
-                        console.warn(`[runAnalysis] ${label}: SDK returned JSON string instead of array (${parsed.length} items). Parsed successfully.`);
-                        return parsed;
-                    }
-                } catch (e) {
-                    console.error(`[runAnalysis] ${label}: Failed to parse string response:`, e.message);
-                }
-            }
-            console.error(`[runAnalysis] ${label}: Unexpected type ${typeof raw}, defaulting to empty array`);
-            return [];
-        };
-
-        const punches = safeArray(punchesRaw, 'Punches');
-        const shifts = safeArray(shiftsRaw, 'Shifts');
-        const exceptions = safeArray(exceptionsRaw, 'Exceptions');
-        const allEmployees = safeArray(allEmployeesRaw, 'Employees');
-        const projectEmployees = safeArray(projectEmployeesRaw, 'ProjectEmployees');
-        const ramadanSchedules = safeArray(ramadanSchedulesRaw, 'RamadanSchedules');
+        // Ensure rulesData and ramadanSchedules are arrays
+        const safeRulesData = Array.isArray(rulesData) ? rulesData : [];
+        const safeRamadanSchedules = Array.isArray(ramadanSchedules) ? ramadanSchedules : [];
 
         console.log('[runAnalysis] Data fetch results - punches:', punches.length, ', shifts:', shifts.length, ', exceptions:', exceptions.length, ', employees:', allEmployees.length);
 
         // CRITICAL GUARD: If punches loaded as 0 but we expected data, abort
         if (punches.length === 0 && shifts.length === 0) {
-            console.error('[runAnalysis] FATAL: Both punches and shifts are empty. Raw types - punches:', typeof punchesRaw, ', shifts:', typeof shiftsRaw);
+            console.error('[runAnalysis] FATAL: Both punches and shifts are empty after paginated fetch');
             return Response.json({ error: 'Failed to load punch/shift data. Please try again or use chunked analysis mode.' }, { status: 500 });
         }
 
@@ -119,7 +134,7 @@ Deno.serve(async (req: Request) => {
         const projectEnd = new Date(date_to);
         let ramadanShiftsLookup: any = {};
 
-        for (const schedule of ramadanSchedules) {
+        for (const schedule of safeRamadanSchedules) {
             try {
                 const ramadanStart = new Date(schedule.ramadan_start_date);
                 const ramadanEnd = new Date(schedule.ramadan_end_date);
@@ -147,9 +162,9 @@ Deno.serve(async (req: Request) => {
 
         // Parse rules
         let rules = null;
-        if (rulesData.length > 0) {
+        if (safeRulesData.length > 0) {
             try {
-                rules = JSON.parse(rulesData[0].rules_json);
+                rules = JSON.parse(safeRulesData[0].rules_json);
             } catch (e) {
                 return Response.json({ error: 'Invalid rules configuration' }, { status: 400 });
             }
