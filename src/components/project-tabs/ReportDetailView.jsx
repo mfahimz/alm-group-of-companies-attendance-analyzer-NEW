@@ -71,9 +71,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // The summary table uses STORED AnalysisResult values (no client-side recalculation).
     const [rawDataRequested, setRawDataRequested] = useState(false);
 
-    const { data: punches = [], isFetched: punchesDone } = useQuery({ queryKey: ['punches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested });
-    const { data: shifts = [], isFetched: shiftsDone } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested && punchesDone });
-    const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested && shiftsDone });
+    // PARALLEL LOADING: All three raw data queries fire simultaneously when requested.
+    // Previously chained sequentially (punches → shifts → exceptions), adding unnecessary latency.
+    const rawDataQueryOpts = { staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested };
+    const { data: punches = [], isFetched: punchesDone } = useQuery({ queryKey: ['projectPunches', project.id], queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }), ...rawDataQueryOpts });
+    const { data: shifts = [], isFetched: shiftsDone } = useQuery({ queryKey: ['projectShifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), ...rawDataQueryOpts });
+    const { data: exceptions = [], isFetched: exceptionsDone } = useQuery({ queryKey: ['projectExceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), ...rawDataQueryOpts });
+    const allRawDataLoaded = punchesDone && shiftsDone && exceptionsDone;
 
     const { data: allResults = [], isLoading: resultsLoading } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
@@ -1434,7 +1438,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 <>
                                     <Button
                                         onClick={() => { loadRawData(); setShowSaveConfirmation(true); }}
-                                        disabled={isSaving || (rawDataRequested && !shiftsDone)}
+                                        disabled={isSaving || (rawDataRequested && !allRawDataLoaded)}
                                         className="bg-green-600 hover:bg-green-700"
                                     >
                                         <Save className="w-4 h-4 mr-2" />
@@ -1569,7 +1573,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 setEditingDay={setEditingDay}
                 handleExportMismatch={handleExportMismatch}
                 onRequestRawData={loadRawData}
-                rawDataLoaded={rawDataRequested && punchesDone && shiftsDone}
+                rawDataLoaded={rawDataRequested && allRawDataLoaded}
             />
             
             <Card className="border-0 shadow-sm">

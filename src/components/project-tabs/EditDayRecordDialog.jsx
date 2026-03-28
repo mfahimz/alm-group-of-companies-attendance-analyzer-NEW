@@ -39,26 +39,44 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
 
+    // Reuse cached employee-level data from DailyBreakdownDialog when available.
+    // Only fetch if no cached data exists. Uses employee-scoped queries (not project-wide)
+    // to be fast and avoid colliding with the parent's paginated project-wide cache keys.
+    const attIdStr = attendanceId ? String(attendanceId) : null;
     const { data: punches = [] } = useQuery({
-       queryKey: ['punches', project?.id, attendanceId],
+       queryKey: ['employeePunches', project?.id, attIdStr],
        queryFn: () => base44.entities.Punch.filter({ 
            project_id: project.id, 
-           attendance_id: String(attendanceId) 
-       }),
-       enabled: !!dayRecord && !!project?.id && !!attendanceId,
-       staleTime: 0
+           attendance_id: attIdStr 
+       }, null, 500),
+       enabled: !!dayRecord && !!project?.id && !!attIdStr,
+       staleTime: 5 * 60 * 1000,
+       gcTime: 10 * 60 * 1000,
+       refetchOnWindowFocus: false
     });
 
     const { data: shifts = [] } = useQuery({
-        queryKey: ['shifts', project?.id],
-        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id }),
-        enabled: !!dayRecord && !!project?.id
+        queryKey: ['employeeShifts', project?.id, attIdStr],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id, attendance_id: attIdStr }, null, 200),
+        enabled: !!dayRecord && !!project?.id && !!attIdStr,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project?.id],
-        queryFn: () => base44.entities.Exception.filter({ project_id: project.id }),
-        enabled: !!dayRecord && !!project?.id
+        queryKey: ['employeeExceptions', project?.id, attIdStr],
+        queryFn: async () => {
+            const [personal, global] = await Promise.all([
+                base44.entities.Exception.filter({ project_id: project.id, attendance_id: attIdStr }, null, 500),
+                base44.entities.Exception.filter({ project_id: project.id, attendance_id: 'ALL' }, null, 200)
+            ]);
+            return [...personal, ...global];
+        },
+        enabled: !!dayRecord && !!project?.id && !!attIdStr,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const parseTime = (timeStr) => {
@@ -612,10 +630,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             ).catch(e => console.error('Failed to log audit:', e));
         },
         onSuccess: () => {
-            // Updated invalidation to match query key structure in ReportDetailView
-            queryClient.invalidateQueries(['results', project.id]);
-            queryClient.invalidateQueries(['results', analysisResult.report_run_id]);
-            queryClient.invalidateQueries(['exceptions', project.id]);
+            // Invalidate results (summary table) + employee-level caches + project-level exceptions
+            queryClient.invalidateQueries({ queryKey: ['results'] });
+            queryClient.invalidateQueries({ queryKey: ['employeeExceptions', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['projectExceptions', project.id] });
             toast.success((isUser && !isSupervisor) ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');
             if (onSave) onSave();
             onClose();

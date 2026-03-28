@@ -44,7 +44,8 @@ export default function DailyBreakdownDialog({
         enabled: open && !!attendanceIdStr && parentPunches.length === 0,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false
+        refetchOnWindowFocus: false,
+        refetchOnMount: false
     });
 
     const { data: selfShifts = [], isFetched: selfShiftsFetched } = useQuery({
@@ -53,7 +54,8 @@ export default function DailyBreakdownDialog({
         enabled: open && !!attendanceIdStr && parentShifts.length === 0,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false
+        refetchOnWindowFocus: false,
+        refetchOnMount: false
     });
 
     const { data: selfExceptions = [], isFetched: selfExceptionsFetched } = useQuery({
@@ -69,7 +71,8 @@ export default function DailyBreakdownDialog({
         enabled: open && !!attendanceIdStr && parentExceptions.length === 0,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
-        refetchOnWindowFocus: false
+        refetchOnWindowFocus: false,
+        refetchOnMount: false
     });
 
     // Use parent data if available (already cached), otherwise use self-fetched data
