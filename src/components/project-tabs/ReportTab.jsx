@@ -54,32 +54,31 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
 
-    // Fetch data needed for analysis - use paginated fetch to avoid SDK truncation
-    const { data: punches = [] } = useQuery({
-        queryKey: ['punches', project.id],
-        queryFn: () => fetchAllRecords(base44.entities.Punch, { project_id: project.id }),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 15 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const { data: shifts = [] } = useQuery({
-        queryKey: ['shifts', project.id],
-        queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 15 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const { data: exceptions = [] } = useQuery({
-        queryKey: ['exceptions', project.id],
-        queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }),
-        staleTime: 10 * 60 * 1000,
-        gcTime: 15 * 60 * 1000,
+    // LIGHTWEIGHT COUNTS ONLY - no heavy paginated fetches
+    // Analysis runs on backend, so we only need counts for the UI status display
+    const { data: dataCounts = { punches: 0, shifts: 0, exceptions: 0, employees: 0 } } = useQuery({
+        queryKey: ['projectDataCounts', project.id],
+        queryFn: async () => {
+            // Fetch just first page with limit=1 to get existence, then use count-like approach
+            const [punchPage, shiftPage, exceptionPage, employeePage] = await Promise.all([
+                base44.entities.Punch.filter({ project_id: project.id }, null, 1),
+                base44.entities.ShiftTiming.filter({ project_id: project.id }, null, 1),
+                base44.entities.Exception.filter({ project_id: project.id }, null, 1),
+                base44.entities.Employee.filter({ company: project.company, active: true }, null, 1)
+            ]);
+            // For display we show ">0" or exact small counts. Full counts come from backend analysis.
+            return {
+                punches: punchPage.length > 0 ? '✓' : 0,
+                shifts: shiftPage.length > 0 ? '✓' : 0,
+                exceptions: exceptionPage.length > 0 ? '✓' : 0,
+                employees: employeePage.length > 0 ? '✓' : 0,
+                hasPunches: punchPage.length > 0,
+                hasShifts: shiftPage.length > 0,
+                hasRules: false // checked separately
+            };
+        },
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false
@@ -101,28 +100,23 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         refetchOnMount: false
     });
 
-    const { data: employees = [] } = useQuery({
-        queryKey: ['employees', project.company],
-        queryFn: () => base44.entities.Employee.filter({ company: project.company }),
-        staleTime: 15 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
-
-    const uniqueEmployeeIds = [...new Set(punches.map(p => p.attendance_id))];
-
-    // Analysis functions
+    // Analysis functions - simplified since analysis runs on backend
     const performDataQualityCheck = () => {
         const issues = [];
         
-        // 1. Basic configuration checks
-        if (punches.length > 0 && shifts.length === 0) {
+        if (!dataCounts.hasPunches) {
             issues.push({
                 type: 'error',
+                title: 'No punch data uploaded',
+                details: 'Upload punch data in the Punches tab before running analysis'
+            });
+        }
+
+        if (!dataCounts.hasShifts) {
+            issues.push({
+                type: 'warning',
                 title: 'No shift timings configured',
-                details: 'Add shift timings in the Shifts tab before running analysis'
+                details: 'Add shift timings in the Shifts tab for accurate analysis'
             });
         }
 
@@ -131,123 +125,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 type: 'error',
                 title: 'Attendance rules not configured',
                 details: 'Configure rules in Settings > Rules for this company'
-            });
-        }
-
-        // 2. Duplicate ID checks
-        const hrmsIds = {};
-        const attIds = {};
-        employees.forEach(emp => {
-            if (emp.hrms_id) {
-                if (!hrmsIds[emp.hrms_id]) hrmsIds[emp.hrms_id] = [];
-                hrmsIds[emp.hrms_id].push(emp.name);
-            }
-            if (emp.attendance_id) {
-                if (!attIds[emp.attendance_id]) attIds[emp.attendance_id] = [];
-                attIds[emp.attendance_id].push(emp.name);
-            }
-        });
-
-        const duplicateHrms = Object.entries(hrmsIds).filter(([, names]) => names.length > 1);
-        if (duplicateHrms.length > 0) {
-            issues.push({
-                type: 'error',
-                title: 'Duplicate HRMS IDs found',
-                details: duplicateHrms.map(([id, names]) => `ID ${id} used by: ${names.join(', ')}`).join(' | ')
-            });
-        }
-
-        const duplicateAtt = Object.entries(attIds).filter(([, names]) => names.length > 1);
-        if (duplicateAtt.length > 0) {
-            issues.push({
-                type: 'error',
-                title: 'Duplicate Attendance IDs found',
-                details: duplicateAtt.map(([id, names]) => `ID ${id} used by: ${names.join(', ')}`).join(' | ')
-            });
-        }
-
-        // 3. 'Missing Shift' Detection (Orphan Punches)
-        const missingShifts = [];
-        const dayNameToNumber = {
-            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-            'Thursday': 4, 'Friday': 5, 'Saturday': 6
-        };
-
-        const startDate = new Date(dateFrom);
-        const endDate = new Date(dateTo);
-        
-        // Group punches by employee and date
-        const punchesByEmpDate = {};
-        punches.forEach(p => {
-            if (p.punch_date >= dateFrom && p.punch_date <= dateTo) {
-                const key = `${p.attendance_id}_${p.punch_date}`;
-                punchesByEmpDate[key] = (punchesByEmpDate[key] || 0) + 1;
-            }
-        });
-
-        uniqueEmployeeIds.forEach(attId => {
-            const attIdStr = String(attId);
-            const employee = employees.find(e => String(e.attendance_id) === attIdStr);
-            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attIdStr);
-            
-            // Determine weekly off
-            let weeklyOffDay = null;
-            if (project.weekly_off_override && project.weekly_off_override !== 'None') {
-                weeklyOffDay = dayNameToNumber[project.weekly_off_override];
-            } else if (employee?.weekly_off) {
-                weeklyOffDay = dayNameToNumber[employee.weekly_off];
-            }
-
-            // Loop through selected range
-            for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
-                const currentDate = new Date(d);
-                const dateStr = currentDate.toISOString().split('T')[0];
-                const dayOfWeek = currentDate.getDay();
-                
-                const punchCount = punchesByEmpDate[`${attIdStr}_${dateStr}`] || 0;
-                
-                // PERFORMANCE SAFETY: Skip if totalPunches === 0
-                if (punchCount > 0) {
-                    const isWeeklyHoliday = (weeklyOffDay !== null && dayOfWeek === weeklyOffDay);
-                    
-                    if (!isWeeklyHoliday) {
-                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        const currentDayName = dayNames[dayOfWeek];
-                        
-                        const hasShift = employeeShifts.some(s => {
-                            if (s.date === dateStr) return true;
-                            if (!s.date && s.applicable_days) {
-                                try {
-                                    const days = JSON.parse(s.applicable_days);
-                                    if (Array.isArray(days) && days.some(day => day.toLowerCase() === currentDayName.toLowerCase())) return true;
-                                } catch(e) {}
-                            }
-                            if (!s.date && !s.applicable_days) {
-                                if (dayOfWeek === 5 && s.is_friday_shift) return true;
-                                if (dayOfWeek !== 5 && !s.is_friday_shift) return true;
-                                if (dayOfWeek === 5 && !employeeShifts.some(ss => ss.is_friday_shift)) return true;
-                            }
-                            return false;
-                        });
-                        
-                        if (!hasShift) {
-                            missingShifts.push({
-                                name: employee?.name || `ID: ${attIdStr}`,
-                                date: dateStr
-                            });
-                        }
-                    }
-                }
-            }
-        });
-
-        if (missingShifts.length > 0) {
-            const uniqueAffected = [...new Set(missingShifts.map(ms => ms.name))].length;
-            issues.push({
-                type: 'warning',
-                title: 'Missing Shift Settings Detected',
-                details: `Warning: ${uniqueAffected} employees have punches on days with no scheduled shifts. Calculations for these days may be inaccurate.`,
-                affectedList: missingShifts
             });
         }
         
@@ -278,12 +155,12 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             return;
         }
 
-        if (punches.length === 0) {
+        if (!dataCounts.hasPunches) {
             toast.error('No punch data available. Please upload punches first.');
             return;
         }
 
-        if (shifts.length === 0) {
+        if (!dataCounts.hasShifts) {
             const proceed = window.confirm('⚠️ No shift timings found. Analysis will proceed but may produce incorrect results. Continue anyway?');
             if (!proceed) return;
         }
@@ -315,7 +192,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 total: 100, 
                 status: 'Analyzing attendance records...',
                 step: 'Processing Attendance',
-                subStatus: `Checking ${uniqueEmployeeIds.length} employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
+                subStatus: `Processing employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
             });
 
             // Single call to backend - processes all employees at once
@@ -792,29 +669,29 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     <CardContent className="space-y-6">
                         <div className="space-y-3">
                             <div className="flex items-center gap-3">
-                                {punches.length > 0 ? (
+                                {dataCounts.hasPunches ? (
                                     <CheckCircle className="w-5 h-5 text-green-600" />
                                 ) : (
                                     <AlertCircle className="w-5 h-5 text-amber-600" />
                                 )}
                                 <span className="text-slate-700">
-                                    Punch Data: <strong>{punches.length}</strong> records from <strong>{uniqueEmployeeIds.length}</strong> employees
+                                    Punch Data: {dataCounts.hasPunches ? <strong>Available</strong> : <strong className="text-amber-600">Not uploaded</strong>}
                                 </span>
                             </div>
                             <div className="flex items-center gap-3">
-                                {shifts.length > 0 ? (
+                                {dataCounts.hasShifts ? (
                                     <CheckCircle className="w-5 h-5 text-green-600" />
                                 ) : (
                                     <AlertCircle className="w-5 h-5 text-amber-600" />
                                 )}
                                 <span className="text-slate-700">
-                                    Shift Timings: <strong>{shifts.length}</strong> records
+                                    Shift Timings: {dataCounts.hasShifts ? <strong>Configured</strong> : <strong className="text-amber-600">Not configured</strong>}
                                 </span>
                             </div>
                             <div className="flex items-center gap-3">
                                 <CheckCircle className="w-5 h-5 text-blue-600" />
                                 <span className="text-slate-700">
-                                    Exceptions: <strong>{exceptions.length}</strong> records
+                                    Exceptions: {dataCounts.exceptions === '✓' ? <strong>Available</strong> : <strong>None</strong>}
                                 </span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -911,7 +788,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             </Button>
                             <Button
                                 onClick={handleAnalyze}
-                                disabled={isAnalyzing || punches.length === 0}
+                                disabled={isAnalyzing || !dataCounts.hasPunches}
                                 className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 shadow-sm"
                             >
                                 {isAnalyzing ? (
