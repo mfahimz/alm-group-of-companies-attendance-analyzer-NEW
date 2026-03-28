@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 Deno.serve(async (req) => {
     try {
@@ -23,18 +23,52 @@ Deno.serve(async (req) => {
         // Logic Guard: Operations are strictly scoped to the Project's associated Company.
         // ================================================================
         
-        // Initial wave: Fetch the project configuration and existing data linked to it
-        const [project, schedule, allExceptions, existingShifts] = await Promise.all([
-            base44.asServiceRole.entities.Project.filter({ id: projectId }).then(res => res[0]),
-            base44.asServiceRole.entities.RamadanSchedule.filter({ id: ramadanScheduleId }).then(res => res[0]),
-            base44.asServiceRole.entities.Exception.filter({ project_id: projectId }),
-            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: projectId })
+        // Paginated fetch helper to avoid SDK truncation on large datasets
+        const fetchAllPages = async (entity, query, pageSize = 200) => {
+            const all = [];
+            let skip = 0;
+            while (true) {
+                let page;
+                try {
+                    page = await entity.filter(query, null, pageSize, skip);
+                } catch (e) {
+                    if (pageSize > 50) { pageSize = Math.floor(pageSize / 2); continue; }
+                    break;
+                }
+                if (!Array.isArray(page)) {
+                    if (pageSize > 50) { pageSize = Math.floor(pageSize / 2); continue; }
+                    break;
+                }
+                if (page.length === 0) break;
+                all.push(...page);
+                skip += page.length;
+                if (page.length < pageSize) break;
+                await new Promise(r => setTimeout(r, 150));
+            }
+            return all;
+        };
+
+        // Initial wave: Fetch project and schedule first (small), then bulk data
+        const [projectArr, scheduleArr] = await Promise.all([
+            base44.asServiceRole.entities.Project.filter({ id: projectId }),
+            base44.asServiceRole.entities.RamadanSchedule.filter({ id: ramadanScheduleId })
         ]);
+        const project = Array.isArray(projectArr) ? projectArr[0] : null;
+        const schedule = Array.isArray(scheduleArr) ? scheduleArr[0] : null;
 
         // Logic Guard: Ensure the project has a valid company association to maintain scoping
         if (!project || !project.company) {
             return Response.json({ error: 'Project or associated company not found' }, { status: 404 });
         }
+
+        if (!schedule) {
+            return Response.json({ error: 'Ramadan schedule not found' }, { status: 404 });
+        }
+
+        // Fetch large datasets sequentially with pagination to avoid truncation & rate limits
+        const allExceptions = await fetchAllPages(base44.asServiceRole.entities.Exception, { project_id: projectId });
+        await new Promise(r => setTimeout(r, 300));
+        const existingShifts = await fetchAllPages(base44.asServiceRole.entities.ShiftTiming, { project_id: projectId });
 
         // Secondary wave: Fetch context-dependent entities (Companies and Employees)
         // Strictly scoped to the project's company to prevent cross-tenant leaked data
