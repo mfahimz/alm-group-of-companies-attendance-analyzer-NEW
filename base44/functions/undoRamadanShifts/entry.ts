@@ -1,8 +1,8 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
- * Undo/Delete Ramadan shifts with optimized batch processing
- * Handles up to 1000+ shifts with progress reporting
+ * Undo/Delete Ramadan shifts with throttled batch processing
+ * Handles up to 1000+ shifts safely without rate limiting
  */
 Deno.serve(async (req) => {
     try {
@@ -20,7 +20,8 @@ Deno.serve(async (req) => {
         }
 
         // Fetch project
-        const [project] = await base44.asServiceRole.entities.Project.filter({ id: projectId });
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: projectId });
+        const project = projects[0];
         if (!project) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
@@ -33,82 +34,70 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Build date filter if provided
-        let dateFilter = {};
-        if (ramadanFrom && ramadanTo) {
-            dateFilter = {
-                date: { $gte: ramadanFrom, $lte: ramadanTo }
-            };
+        // Fetch all shifts for this project in pages
+        let allShifts = [];
+        let skip = 0;
+        const PAGE_SIZE = 50;
+        while (true) {
+            const page = await base44.asServiceRole.entities.ShiftTiming.filter(
+                { project_id: projectId }, null, PAGE_SIZE, skip
+            );
+            if (!Array.isArray(page) || page.length === 0) break;
+            allShifts.push(...page);
+            skip += page.length;
+            if (page.length < PAGE_SIZE) break;
+            // Small delay between pages
+            await new Promise(r => setTimeout(r, 200));
         }
 
-        // Fetch all Ramadan shifts for this project
-        const allShifts = await base44.asServiceRole.entities.ShiftTiming.filter({ 
-            project_id: projectId,
-            ...dateFilter
-        }, null, 10000); // Fetch up to 10000 to ensure we get all
-
-        // Filter only Ramadan shifts (applicable_days contains 'Ramadan')
-        const ramadanShifts = allShifts.filter(s => 
+        // Filter only Ramadan shifts
+        let ramadanShifts = allShifts.filter(s => 
             s.applicable_days && s.applicable_days.includes('Ramadan')
         );
+
+        // Further filter by date range if provided
+        if (ramadanFrom && ramadanTo) {
+            ramadanShifts = ramadanShifts.filter(s => {
+                if (!s.date) return true; // Non-date-specific Ramadan shifts always included
+                return s.date >= ramadanFrom && s.date <= ramadanTo;
+            });
+        }
 
         if (ramadanShifts.length === 0) {
             return Response.json({ 
                 success: true, 
                 deletedCount: 0, 
+                totalFound: 0,
                 message: 'No Ramadan shifts found to delete' 
             });
         }
 
         console.log(`[undoRamadanShifts] Found ${ramadanShifts.length} Ramadan shifts to delete`);
 
-        // OPTIMIZED DELETION: Process in parallel batches of 100
-        const BATCH_SIZE = 100;
-        const PARALLEL_BATCHES = 5; // Process 5 batches simultaneously = 500 shifts at once
+        // Delete in small batches with delays to avoid rate limiting
+        const BATCH_SIZE = 5;
         let deletedCount = 0;
         const shiftIds = ramadanShifts.map(s => s.id);
-        
-        // Split into batches
-        const batches = [];
+
         for (let i = 0; i < shiftIds.length; i += BATCH_SIZE) {
-            batches.push(shiftIds.slice(i, i + BATCH_SIZE));
-        }
-
-        console.log(`[undoRamadanShifts] Processing ${batches.length} batches (${BATCH_SIZE} shifts each)`);
-
-        // Process batches in parallel groups
-        for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
-            const parallelBatches = batches.slice(i, i + PARALLEL_BATCHES);
+            const batch = shiftIds.slice(i, i + BATCH_SIZE);
             
-            // Delete all parallel batches simultaneously
-            const deletePromises = parallelBatches.map(async (batchIds) => {
-                try {
-                    // Use deleteMany for bulk deletion
-                    await base44.asServiceRole.entities.ShiftTiming.deleteMany({
-                        id: { $in: batchIds }
-                    });
-                    return batchIds.length;
-                } catch (err) {
-                    console.error('[undoRamadanShifts] Batch delete failed:', err.message);
-                    // Fallback: delete one by one
-                    let count = 0;
-                    for (const id of batchIds) {
-                        try {
-                            await base44.asServiceRole.entities.ShiftTiming.delete(id);
-                            count++;
-                        } catch (e) {
-                            console.error(`[undoRamadanShifts] Failed to delete shift ${id}:`, e.message);
-                        }
-                    }
-                    return count;
-                }
-            });
+            // Delete batch in parallel (small batch = safe)
+            const results = await Promise.allSettled(
+                batch.map(id => base44.asServiceRole.entities.ShiftTiming.delete(id))
+            );
 
-            const results = await Promise.all(deletePromises);
-            const batchDeleted = results.reduce((sum, count) => sum + count, 0);
-            deletedCount += batchDeleted;
+            deletedCount += results.filter(r => r.status === 'fulfilled').length;
 
-            console.log(`[undoRamadanShifts] Deleted ${deletedCount}/${shiftIds.length} shifts`);
+            // Log progress every 50
+            if (deletedCount % 50 === 0 || i + BATCH_SIZE >= shiftIds.length) {
+                console.log(`[undoRamadanShifts] Deleted ${deletedCount}/${shiftIds.length} shifts`);
+            }
+
+            // Delay between batches to respect rate limits
+            if (i + BATCH_SIZE < shiftIds.length) {
+                await new Promise(r => setTimeout(r, 500));
+            }
         }
 
         return Response.json({
