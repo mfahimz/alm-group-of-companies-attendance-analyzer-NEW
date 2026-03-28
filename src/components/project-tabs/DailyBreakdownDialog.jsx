@@ -791,7 +791,7 @@ export default function DailyBreakdownDialog({
                                                                     {match.matchedTo && (
                                                                         <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : isNextDayPunch ? 'text-indigo-500' : 'text-slate-500'}`}>
                                                                             →{match.matchedTo.replace(/_/g, ' ')}
-                                                                            {isNextDayPunch && ' (next day)'}
+                                                                            {isNextDayPunch && ''}
                                                                             {match.isFarExtendedMatch && ' 🔴'}
                                                                             {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
                                                                         </span>

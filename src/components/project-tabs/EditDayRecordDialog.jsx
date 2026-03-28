@@ -821,8 +821,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                                                 <span className="font-medium text-slate-400 w-5">{idx + 1}.</span>
                                                 <span className="tabular-nums">{displayTime}</span>
                                                 {isNextDay && (
-                                                    <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider ml-auto flex items-center gap-1">
-                                                        Next Day 🌙
+                                                    <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-[4px] text-[10px] ml-auto flex items-center justify-center min-w-[1.5rem]">
+                                                        🌙
                                                     </span>
                                                 )}
                                             </div>

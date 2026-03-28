@@ -2247,7 +2247,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                                         <span key={idx} className="flex items-center gap-1 bg-white border px-1.5 py-0.5 rounded text-[10px] text-slate-600">
                                                                                             {extractTime(p.raw)}
                                                                                             {p.isPrev && (
-                                                                                                <span className="bg-blue-100 text-blue-600 px-1 py-0 rounded-[2px] leading-none transform scale-90">prev day</span>
+                                                                                                <span className="ml-1 text-[10px]" title="Previous Day">🌙</span>
                                                                                             )}
                                                                                         </span>
                                                                                     ))}
@@ -2450,7 +2450,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                                                                                 </span>
                                                                                             )}
                                                                                             {p.isPrev && (
-                                                                                                <span className="bg-blue-100 text-blue-600 px-1 py-0 rounded-[2px] leading-none transform scale-95">prev day</span>
+                                                                                                <span className="ml-1 text-[10px]" title="Previous Day">🌙</span>
                                                                                             )}
                                                                                         </span>
                                                                                     ))}
