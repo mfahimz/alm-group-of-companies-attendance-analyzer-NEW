@@ -725,10 +725,15 @@ Deno.serve(async (req: Request) => {
                 const currentDayName = dayNames[dayOfWeek];
 
                 let weeklyOffDay = null;
+                // Determine weekly off day from project override or employee setting
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (employee?.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                }
 
                 // Check if this is employee's weekly off day - BEFORE any other processing
                 if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                    // Track weekly off day in dateStatusMap for LOP-adjacent check
                     dateStatusMap[dateStr] = 'WEEKLY_OFF';
                     continue;
                 }
@@ -1241,7 +1246,7 @@ Deno.serve(async (req: Request) => {
                     const dStr = allDatesInRange[i];
                     const status = (dateStatusMap as Record<string, string>)[dStr];
 
-                    if (status === 'WEEKLY_OFF' || status === 'PUBLIC_HOLIDAY') {
+                    if (status === 'WEEKLY_OFF') {
                         currentOffBlock.push(dStr);
                     } else {
                         if (currentOffBlock.length > 0) {
