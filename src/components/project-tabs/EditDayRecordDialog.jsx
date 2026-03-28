@@ -751,17 +751,30 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         ) : (
                             <div className="space-y-1">
                                 {dayPunches.map((punch, idx) => {
-                                    // FIX 3: Label next day midnight buffer punches
-                                    // Use dateStr comparison to identify carry-forward punches
+                                    // Parse and strictly format the punch timestamp: DD/MM/YYYY hh:mm AM/PM
+                                    const pDate = new Date(punch.timestamp_raw);
+                                    let displayTime = punch.timestamp_raw;
+                                    
+                                    if (!isNaN(pDate.getTime())) {
+                                        const dPart = pDate.toLocaleDateString('en-GB'); // DD/MM/YYYY
+                                        const tPart = pDate.toLocaleTimeString('en-US', { 
+                                            hour: '2-digit', 
+                                            minute: '2-digit', 
+                                            hour12: true 
+                                        }); // hh:mm AM/PM
+                                        displayTime = `${dPart} ${tPart}`;
+                                    }
+
+                                    // Identify if this punch belongs to the next calendar day (midnight crossover)
                                     const isNextDay = punch.punch_date && dayRecord.dateStr && punch.punch_date !== dayRecord.dateStr;
 
                                     return (
-                                        <div key={punch.id} className="text-sm text-slate-700 flex items-center gap-2">
-                                            {/* FIX 2: Display formatted timestamp instead of raw string */}
-                                            <span>{idx + 1}. {formatPunchDisplay(punch.timestamp_raw)}</span>
+                                        <div key={punch.id || idx} className="text-sm text-slate-700 flex items-center gap-2 py-0.5">
+                                            <span className="font-medium text-slate-400 w-5">{idx + 1}.</span>
+                                            <span className="tabular-nums">{displayTime}</span>
                                             {isNextDay && (
-                                                <span className="bg-slate-100 text-slate-500 px-1 py-0 rounded-[2px] text-[9px] font-bold leading-none uppercase">
-                                                    next day
+                                                <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold uppercase tracking-wider ml-auto flex items-center gap-1">
+                                                    Next Day 🌙
                                                 </span>
                                             )}
                                         </div>
