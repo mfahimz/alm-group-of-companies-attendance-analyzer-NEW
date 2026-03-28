@@ -13,7 +13,9 @@ import {
     BarChart3,
     Palette,
     Brain,
-    BookOpen
+    BookOpen,
+    Code,
+    ScanLine
 } from 'lucide-react';
 
 /**

@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../../utils';
-import AnomalyDetectionCard from './AnomalyDetectionCard';
+
 import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 import CloseProjectDialog from './CloseProjectDialog';
 import ProjectEmployeeOverrideDialog from '../projects/ProjectEmployeeOverrideDialog';
@@ -473,8 +473,7 @@ export default function OverviewTab({ project }) {
                 </CardContent>
             </Card>
 
-            {/* AI Anomaly Detection */}
-            <AnomalyDetectionCard project={project} />
+
 
             {/* Unmatched Employees Warning */}
             {unmatchedCount > 0 && isAdmin && (

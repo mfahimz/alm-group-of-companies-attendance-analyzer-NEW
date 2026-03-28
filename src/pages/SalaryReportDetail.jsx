@@ -83,7 +83,11 @@ export default function SalaryReportDetail() {
         queryKey: ['liveSalarySnapshots', report?.report_run_id],
         queryFn: () => base44.entities.SalarySnapshot.filter({ report_run_id: report.report_run_id }),
         enabled: !!report?.report_run_id,
-        staleTime: 0
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
     // Load verified employees from report snapshot_data
@@ -450,11 +454,12 @@ export default function SalaryReportDetail() {
 
             // Also update the live SalarySnapshot entities for bidirectional sync
             // This ensures OvertimeTab sees the same values
+            // Batch updates with delay to avoid rate limiting
+            const snapshotUpdates = [];
             for (const row of updatedData) {
                 const edits = editableData[row.hrms_id];
                 if (!edits) continue;
                 
-                // Find the live snapshot for this employee
                 const liveSnapshot = liveSalarySnapshots.find(s => 
                     String(s.attendance_id) === String(row.attendance_id)
                 );
@@ -469,16 +474,30 @@ export default function SalaryReportDetail() {
                     if ('advanceSalaryDeduction' in edits) updatePayload.advanceSalaryDeduction = edits.advanceSalaryDeduction;
                     
                     if (Object.keys(updatePayload).length > 0) {
-                        await base44.entities.SalarySnapshot.update(liveSnapshot.id, updatePayload);
+                        snapshotUpdates.push({ id: liveSnapshot.id, payload: updatePayload });
                     }
+                }
+            }
+
+            // Process snapshot updates in batches of 5 with delay
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < snapshotUpdates.length; i += BATCH_SIZE) {
+                const batch = snapshotUpdates.slice(i, i + BATCH_SIZE);
+                await Promise.all(batch.map(u => base44.entities.SalarySnapshot.update(u.id, u.payload)));
+                if (i + BATCH_SIZE < snapshotUpdates.length) {
+                    await new Promise(r => setTimeout(r, 1000));
                 }
             }
 
             toast.success('Report saved successfully');
             setEditableData({});
+            // Stagger query invalidations to prevent burst of API calls
             queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            await new Promise(r => setTimeout(r, 500));
             queryClient.invalidateQueries({ queryKey: ['salaryReports', report.project_id] });
+            await new Promise(r => setTimeout(r, 500));
             queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+            await new Promise(r => setTimeout(r, 500));
             queryClient.invalidateQueries({ queryKey: ['salarySnapshots', report?.project_id] });
         } catch (error) {
             toast.error('Failed to save: ' + error.message);
@@ -548,15 +567,16 @@ export default function SalaryReportDetail() {
                     errors.push(`${attendanceId}: ${error.response?.data?.error || error.message}`);
                 }
                 
-                // Add 500ms delay between calls to avoid rate limiting
+                // Add 1.5s delay between calls to avoid rate limiting
                 if (i < attendanceIds.length - 1) {
-                    await delay(500);
+                    await delay(1500);
                 }
             }
             
-            // Refresh data
-            queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+            // Refresh data with staggered invalidation
             queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            await delay(1000);
+            queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
             
             if (errorCount === 0) {
                 toast.success(`All ${successCount} employees recalculated successfully`);

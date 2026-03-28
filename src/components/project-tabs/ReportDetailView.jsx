@@ -1092,7 +1092,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             toast.error('Failed to update verification');
         },
         retry: 3,
-        retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 8000)
+        retryDelay: (attemptIndex) => Math.min(2000 * Math.pow(2, attemptIndex), 15000)
     });
 
     // Debounce verification updates to prevent rate limiting
@@ -1116,13 +1116,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             clearTimeout(debounceTimeoutRef.current);
         }
 
-        // Debounce the API call by 1.5 seconds to batch multiple clicks
+        // Debounce the API call by 3s to batch clicks & avoid rate limits
         debounceTimeoutRef.current = setTimeout(() => {
             if (pendingVerifiedRef.current) {
                 updateVerificationMutation.mutate(pendingVerifiedRef.current);
                 pendingVerifiedRef.current = null;
             }
-        }, 1500);
+        }, 3000);
     };
 
     // Cleanup timeout on unmount and save pending changes
@@ -1752,13 +1752,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             await base44.entities.AnalysisResult.update(id, { grace_minutes });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results', reportRun.id]);
+            queryClient.invalidateQueries(['results', reportRun.id, project.id]);
             setEditingGraceMinutes(null);
             toast.success('Grace minutes updated');
         },
-        onError: () => {
-            toast.error('Failed to update grace minutes');
-        }
+        onError: () => { toast.error('Failed to update grace minutes'); },
+        retry: 2, retryDelay: (i) => Math.min(2000 * Math.pow(2, i), 10000)
     });
 
     const updateManualOverrideMutation = useMutation({
@@ -1766,12 +1765,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             await base44.entities.AnalysisResult.update(id, { [field]: value });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['results', reportRun.id]);
+            queryClient.invalidateQueries(['results', reportRun.id, project.id]);
             toast.success('Value updated - will be used in salary calculation');
         },
-        onError: () => {
-            toast.error('Failed to update value');
-        }
+        onError: () => { toast.error('Failed to update value'); },
+        retry: 2, retryDelay: (i) => Math.min(2000 * Math.pow(2, i), 10000)
     });
 
     /**

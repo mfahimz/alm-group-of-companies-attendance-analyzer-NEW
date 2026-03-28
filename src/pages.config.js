@@ -22,6 +22,7 @@
  *   export const pagesConfig = {
  *       mainPage: "HomePage",
  *       Pages: PAGES,
+ *       Layout: __Layout,
  *   };
  * 
  * Example with Layout (wraps all pages):
@@ -40,7 +41,7 @@
  *       Pages: PAGES,
  *       Layout: __Layout,
  *   };
- *
+ * 
  * To change the main page from HomePage to Dashboard, use find_replace:
  *   Old: mainPage: "HomePage",
  *   New: mainPage: "Dashboard",
