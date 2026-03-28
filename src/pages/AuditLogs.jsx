@@ -182,7 +182,7 @@ export default function AuditLogs() {
                                                             View changes
                                                         </summary>
                                                         <pre className="text-xs mt-2 p-2 bg-slate-50 rounded border max-w-md overflow-auto">
-                                                            {JSON.stringify(JSON.parse(log.changes), null, 2)}
+                                                            {(() => { try { return JSON.stringify(JSON.parse(log.changes), null, 2); } catch { return log.changes; } })()}
                                                         </pre>
                                                     </details>
                                                 )}
@@ -192,7 +192,7 @@ export default function AuditLogs() {
                                                             View context
                                                         </summary>
                                                         <pre className="text-xs mt-2 p-2 bg-slate-50 rounded border max-w-md overflow-auto">
-                                                            {JSON.stringify(JSON.parse(log.context), null, 2)}
+                                                            {(() => { try { return JSON.stringify(JSON.parse(log.context), null, 2); } catch { return log.context; } })()}
                                                         </pre>
                                                     </details>
                                                 )}
