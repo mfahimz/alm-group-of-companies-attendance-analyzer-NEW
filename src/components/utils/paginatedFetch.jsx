@@ -20,28 +20,7 @@ const BASE_DELAY_MS = 3000;
 // Additional calls wait in a queue until a slot opens.
 // This prevents React Query from firing 20+ API calls at once.
 // ========================================================
-const MAX_CONCURRENT = 2;
-let activeCount = 0;
-const waitQueue = [];
-
-function acquireSlot() {
-    if (activeCount < MAX_CONCURRENT) {
-        activeCount++;
-        return Promise.resolve();
-    }
-    return new Promise(resolve => {
-        waitQueue.push(resolve);
-    });
-}
-
-function releaseSlot() {
-    activeCount--;
-    if (waitQueue.length > 0) {
-        activeCount++;
-        const next = waitQueue.shift();
-        next();
-    }
-}
+// No concurrency limiter needed — React Query `enabled` chains handle sequencing
 
 // ========================================================
 // RETRY WITH EXPONENTIAL BACKOFF
@@ -69,10 +48,6 @@ async function fetchWithRetry(fn, retries = MAX_RETRIES) {
 // MAIN EXPORT
 // ========================================================
 export async function fetchAllRecords(entity, query, sortField = null, pageSize = DEFAULT_PAGE_SIZE) {
-    // Wait for a concurrency slot before starting
-    await acquireSlot();
-
-    try {
         const allItems = [];
         let skip = 0;
         let currentPageSize = pageSize;
@@ -119,8 +94,4 @@ export async function fetchAllRecords(entity, query, sortField = null, pageSize 
         }
 
         return allItems;
-    } finally {
-        // Always release the slot, even on error
-        releaseSlot();
-    }
 }
