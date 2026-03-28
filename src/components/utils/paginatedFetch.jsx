@@ -10,9 +10,9 @@
  * - Inter-page delays to stay under rate limits
  */
 
-const DEFAULT_PAGE_SIZE = 50;
-const MAX_RETRIES = 6;
-const BASE_DELAY_MS = 4000;
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_RETRIES = 4;
+const BASE_DELAY_MS = 2000;
 
 // ========================================================
 // GLOBAL CONCURRENCY LIMITER
@@ -90,7 +90,7 @@ export async function fetchAllRecords(entity, query, sortField = null, pageSize 
             if (page.length < currentPageSize) break;
 
             // Delay between pages to avoid hitting rate limits
-            await new Promise(r => setTimeout(r, 600));
+            await new Promise(r => setTimeout(r, 150));
         }
 
         return allItems;

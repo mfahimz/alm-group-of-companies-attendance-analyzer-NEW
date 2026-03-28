@@ -41,7 +41,11 @@ export default function ReportDetailPage() {
             const runs = await base44.entities.ReportRun.filter({ id: reportRunId });
             return runs[0];
         },
-        enabled: !!reportRunId
+        enabled: !!reportRunId,
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false
     });
 
     const { data: project, isLoading: projectLoading, error: projectError } = useQuery({
@@ -50,7 +54,11 @@ export default function ReportDetailPage() {
             const projects = await base44.entities.Project.filter({ id: projectId });
             return projects[0];
         },
-        enabled: !!projectId
+        enabled: !!projectId,
+        staleTime: 10 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false
     });
 
     if (reportLoading || projectLoading) {

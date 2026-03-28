@@ -75,12 +75,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const { data: shifts = [], isFetched: shiftsDone } = useQuery({ queryKey: ['shifts', project.id], queryFn: () => fetchAllRecords(base44.entities.ShiftTiming, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested && punchesDone });
     const { data: exceptions = [] } = useQuery({ queryKey: ['exceptions', project.id], queryFn: () => fetchAllRecords(base44.entities.Exception, { project_id: project.id }), staleTime: 10*60*1000, gcTime: 15*60*1000, refetchOnWindowFocus: false, refetchOnReconnect: false, refetchOnMount: false, enabled: rawDataRequested && shiftsDone });
 
-    const { data: allResults = [] } = useQuery({
+    const { data: allResults = [], isLoading: resultsLoading } = useQuery({
         queryKey: ['results', reportRun.id, project.id],
         queryFn: async () => {
-            const results = await fetchAllRecords(base44.entities.AnalysisResult, { report_run_id: reportRun.id });
+            // Fast path: fetch by report_run_id with large limit (avoids slow pagination for most reports)
+            let results = await base44.entities.AnalysisResult.filter({ report_run_id: reportRun.id }, null, 500);
+            if (results.length === 500) {
+                // Rare: more than 500 employees, fall back to paginated fetch
+                results = await fetchAllRecords(base44.entities.AnalysisResult, { report_run_id: reportRun.id });
+            }
             if (results.length === 0 && project?.id && (project.status === 'closed' || reportRun.is_final)) {
-                const byProject = await fetchAllRecords(base44.entities.AnalysisResult, { project_id: project.id });
+                let byProject = await base44.entities.AnalysisResult.filter({ project_id: project.id }, null, 500);
+                if (byProject.length === 500) {
+                    byProject = await fetchAllRecords(base44.entities.AnalysisResult, { project_id: project.id });
+                }
                 const matchingRun = byProject.filter(r => r.report_run_id === reportRun.id);
                 if (matchingRun.length > 0) return matchingRun;
                 if (byProject.length > 0) return byProject;
@@ -96,15 +104,25 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const { data: allReportRuns = [] } = useQuery({
         queryKey: ['reportRuns', project.id],
-        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }),
+        queryFn: () => base44.entities.ReportRun.filter({ project_id: project.id }, null, 100),
         enabled: !!project?.id,
         staleTime: 30 * 60 * 1000,
-        gcTime: 60 * 60 * 1000
+        gcTime: 60 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false
     });
 
-    const { data: allEmployees = [] } = useQuery({
+    const { data: allEmployees = [], isLoading: employeesLoading } = useQuery({
         queryKey: ['employees', project.company],
-        queryFn: () => fetchAllRecords(base44.entities.Employee, { company: project.company }),
+        queryFn: async () => {
+            // Fast path: single call with large limit for most companies
+            const results = await base44.entities.Employee.filter({ company: project.company }, null, 500);
+            if (results.length === 500) {
+                return fetchAllRecords(base44.entities.Employee, { company: project.company });
+            }
+            return results;
+        },
         staleTime: 30 * 60 * 1000,
         gcTime: 60 * 60 * 1000,
         refetchOnWindowFocus: false,
@@ -1556,7 +1574,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             
             <Card className="border-0 shadow-sm">
                 <CardHeader>
-                    <CardTitle>Attendance Report</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>Attendance Report</CardTitle>
+                        {(resultsLoading || employeesLoading) && (
+                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Loading data...
+                            </div>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent className="p-0 sm:p-6">
                     <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
