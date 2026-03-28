@@ -1,5 +1,6 @@
 import { createClient } from '@base44/sdk';
 import { appParams } from '@/lib/app-params';
+import { installRateLimitGuard } from '@/lib/rateLimitGuard';
 
 const { appId, serverUrl, token, functionsVersion } = appParams;
 
@@ -11,3 +12,6 @@ export const base44 = createClient({
   functionsVersion,
   requiresAuth: false
 });
+
+// Install global rate-limit resilience on ALL SDK calls
+installRateLimitGuard(base44);

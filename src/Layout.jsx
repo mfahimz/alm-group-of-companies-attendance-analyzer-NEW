@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useCallback } from 'react';
 import { Toaster } from 'sonner';
 import NotificationCenter from './components/ui/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
+import { installToastGuard } from '@/lib/toastGuard';
+
+// Install toast guard once at module level — suppresses rate-limit error toasts globally
+installToastGuard();
 import { base44 } from '@/api/base44Client';
 import { formatInUAE } from '@/components/ui/timezone';
 import { useNavigate } from 'react-router-dom';
