@@ -71,14 +71,14 @@ Deno.serve(async (req: Request) => {
         // We must fetch in pages of 200 records to avoid truncation.
         // Includes retry with backoff for rate limit (429) errors.
         const PAGE_SIZE = 200;
-        const fetchWithRetry = async (fn, maxRetries = 4) => {
+        const fetchWithRetry = async (fn, maxRetries = 6) => {
             for (let attempt = 0; attempt <= maxRetries; attempt++) {
                 try {
                     return await fn();
                 } catch (e) {
                     const status = e?.status || e?.response?.status || 0;
                     if (status === 429 && attempt < maxRetries) {
-                        const delay = Math.min(1000 * Math.pow(2, attempt), 8000);
+                        const delay = Math.min(2000 * Math.pow(2, attempt), 30000);
                         console.warn(`[runAnalysis] Rate limited, retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
                         await new Promise(r => setTimeout(r, delay));
                         continue;
@@ -99,16 +99,14 @@ Deno.serve(async (req: Request) => {
                 if (Array.isArray(raw)) {
                     page = raw;
                 } else if (typeof raw === 'string') {
-                    // SDK returned a string — try parsing, if truncated reduce page size
                     try {
                         const parsed = JSON.parse(raw);
                         if (Array.isArray(parsed)) page = parsed;
                     } catch {
-                        // JSON truncated — reduce page size and retry THIS page
                         if (currentPageSize > 25) {
                             currentPageSize = Math.max(25, Math.floor(currentPageSize / 2));
                             console.warn(`[runAnalysis] Paginated fetch: JSON truncated at skip=${skip}, reducing page to ${currentPageSize} and retrying`);
-                            continue; // retry same skip with smaller page
+                            continue;
                         }
                         console.error(`[runAnalysis] Paginated fetch: JSON still truncated at page size ${currentPageSize}, skip=${skip}. Skipping batch.`);
                         skip += currentPageSize;
@@ -117,29 +115,34 @@ Deno.serve(async (req: Request) => {
                 }
                 if (page.length === 0) {
                     consecutiveEmpty++;
-                    // Try one more time in case it was a transient issue
                     skip += currentPageSize;
                     continue;
                 }
                 consecutiveEmpty = 0;
                 allItems.push(...page);
                 skip += page.length;
-                // If we got fewer than requested, we've reached the end
                 if (page.length < currentPageSize) break;
+                // Small delay between pages to avoid rate limits
+                await new Promise(r => setTimeout(r, 200));
             }
             return allItems;
         };
 
         // Fetch data SEQUENTIALLY to avoid rate limiting.
-        // Large entities (punches, shifts) are fetched one at a time.
         console.log('[runAnalysis] Fetching punches...');
         const punches = await fetchAllPages(base44.asServiceRole.entities.Punch, { project_id });
+        await new Promise(r => setTimeout(r, 500));
         console.log('[runAnalysis] Fetching shifts...');
         const shifts = await fetchAllPages(base44.asServiceRole.entities.ShiftTiming, { project_id });
-        console.log('[runAnalysis] Fetching exceptions, employees, rules, etc...');
-        const [exceptions, allEmployees, rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
-            fetchAllPages(base44.asServiceRole.entities.Exception, { project_id }),
-            fetchAllPages(base44.asServiceRole.entities.Employee, { company: project.company, active: true }),
+        await new Promise(r => setTimeout(r, 500));
+        console.log('[runAnalysis] Fetching exceptions...');
+        const exceptions = await fetchAllPages(base44.asServiceRole.entities.Exception, { project_id });
+        await new Promise(r => setTimeout(r, 500));
+        console.log('[runAnalysis] Fetching employees...');
+        const allEmployees = await fetchAllPages(base44.asServiceRole.entities.Employee, { company: project.company, active: true });
+        await new Promise(r => setTimeout(r, 500));
+        console.log('[runAnalysis] Fetching rules, project employees, ramadan schedules...');
+        const [rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
             fetchWithRetry(() => base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })),
             fetchAllPages(base44.asServiceRole.entities.ProjectEmployee, { project_id }),
             fetchWithRetry(() => base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100))
@@ -1582,23 +1585,25 @@ Deno.serve(async (req: Request) => {
         }
 
         // Save results in larger batches with minimal delays
-        const SAVE_BATCH_SIZE = 100; // CRITICAL FIX: Save 100 results at once to avoid timeout
-        const SAVE_BATCH_DELAY = 0; // No delays for maximum speed
+        const SAVE_BATCH_SIZE = 25; // Smaller batches to avoid rate limits
+        const SAVE_BATCH_DELAY = 500; // Delay between batches to avoid rate limits
 
         for (let i = 0; i < allResults.length; i += SAVE_BATCH_SIZE) {
             const batch = allResults.slice(i, i + SAVE_BATCH_SIZE);
 
-            // Retry logic for save operations
-            let retries = 3;
+            // Retry logic for save operations with longer backoff
+            let retries = 5;
             while (retries > 0) {
                 try {
                     await base44.asServiceRole.entities.AnalysisResult.bulkCreate(batch);
-                    break; // Success, exit retry loop
+                    break;
                 } catch (saveError) {
                     retries--;
-                    console.warn(`[runAnalysis] Save batch failed, retries left: ${retries}`, saveError.message);
+                    const isRateLimit = saveError?.status === 429 || saveError?.message?.includes('Rate limit');
+                    const delay = isRateLimit ? Math.min(3000 * Math.pow(2, 5 - retries), 30000) : 2000;
+                    console.warn(`[runAnalysis] Save batch failed (${isRateLimit ? 'rate limit' : 'error'}), retries left: ${retries}, waiting ${delay}ms`);
                     if (retries === 0) throw saveError;
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
 
