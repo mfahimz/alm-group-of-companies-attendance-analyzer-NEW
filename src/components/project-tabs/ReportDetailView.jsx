@@ -1299,69 +1299,78 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             while (attempt <= maxAttempts) {
                 try {
-                    // STEP 1: Update AnalysisResult record directly
+                    // PRIMARY OPERATION: Update AnalysisResult record directly.
+                    // This is the core requirement for gift minutes persistence.
                     await base44.entities.AnalysisResult.update(record.id, { 
                         ramadan_gift_minutes: record.ramadan_gift_minutes 
                     });
 
-                    // STEP 2: Find the matching result in memory to get the attendance_id
-                    const resultRow = results.find(r => r.id === record.id);
-                    if (resultRow) {
-                        const attId = String(resultRow.attendance_id);
-                        
-                        // SYNC: Find existing GIFT_MINUTES exception to avoid duplicates
-                        // RATE LIMIT PROTECTED READ: Ensure Exception.filter isn't failed by temporary 429 rate limit errors
-                        let existing = [];
-                        let filterAttempt = 0;
-                        while (filterAttempt < 3) {
-                            try {
-                                existing = await base44.entities.Exception.filter({
+                    // If primary update succeeds, count it as a success immediately
+                    successCount++;
+
+                    // SECONDARY OPERATION: Sync with Exception entity (non-blocking).
+                    // This ensures the gift minutes are reflected as exceptions for future analysis runs.
+                    // If this fails, we log a warning but do not affect successCount or return false.
+                    try {
+                        const resultRow = results.find(r => r.id === record.id);
+                        if (resultRow) {
+                            const attId = String(resultRow.attendance_id);
+                            
+                            // SYNC: Find existing GIFT_MINUTES exception to avoid duplicates
+                            // RATE LIMIT PROTECTED READ: Ensure Exception.filter isn't failed by temporary 429 rate limit errors
+                            let existing = [];
+                            let filterAttempt = 0;
+                            while (filterAttempt < 3) {
+                                try {
+                                    existing = await base44.entities.Exception.filter({
+                                        type: 'GIFT_MINUTES',
+                                        attendance_id: attId,
+                                        project_id: project.id,
+                                        date_from: reportRun.date_from,
+                                        date_to: reportRun.date_to
+                                    });
+                                    break;
+                                } catch (error) {
+                                    const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
+                                    if (isRateLimit && filterAttempt < 2) {
+                                        await sleep(RETRY_DELAYS[filterAttempt]);
+                                        filterAttempt++;
+                                        continue;
+                                    }
+                                    throw error;
+                                }
+                            }
+
+                            if (record.ramadan_gift_minutes > 0) {
+                                // UPSERT: Create new or update existing exception
+                                const payload = {
                                     type: 'GIFT_MINUTES',
                                     attendance_id: attId,
                                     project_id: project.id,
                                     date_from: reportRun.date_from,
-                                    date_to: reportRun.date_to
-                                });
-                                break;
-                            } catch (error) {
-                                const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
-                                if (isRateLimit && filterAttempt < 2) {
-                                    await sleep(RETRY_DELAYS[filterAttempt]);
-                                    filterAttempt++;
-                                    continue;
+                                    date_to: reportRun.date_to,
+                                    allowed_minutes: record.ramadan_gift_minutes,
+                                    use_in_analysis: true,
+                                    details: 'Automatically generated from Gift Minutes calculation'
+                                };
+
+                                if (existing.length > 0) {
+                                    await base44.entities.Exception.update(existing[0].id, { allowed_minutes: record.ramadan_gift_minutes });
+                                } else {
+                                    await base44.entities.Exception.create(payload);
                                 }
-                                throw error;
+                            } else if (existing.length > 0) {
+                                // CLEANUP: Remove exception if gift minutes value is now zero
+                                await base44.entities.Exception.delete(existing[0].id);
                             }
                         }
-
-                        if (record.ramadan_gift_minutes > 0) {
-                            // UPSERT: Create new or update existing exception
-                            const payload = {
-                                type: 'GIFT_MINUTES',
-                                attendance_id: attId,
-                                project_id: project.id,
-                                date_from: reportRun.date_from,
-                                date_to: reportRun.date_to,
-                                allowed_minutes: record.ramadan_gift_minutes,
-                                use_in_analysis: true,
-                                details: 'Automatically generated from Gift Minutes calculation'
-                            };
-
-                            if (existing.length > 0) {
-                                await base44.entities.Exception.update(existing[0].id, { allowed_minutes: record.ramadan_gift_minutes });
-                            } else {
-                                await base44.entities.Exception.create(payload);
-                            }
-                        } else if (existing.length > 0) {
-                            // CLEANUP: Remove exception if gift minutes value is now zero
-                            await base44.entities.Exception.delete(existing[0].id);
-                        }
+                    } catch (syncError) {
+                        console.warn(`[SaveBatch] Exception sync failed for record ${record.id} (non-blocking):`, syncError);
                     }
 
-                    successCount++;
                     return true;
                 } catch (error) {
-                    // RETRY logic for 429 Rate Limit responses
+                    // RETRY logic for 429 Rate Limit responses (applies to primary update)
                     const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
                     if (isRateLimit && attempt < maxAttempts) {
                         console.warn(`[SaveBatch] Rate limited for record ${record.id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
@@ -1370,7 +1379,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         continue;
                     }
                     
-                    // TERMINAL failure for this record
+                    // TERMINAL failure for this record (primary update failed)
                     console.error(`[SaveBatch] Permanent failure for record ${record.id}:`, error);
                     failCount++;
                     return false;
@@ -1430,6 +1439,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const outcome = await saveGiftMinutesBatch(recordsToSave);
 
             // 5. CACHE REFRESH: Invalidate queries to ensure UI data stays consistent with DB
+            // DELAY: Wait 2000ms before refetching to ensure read-after-write consistency 
+            // and allow database commitment of batch writes to stabilize.
+            await new Promise(resolve => setTimeout(resolve, 2000));
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['results', reportRun.id, project.id]);
 
