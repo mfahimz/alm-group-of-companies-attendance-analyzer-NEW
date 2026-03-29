@@ -1271,19 +1271,187 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
 
     /**
+     * Helper to save gift minutes in controlled batches.
+     * Implements controlled concurrency (8 records), 1500ms delay between batches,
+     * and a 429 rate-limit retry strategy with exponential backoff on individual updates.
+     */
+    const saveGiftMinutesBatch = async (data) => {
+        // CONFIG: Batch size and throttle delay between batches
+        const BATCH_SIZE = 8;
+        const BATCH_DELAY = 1500;
+        
+        // RETRY: Delays for exponential backoff (1000ms, 2000ms, 4000ms)
+        const RETRY_DELAYS = [1000, 2000, 4000];
+        
+        // RESULTS: Track operation outcome
+        let successCount = 0;
+        let failCount = 0;
+
+        // HELPER: Simple promise-based sleep
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        /**
+         * Individual processing logic with 429 retry implementation
+         */
+        const processSingleRecord = async (record) => {
+            let attempt = 0;
+            const maxAttempts = 3;
+
+            while (attempt <= maxAttempts) {
+                try {
+                    // STEP 1: Update AnalysisResult record directly
+                    await base44.entities.AnalysisResult.update(record.id, { 
+                        ramadan_gift_minutes: record.ramadan_gift_minutes 
+                    });
+
+                    // STEP 2: Find the matching result in memory to get the attendance_id
+                    const resultRow = results.find(r => r.id === record.id);
+                    if (resultRow) {
+                        const attId = String(resultRow.attendance_id);
+                        
+                        // SYNC: Find existing GIFT_MINUTES exception to avoid duplicates
+                        // RATE LIMIT PROTECTED READ: Ensure Exception.filter isn't failed by temporary 429 rate limit errors
+                        let existing = [];
+                        let filterAttempt = 0;
+                        while (filterAttempt < 3) {
+                            try {
+                                existing = await base44.entities.Exception.filter({
+                                    type: 'GIFT_MINUTES',
+                                    attendance_id: attId,
+                                    project_id: project.id,
+                                    date_from: reportRun.date_from,
+                                    date_to: reportRun.date_to
+                                });
+                                break;
+                            } catch (error) {
+                                const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
+                                if (isRateLimit && filterAttempt < 2) {
+                                    await sleep(RETRY_DELAYS[filterAttempt]);
+                                    filterAttempt++;
+                                    continue;
+                                }
+                                throw error;
+                            }
+                        }
+
+                        if (record.ramadan_gift_minutes > 0) {
+                            // UPSERT: Create new or update existing exception
+                            const payload = {
+                                type: 'GIFT_MINUTES',
+                                attendance_id: attId,
+                                project_id: project.id,
+                                date_from: reportRun.date_from,
+                                date_to: reportRun.date_to,
+                                allowed_minutes: record.ramadan_gift_minutes,
+                                use_in_analysis: true,
+                                details: 'Automatically generated from Gift Minutes calculation'
+                            };
+
+                            if (existing.length > 0) {
+                                await base44.entities.Exception.update(existing[0].id, { allowed_minutes: record.ramadan_gift_minutes });
+                            } else {
+                                await base44.entities.Exception.create(payload);
+                            }
+                        } else if (existing.length > 0) {
+                            // CLEANUP: Remove exception if gift minutes value is now zero
+                            await base44.entities.Exception.delete(existing[0].id);
+                        }
+                    }
+
+                    successCount++;
+                    return true;
+                } catch (error) {
+                    // RETRY logic for 429 Rate Limit responses
+                    const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
+                    if (isRateLimit && attempt < maxAttempts) {
+                        console.warn(`[SaveBatch] Rate limited for record ${record.id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
+                        await sleep(RETRY_DELAYS[attempt]);
+                        attempt++;
+                        continue;
+                    }
+                    
+                    // TERMINAL failure for this record
+                    console.error(`[SaveBatch] Permanent failure for record ${record.id}:`, error);
+                    failCount++;
+                    return false;
+                }
+            }
+        };
+
+        // BATCH CYCLE: Loop through data in chunks of BATCH_SIZE
+        for (let i = 0; i < data.length; i += BATCH_SIZE) {
+            const currentBatch = data.slice(i, i + BATCH_SIZE);
+            
+            // CONCURRENCY: Fire all updates in current batch simultaneously
+            await Promise.all(currentBatch.map(item => processSingleRecord(item)));
+
+            // THROTTLE: Delay before starting next batch to sustain database stability
+            if (i + BATCH_SIZE < data.length) {
+                await sleep(BATCH_DELAY);
+            }
+        }
+
+        return { success: successCount, failed: failCount };
+    };
+
+    /**
      * Change 2 - Calculate Gift Minutes Logic
      * Applies the rule: deductible < 30 ? full amount : 15 mins to every employee.
-     * This updates the UI overrides state immediately.
+     * This updates the UI overrides state immediately, then synchronizes to DB in one batched operation.
      */
-    const handleCalculateAllGiftMinutes = () => {
+    const handleCalculateAllGiftMinutes = async () => {
         const updated = { ...giftMinutesOverrides };
+        const recordsToSave = [];
+
+        // 1. CALCULATE: Iterate through results and determine gift minutes based on raw attendance
         results.forEach(r => {
             const rawMinutes = Math.max(0, r.late_minutes ?? 0) + Math.max(0, r.early_checkout_minutes ?? 0);
             const calculated = rawMinutes < 30 ? rawMinutes : 15;
-            updated[r.id] = (rawMinutes > 0) ? calculated : 0;
+            const giftValue = (rawMinutes > 0) ? calculated : 0;
+            
+            // Update local state tracking
+            updated[r.id] = giftValue;
+            
+            // Build payload for batch save
+            recordsToSave.push({
+                id: r.id,
+                ramadan_gift_minutes: giftValue
+            });
         });
+
+        // 2. OPTIMISTIC UPDATE: Set local state for instant UI feedback
         setGiftMinutesOverrides(updated);
-        toast.info('Gift minutes recalculated for all employees (unsaved)');
+
+        // 3. SHOW PROGRESS UI: Inform user that saving is beginning
+        const loadingToastId = toast.loading('Calculating and saving gift minutes for all employees...');
+
+        try {
+            // 4. DB SYNC: Execute the batched save operation
+            const outcome = await saveGiftMinutesBatch(recordsToSave);
+
+            // 5. CACHE REFRESH: Invalidate queries to ensure UI data stays consistent with DB
+            queryClient.invalidateQueries(['exceptions', project.id]);
+            queryClient.invalidateQueries(['results', reportRun.id, project.id]);
+
+            // 6. RESULT FEEDBACK: Inform user of success or partial failures
+            if (outcome.failed > 0) {
+                toast.warning(`Saved ${outcome.success} employee gift minutes, but ${outcome.failed} failed after retries.`, {
+                    id: loadingToastId,
+                    duration: 5000
+                });
+            } else {
+                toast.success(`Successfully saved gift minutes for all ${outcome.success} employees.`, {
+                    id: loadingToastId,
+                    duration: 4000
+                });
+            }
+        } catch (error) {
+            // CATASTROPHIC FAILURE: Alert user to process-level errors
+            console.error('[GiftMinutesBatch] Catastrophic failure:', error);
+            toast.error('An unexpected error occurred while saving gift minutes batch.', { 
+                id: loadingToastId 
+            });
+        }
     };
 
     // Save only Gift Minutes. deductible_minutes (raw) stays untouched.
