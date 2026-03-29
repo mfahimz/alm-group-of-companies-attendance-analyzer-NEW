@@ -1612,6 +1612,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <p className="text-sm text-slate-600">
                                 Verified: <span className="font-medium text-slate-900">{verifiedCount} / {results.length} employees</span>
                             </p>
+                            {reportRun.is_saved && (
+                                <div className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
+                                    <Save className="w-3.5 h-3.5" />
+                                    Report Saved
+                                </div>
+                            )}
                             {/* IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs) */}
                             {project.company === 'Al Maraghi Auto Repairs' && (
                                 <p className="text-xs text-purple-600 font-medium">
