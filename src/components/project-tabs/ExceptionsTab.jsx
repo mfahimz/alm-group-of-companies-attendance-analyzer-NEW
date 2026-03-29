@@ -1311,14 +1311,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, SKIP_PUNCH, and HALF_DAY_HOLIDAY types, attendance_id is optional
-        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && formData.type !== 'HALF_DAY_HOLIDAY' && !formData.attendance_id) {
+        // For PUBLIC_HOLIDAY, ALLOWED_MINUTES, SKIP_PUNCH, HALF_DAY_HOLIDAY, and SKIP_DOUBLE_DEDUCTION types, attendance_id is optional
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'SKIP_DOUBLE_DEDUCTION' && !formData.attendance_id) {
             toast.error('Please select an employee');
             return;
         }
 
-        // For ALLOWED_MINUTES, SKIP_PUNCH and HALF_DAY_HOLIDAY, default to ALL if not selected
-        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'HALF_DAY_HOLIDAY') && !formData.attendance_id) {
+        // For ALLOWED_MINUTES, SKIP_PUNCH, HALF_DAY_HOLIDAY, and SKIP_DOUBLE_DEDUCTION, default to ALL if not selected
+        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'HALF_DAY_HOLIDAY' || formData.type === 'SKIP_DOUBLE_DEDUCTION') && !formData.attendance_id) {
             formData.attendance_id = 'ALL';
         }
         
@@ -1727,14 +1727,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && '*'}</Label>
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && formData.type !== 'SKIP_DOUBLE_DEDUCTION' && '*'}</Label>
                                     {formData.type === 'PUBLIC_HOLIDAY' || formData.type === 'HALF_DAY_HOLIDAY' ? (
                                         <Input className="border-slate-200 focus:ring-indigo-100" 
                                             value="All Employees" 
                                             disabled 
                                             className="bg-slate-50"
                                         />
-                                    ) : formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' ? (
+                                    ) : formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'SKIP_DOUBLE_DEDUCTION' ? (
                                         <Select
                                             value={formData.attendance_id || undefined}
                                             onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
