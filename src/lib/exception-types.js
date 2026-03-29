@@ -84,6 +84,11 @@ export const EXCEPTION_TYPES = [
         categories: ['day_override'] 
     },
     { 
+        value: 'SKIP_DOUBLE_DEDUCTION', 
+        label: 'Skip Double Deduction', 
+        categories: ['general', 'filter'] 
+    },
+    { 
         value: 'CUSTOM', 
         label: 'Custom Type', 
         categories: ['general'] 
