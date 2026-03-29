@@ -1178,23 +1178,24 @@ Deno.serve(async (req: Request) => {
                     'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_OTHER_MINUTES'
                 ].includes(dateException.type)) || hasManualOtherInExceptions;
 
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+
                 if (hasManualTimeException) {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        lateMinutes += Math.abs(dateException.late_minutes);
+                        dayLateMinutes += Math.abs(dateException.late_minutes);
                     }
                     if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        earlyCheckoutMinutes += Math.abs(dateException.early_checkout_minutes);
+                        dayEarlyMinutes += Math.abs(dateException.early_checkout_minutes);
                     }
-                    if (dateException.other_minutes && dateException.other_minutes > 0) {
+                    if (dateException.other_minutes && dateException.other_minutes > 0 && !hasManualOtherInExceptions) {
                         otherMinutes += Math.abs(dateException.other_minutes);
                         // Track that these other minutes came FROM an existing exception
-                        // so we do NOT re-create them at the end of analysis
+                        // so we do NOT re-create them at the end of analysis.
+                        // Guard added to prevent double counting with MANUAL_OTHER_MINUTES check above.
                         otherMinutesFromExceptions[dateStr] = Math.abs(dateException.other_minutes);
                     }
                 } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
-                    let dayLateMinutes = 0;
-                    let dayEarlyMinutes = 0;
-                    
                     // Track which shift points had actual punches matched
                     const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
                     
@@ -1243,13 +1244,17 @@ Deno.serve(async (req: Request) => {
                             }
                         }
                     }
-                    
-                    // FIX: Apply approved minutes PER-DAY before accumulating.
-                    // Reduce this day's late+early by the approved amount (floor at 0 each).
-                    // This means lateMinutes/earlyCheckoutMinutes in AnalysisResult are ALREADY
-                    // net of approved minutes. totalApprovedMinutes tracks the sum for display.
-                    if (approvedMinutesForDay > 0) {
-                        const dayTotal = dayLateMinutes + dayEarlyMinutes;
+                } else if (hasSkipPunchApplied && hasOnlyFakePunches && !shouldSkipTimeCalculation) {
+                    // SKIP_PUNCH with only fake punches (0 real punches + FULL_SKIP):
+                    // No time calculation needed — all minutes already 0
+                    console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 real punches, skip applied → no time calc needed`);
+                }
+
+                // FIX: Apply approved minutes PER-DAY before accumulating.
+                // approvedMinutesForDay runs independently of punch calculation if punches are present.
+                if (filteredPunches.length > 0 && approvedMinutesForDay > 0) {
+                    const dayTotal = dayLateMinutes + dayEarlyMinutes;
+                    if (dayTotal > 0) {
                         const reduction = Math.min(approvedMinutesForDay, dayTotal);
                         const lateRatio = dayLateMinutes / dayTotal;
                         const earlyRatio = dayEarlyMinutes / dayTotal;
@@ -1258,14 +1263,10 @@ Deno.serve(async (req: Request) => {
                         totalApprovedMinutes += reduction; // track actual reduction for display
                         console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayLateMinutes}, early: ${dayEarlyMinutes})`);
                     }
-                    
-                    lateMinutes += dayLateMinutes;
-                    earlyCheckoutMinutes += dayEarlyMinutes;
-                } else if (hasSkipPunchApplied && hasOnlyFakePunches && !shouldSkipTimeCalculation) {
-                    // SKIP_PUNCH with only fake punches (0 real punches + FULL_SKIP):
-                    // No time calculation needed — all minutes already 0
-                    console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 real punches, skip applied → no time calc needed`);
                 }
+
+                lateMinutes += dayLateMinutes;
+                earlyCheckoutMinutes += dayEarlyMinutes;
 
                 const expectedPunches = isSingleShift ? 2 : 4;
 
