@@ -312,7 +312,23 @@ export default function DailyBreakdownDialog({
             });
 
             const dateException = matchingExceptions.length > 0
-                ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                ? matchingExceptions.sort((a, b) => {
+                    // This must stay in sync with runAnalysis priority sort
+                    const PRIORITY_MAP = {
+                        'MANUAL_ABSENT': 10, 'MANUAL_PRESENT': 10, 'SICK_LEAVE': 10, 'ANNUAL_LEAVE': 10,
+                        'SHIFT_OVERRIDE': 9, 'SKIP_PUNCH': 9,
+                        'ALLOWED_MINUTES': 8, 'MANUAL_LATE': 8, 'MANUAL_EARLY_CHECKOUT': 8,
+                        'MANUAL_OTHER_MINUTES': 7, 'DAY_SWAP': 7, 'WEEKLY_OFF_OVERRIDE': 7,
+                        'HALF_DAY_HOLIDAY': 6,
+                        'CUSTOM': 5,
+                        'DISMISSED_MISMATCH': 3,
+                        'GIFT_MINUTES': 1
+                    };
+                    const pA = PRIORITY_MAP[a.type] || 5;
+                    const pB = PRIORITY_MAP[b.type] || 5;
+                    if (pA !== pB) return pB - pA;
+                    return new Date(b.created_date || 0) - new Date(a.created_date || 0);
+                })[0]
                 : null;
 
             // Get punches for this date
@@ -450,6 +466,7 @@ export default function DailyBreakdownDialog({
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
             let currentOtherMinutes = 0;
+            const hasManualOtherInExceptions = matchingExceptions.some(ex => ex.type === 'MANUAL_OTHER_MINUTES');
             let exceptionLateMinutes = 0;
             let exceptionEarlyMinutes = 0;
 
@@ -457,18 +474,24 @@ export default function DailyBreakdownDialog({
                 if (!['OFF', 'PUBLIC_HOLIDAY', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE'].includes(dateException.type)) {
                     if (dateException.late_minutes > 0) exceptionLateMinutes = dateException.late_minutes;
                     if (dateException.early_checkout_minutes > 0) exceptionEarlyMinutes = dateException.early_checkout_minutes;
-                    if (dateException.other_minutes > 0) currentOtherMinutes = dateException.other_minutes;
+                    
+                    // Only read dateException.other_minutes if no MANUAL_OTHER_MINUTES exception exists in matchingExceptions for that day.
+                    if (!hasManualOtherInExceptions && dateException.other_minutes > 0) {
+                        currentOtherMinutes = dateException.other_minutes;
+                    }
                 }
             }
 
             let allowedMinutesForDay = 0;
-            if (dateException && dateException.type === 'ALLOWED_MINUTES') {
-                allowedMinutesForDay = dateException.allowed_minutes || 0;
+            const allowedMinutesEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
+            if (allowedMinutesEx) {
+                allowedMinutesForDay = allowedMinutesEx.allowed_minutes || 0;
             }
 
-            const shouldSkipTimeCalc = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
-            ].includes(dateException.type);
+            // This must stay in sync with runAnalysis shouldSkipTimeCalculation logic.
+            const shouldSkipTimeCalc = (dateException && [
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_OTHER_MINUTES'
+            ].includes(dateException.type)) || hasManualOtherInExceptions;
 
             const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
             // NOTE: isFinalized is intentionally NOT included here.
