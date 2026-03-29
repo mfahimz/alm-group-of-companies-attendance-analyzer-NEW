@@ -1,0 +1,122 @@
+{
+  "name": "Project",
+  "type": "object",
+  "properties": {
+    "grace_carried_forward": {
+      "type": "boolean",
+      "default": false,
+      "description": "Flag indicating grace minutes have been successfully carried forward during project close"
+    },
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "company": {
+      "type": "string",
+      "description": "Company for this project"
+    },
+    "date_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date of analysis period"
+    },
+    "date_to": {
+      "type": "string",
+      "format": "date",
+      "description": "End date of analysis period"
+    },
+    "custom_employee_ids": {
+      "type": "string",
+      "description": "Comma-separated HRMS IDs for custom employee selection"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "analyzed",
+        "locked",
+        "closed"
+      ],
+      "default": "draft",
+      "description": "Project status"
+    },
+    "use_carried_grace_minutes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to use carried forward grace minutes for this project"
+    },
+    "use_gift_minutes": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to enable Ramadan gift minutes for this project"
+    },
+    "gift_minutes_date_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date for Ramadan gift minutes eligibility window"
+    },
+    "gift_minutes_date_to": {
+      "type": "string",
+      "format": "date",
+      "description": "End date for Ramadan gift minutes eligibility window"
+    },
+    "weekly_off_override": {
+      "type": "string",
+      "enum": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "None"
+      ],
+      "description": "Override weekly off for all employees in this project. 'None' = all 7 days are working days"
+    },
+    "shift_blocks_count": {
+      "type": "number",
+      "default": 2,
+      "description": "Number of shift blocks for this project (1-5)"
+    },
+    "shift_block_ranges": {
+      "type": "string",
+      "description": "JSON string storing date ranges for shift blocks: {block1: {from: date, to: date}, block2: {from: date, to: date}}"
+    },
+    "last_saved_report_id": {
+      "type": "string",
+      "description": "Reference to the last saved report run (used for close & finalize)"
+    },
+    "salary_calculation_days": {
+      "type": "number",
+      "default": 30,
+      "description": "DIVISOR_LEAVE_DEDUCTION: Days used for Leave Pay, Salary Leave Amount, Hourly Rate (for deductions), and Deductible Hours Pay calculations. Al Maraghi Motors only. [MERGE_NOTE: If merging divisors, this becomes the single divisor]"
+    },
+    "ot_calculation_days": {
+      "type": "number",
+      "default": 30,
+      "description": "DIVISOR_OT: Days used for OT Hourly Rate calculation (Normal OT Salary, Special OT Salary). Al Maraghi Motors only. [MERGE_NOTE: If merging divisors, remove this field and use salary_calculation_days instead]"
+    },
+    "skip_double_deduction": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to skip LOP-adjacent weekly off double deduction for this project"
+    },
+    "skip_double_deduction_date_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date for skip double deduction eligibility window (optional)"
+    },
+    "skip_double_deduction_date_to": {
+      "type": "string",
+      "format": "date",
+      "description": "End date for skip double deduction eligibility window (optional)"
+    }
+  },
+  "required": [
+    "name",
+    "company",
+    "date_from",
+    "date_to"
+  ]
+}

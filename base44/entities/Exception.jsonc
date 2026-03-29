@@ -44,7 +44,8 @@
         "GIFT_MINUTES",
         "CUSTOM",
         "DISMISSED_MISMATCH",
-        "HALF_DAY_HOLIDAY"
+        "HALF_DAY_HOLIDAY",
+        "SKIP_DOUBLE_DEDUCTION"
       ],
       "description": "Exception type"
     },
@@ -52,22 +53,17 @@
       "type": "string",
       "enum": [
         "AM_PUNCH_IN",
-        "AM_PUNCH_OUT",
-        "PM_PUNCH_IN",
-        "PM_PUNCH_OUT",
-        "FULL_SKIP"
+        "PM_PUNCH_OUT"
       ],
-      "description": "For SKIP_PUNCH type: which punch to skip from analysis."
+      "description": "For SKIP_PUNCH type: which punch to skip from analysis (AM_PUNCH_IN or PM_PUNCH_OUT)"
     },
     "half_day_target": {
       "type": "string",
-      "enum": ["AM", "PM"],
-      "description": "For HALF_DAY_HOLIDAY type: specifies which half of the day is the holiday (AM or PM)"
+      "description": "For HALF_DAY_HOLIDAY type: specifies which half of the day is the holiday (e.g., AM or PM)"
     },
     "target_punch": {
       "type": "string",
-      "enum": ["AM_START", "AM_END", "PM_START", "PM_END"],
-      "description": "Specifies which punch this exception targets (for Unified Grace / ALLOWED_MINUTES)"
+      "description": "Specifies which punch this exception targets (e.g., AM_PUNCH_IN, PM_PUNCH_OUT)"
     },
     "new_weekly_off": {
       "type": "string",
