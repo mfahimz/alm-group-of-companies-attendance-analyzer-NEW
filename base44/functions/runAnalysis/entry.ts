@@ -133,9 +133,9 @@ Deno.serve(async (req: Request) => {
         await new Promise(r => setTimeout(r, 500));
         console.log('[runAnalysis] Fetching rules, project employees, ramadan schedules...');
         const [rulesData, projectEmployees, ramadanSchedules] = await Promise.all([
-            fetchWithRetry(() => base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company })),
+            fetchAllPages(base44.asServiceRole.entities.AttendanceRules, { company: project.company }),
             fetchAllPages(base44.asServiceRole.entities.ProjectEmployee, { project_id }),
-            fetchWithRetry(() => base44.asServiceRole.entities.RamadanSchedule.filter({ company: project.company, active: true }, null, 100))
+            fetchAllPages(base44.asServiceRole.entities.RamadanSchedule, { company: project.company, active: true })
         ]);
 
         // Ensure rulesData and ramadanSchedules are arrays
@@ -1123,14 +1123,14 @@ Deno.serve(async (req: Request) => {
                 // 2. Applied PER-DAY: reduces that specific day's late+early BEFORE accumulating.
                 //    This means the raw late/early stored in AnalysisResult are ALREADY reduced.
                 //    totalApprovedMinutes is the SUM of per-day reductions, tracked for DISPLAY only.
+                // ALLOWED_MINUTES must be applied independently of dateException priority because it can coexist with other exception types on the same day.
                 let approvedMinutesForDay = 0;
                 try {
-                    if (rules.approved_minutes_enabled &&
-                        dateException &&
-                        dateException.type === 'ALLOWED_MINUTES' &&
-                        dateException.approval_status === 'approved_dept_head' &&
-                        filteredPunches.length > 0) {  // FIX: only apply if employee was present
-                        approvedMinutesForDay = dateException.allowed_minutes || 0;
+                    if (rules.approved_minutes_enabled && filteredPunches.length > 0) {
+                        const amEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
+                        if (amEx) {
+                            approvedMinutesForDay = amEx.allowed_minutes || 0;
+                        }
                     }
                 } catch {
                     approvedMinutesForDay = 0;
@@ -1170,8 +1170,9 @@ Deno.serve(async (req: Request) => {
                     (dateException.other_minutes && dateException.other_minutes > 0)
                 );
 
+                // MANUAL_OTHER_MINUTES is included because it represents a manual override of what happened on that day and punch-based time must not be recalculated alongside it.
                 const shouldSkipTimeCalculation = dateException && [
-                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_OTHER_MINUTES'
                 ].includes(dateException.type);
 
                 if (hasManualTimeException) {
@@ -1519,10 +1520,10 @@ Deno.serve(async (req: Request) => {
         // ============================================================================
         // PRIMARY PERSISTENCE: Look for gift minutes within the current report run
         // (Handles updates to an existing report run)
-        const existingResultsForReport = await base44.asServiceRole.entities.AnalysisResult.filter({
+        const existingResultsForReport = await fetchAllPages(base44.asServiceRole.entities.AnalysisResult, {
             project_id,
             report_run_id: reportRun.id
-        }, null, 5000);
+        });
 
         const existingRamadanGiftMinutesByAttendanceId = new Map(
             existingResultsForReport
@@ -1596,22 +1597,26 @@ Deno.serve(async (req: Request) => {
                 }
 
                 processedAttendanceIds.add(idStr);
-                const result = await analyzeEmployee(attendance_id);
-                const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
+                try {
+                    const result = await analyzeEmployee(attendance_id);
+                    const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
 
-                allResults.push({
-                    project_id,
-                    report_run_id: reportRun.id,
-                    // Step 3: Write the preserved Ramadan gift minutes value. 
-                    // This value is carried forward from either the primary lookup (same report run update) 
-                    // or the secondary lookup (different report run within the same project).
-                    ramadan_gift_minutes: preservedRamadanGiftMinutes,
-                    ...result
-                });
+                    allResults.push({
+                        project_id,
+                        report_run_id: reportRun.id,
+                        // Step 3: Write the preserved Ramadan gift minutes value. 
+                        // This value is carried forward from either the primary lookup (same report run update) 
+                        // or the secondary lookup (different report run within the same project).
+                        ramadan_gift_minutes: preservedRamadanGiftMinutes,
+                        ...result
+                    });
 
-                // Track other minutes for exception creation
-                if (result._otherMinutesDetails) {
-                    otherMinutesExceptionsToCreate.push(result._otherMinutesDetails);
+                    // Track other minutes for exception creation
+                    if (result._otherMinutesDetails) {
+                        otherMinutesExceptionsToCreate.push(result._otherMinutesDetails);
+                    }
+                } catch (e: any) {
+                    console.error(`[runAnalysis] ERROR: Failed to analyze employee ${idStr}:`, e.message);
                 }
             }
 
@@ -1651,32 +1656,35 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        // Save results in larger batches with minimal delays
-        const SAVE_BATCH_SIZE = 25; // Smaller batches to avoid rate limits
-        const SAVE_BATCH_DELAY = 500; // Delay between batches to avoid rate limits
+        // Save results in batches of 8 with Promise.all and 1500ms delay
+        const SAVE_BATCH_SIZE = 8;
+        const SAVE_BATCH_DELAY = 1500;
 
         for (let i = 0; i < allResults.length; i += SAVE_BATCH_SIZE) {
             const batch = allResults.slice(i, i + SAVE_BATCH_SIZE);
 
-            // Retry logic for save operations with longer backoff
-            let retries = 5;
-            while (retries > 0) {
-                try {
-                    await base44.asServiceRole.entities.AnalysisResult.bulkCreate(batch);
-                    break;
-                } catch (saveError) {
-                    retries--;
-                    const isRateLimit = saveError?.status === 429 || saveError?.message?.includes('Rate limit');
-                    const delay = isRateLimit ? Math.min(3000 * Math.pow(2, 5 - retries), 30000) : 2000;
-                    console.warn(`[runAnalysis] Save batch failed (${isRateLimit ? 'rate limit' : 'error'}), retries left: ${retries}, waiting ${delay}ms`);
-                    if (retries === 0) throw saveError;
-                    await new Promise(resolve => setTimeout(resolve, delay));
+            const processResult = async (res: any) => {
+                const retryDelays = [1000, 2000, 4000];
+                for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+                    try {
+                        await base44.asServiceRole.entities.AnalysisResult.create(res);
+                        return;
+                    } catch (error: any) {
+                        const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('rate limit');
+                        if (isRateLimit && attempt < retryDelays.length) {
+                            const delay = retryDelays[attempt];
+                            console.warn(`[runAnalysis] Rate limited saving result for ${res.attendance_id}, retrying in ${delay}ms...`);
+                            await new Promise(r => setTimeout(r, delay));
+                            continue;
+                        }
+                        throw error;
+                    }
                 }
-            }
+            };
 
-            console.log(`[runAnalysis] Saved batch ${Math.floor(i / SAVE_BATCH_SIZE) + 1}/${Math.ceil(allResults.length / SAVE_BATCH_SIZE)}`);
+            await Promise.all(batch.map(res => processResult(res)));
+            console.log(`[runAnalysis] Saved batch of outcomes: ${Math.min(i + SAVE_BATCH_SIZE, allResults.length)}/${allResults.length}`);
 
-            // Add delay between save batches
             if (i + SAVE_BATCH_SIZE < allResults.length) {
                 await new Promise(resolve => setTimeout(resolve, SAVE_BATCH_DELAY));
             }
