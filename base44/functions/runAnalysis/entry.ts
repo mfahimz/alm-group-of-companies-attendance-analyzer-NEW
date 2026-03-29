@@ -1480,7 +1480,18 @@ Deno.serve(async (req: Request) => {
             };
         };
 
-        // Preserve Ramadan gift minutes when re-running analysis for an existing report
+        // CHUNK PROCESSING: If chunk params provided, only process that subset
+        // We calculate this early to know which employees need gift minutes persistence lookup
+        const employeeIdsArray = [...uniqueEmployeeIds];
+        const startIdx = _chunk_offset !== undefined ? _chunk_offset : 0;
+        const endIdx = _chunk_size !== undefined ? Math.min(startIdx + _chunk_size, employeeIdsArray.length) : employeeIdsArray.length;
+        const employeesToProcess = employeeIdsArray.slice(startIdx, endIdx);
+
+        // ============================================================================
+        // GIFT MINUTES PERSISTENCE (Step 1 & 2)
+        // ============================================================================
+        // PRIMARY PERSISTENCE: Look for gift minutes within the current report run
+        // (Handles updates to an existing report run)
         const existingResultsForReport = await base44.asServiceRole.entities.AnalysisResult.filter({
             project_id,
             report_run_id: reportRun.id
@@ -1492,6 +1503,50 @@ Deno.serve(async (req: Request) => {
                 .map(r => [String(r.attendance_id), Math.max(0, Number(r.ramadan_gift_minutes || 0))])
         );
 
+        // SECONDARY PERSISTENCE: If no gift minutes found for an employee in this run,
+        // lookup their most recently saved gift minutes from ANY prior run in this project.
+        const employeesNeedingLookup = employeesToProcess.filter(attendance_id => {
+            const idStr = String(attendance_id);
+            return !existingRamadanGiftMinutesByAttendanceId.has(idStr) || existingRamadanGiftMinutesByAttendanceId.get(idStr) === 0;
+        });
+
+        if (employeesNeedingLookup.length > 0) {
+            console.log(`[runAnalysis] Performing secondary gift minutes lookup for ${employeesNeedingLookup.length} employees (preserving values from prior report runs in project ${project_id})...`);
+            
+            // Batch lookups to avoid backend rate limits
+            const SECONDARY_LOOKUP_BATCH_SIZE = 8;
+            const SECONDARY_LOOKUP_BATCH_DELAY = 1500;
+            
+            for (let i = 0; i < employeesNeedingLookup.length; i += SECONDARY_LOOKUP_BATCH_SIZE) {
+                const batch = employeesNeedingLookup.slice(i, i + SECONDARY_LOOKUP_BATCH_SIZE);
+                
+                await Promise.all(batch.map(async (attendance_id) => {
+                    const idStr = String(attendance_id);
+                    // Search for ANY previous AnalysisResult for this employee + project that has gift minutes saved.
+                    // We sort by -updated_at to ensure we carry forward the most recently finalized entry.
+                    const priorResults = await base44.asServiceRole.entities.AnalysisResult.filter({
+                        project_id: project_id,
+                        attendance_id: attendance_id
+                    }, '-updated_at', 50); // Fetch a small history to safely find non-zero values
+
+                    if (priorResults && priorResults.length > 0) {
+                        // Find the newest record that actually has gift minutes (not just any record)
+                        const newestWithGift = priorResults.find(r => Number(r.ramadan_gift_minutes || 0) > 0);
+                        if (newestWithGift) {
+                            const giftMinutes = Math.max(0, Number(newestWithGift.ramadan_gift_minutes || 0));
+                            existingRamadanGiftMinutesByAttendanceId.set(idStr, giftMinutes);
+                            console.log(`[runAnalysis] ✨ Preserved ${giftMinutes} gift minutes for ${idStr} from prior run (Report ID: ${newestWithGift.report_run_id})`);
+                        }
+                    }
+                }));
+                
+                // Rate-limiting delay between batches of parallel lookups
+                if (i + SECONDARY_LOOKUP_BATCH_SIZE < employeesNeedingLookup.length) {
+                    await new Promise(r => setTimeout(r, SECONDARY_LOOKUP_BATCH_DELAY));
+                }
+            }
+        }
+
         // Process all employees and build results array
         // Using smaller batches with delays to handle database load issues
         const allResults = [];
@@ -1499,14 +1554,6 @@ Deno.serve(async (req: Request) => {
         const otherMinutesExceptionsToCreate = []; // Track other minutes exceptions to create
         const ANALYSIS_BATCH_SIZE = 100; // CRITICAL FIX: Process 100 employees at once to avoid timeout
         const ANALYSIS_BATCH_DELAY = 0; // No delays for maximum speed
-
-        // Convert to array for batch processing
-        const employeeIdsArray = [...uniqueEmployeeIds];
-
-        // CHUNK PROCESSING: If chunk params provided, only process that subset
-        const startIdx = _chunk_offset !== undefined ? _chunk_offset : 0;
-        const endIdx = _chunk_size !== undefined ? Math.min(startIdx + _chunk_size, employeeIdsArray.length) : employeeIdsArray.length;
-        const employeesToProcess = employeeIdsArray.slice(startIdx, endIdx);
 
         console.log(`[runAnalysis] Processing chunk: employees ${startIdx}-${endIdx} of ${employeeIdsArray.length}`);
 
@@ -1528,6 +1575,9 @@ Deno.serve(async (req: Request) => {
                 allResults.push({
                     project_id,
                     report_run_id: reportRun.id,
+                    // Step 3: Write the preserved Ramadan gift minutes value. 
+                    // This value is carried forward from either the primary lookup (same report run update) 
+                    // or the secondary lookup (different report run within the same project).
                     ramadan_gift_minutes: preservedRamadanGiftMinutes,
                     ...result
                 });
