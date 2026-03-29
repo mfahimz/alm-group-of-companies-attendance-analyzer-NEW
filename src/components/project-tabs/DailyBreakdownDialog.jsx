@@ -538,7 +538,13 @@ export default function DailyBreakdownDialog({
                 }
             }
 
-            // Step 3: After both branches apply ALLOWED_MINUTES reduction independently using the existing allowedMinutesForDay logic
+            // Step 3: After both branches apply ALLOWED_MINUTES reduction independently
+            // Find ALLOWED_MINUTES exception for this day (mirrors runAnalysis logic)
+            let allowedMinutesForDay = 0;
+            const amEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
+            if (amEx && dayPunches.length > 0) {
+                allowedMinutesForDay = amEx.allowed_minutes || 0;
+            }
             const rawDayMinutes = dayLateMinutes + dayEarlyMinutes;
             if (allowedMinutesForDay > 0 && rawDayMinutes > 0) {
                 const remaining = Math.max(0, rawDayMinutes - allowedMinutesForDay);
@@ -684,7 +690,11 @@ export default function DailyBreakdownDialog({
                 if (dayOverride.isAbnormal !== undefined) isAbnormal = dayOverride.isAbnormal;
             }
 
-            // Apply exception minutes
+            // Apply exception minutes (MANUAL_LATE / MANUAL_EARLY_CHECKOUT that are NOT report-generated)
+            const manualLateEx = matchingExceptions.find(ex => ex.type === 'MANUAL_LATE' && !ex.created_from_report);
+            const manualEarlyEx = matchingExceptions.find(ex => ex.type === 'MANUAL_EARLY_CHECKOUT' && !ex.created_from_report);
+            const exceptionLateMinutes = manualLateEx?.late_minutes || 0;
+            const exceptionEarlyMinutes = manualEarlyEx?.early_checkout_minutes || 0;
             if (exceptionLateMinutes > 0 && !dayOverride) {
                 lateMinutesTotal = Math.abs(exceptionLateMinutes);
                 lateInfo = `${Math.abs(exceptionLateMinutes)} min (from exception)`;
