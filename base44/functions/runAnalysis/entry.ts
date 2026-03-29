@@ -1170,10 +1170,13 @@ Deno.serve(async (req: Request) => {
                     (dateException.other_minutes && dateException.other_minutes > 0)
                 );
 
-                // MANUAL_OTHER_MINUTES is included because it represents a manual override of what happened on that day and punch-based time must not be recalculated alongside it.
-                const shouldSkipTimeCalculation = dateException && [
+                // MANUAL_OTHER_MINUTES is checked independently because it may not win the priority sort as dateException 
+                // but must still suppress punch calculation for that day.
+                const hasManualOtherInExceptions = matchingExceptions.some((ex: any) => ex.type === 'MANUAL_OTHER_MINUTES');
+
+                const shouldSkipTimeCalculation = (dateException && [
                     'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_OTHER_MINUTES'
-                ].includes(dateException.type);
+                ].includes(dateException.type)) || hasManualOtherInExceptions;
 
                 if (hasManualTimeException) {
                     if (dateException.late_minutes && dateException.late_minutes > 0) {
