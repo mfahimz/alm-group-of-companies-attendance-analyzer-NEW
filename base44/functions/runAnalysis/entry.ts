@@ -865,9 +865,33 @@ Deno.serve(async (req: Request) => {
                 // Now it's safe to count as a working day
                 workingDays++;
 
-                // Get the most recent exception (PUBLIC_HOLIDAY already handled above)
+                // CRITICAL: Determine dateException using priority-based sorting.
+                // This prevents automated GIFT_MINUTES exceptions from overriding active operational 
+                // exceptions (like SICK_LEAVE or ALLOWED_MINUTES) regardless of creation date.
+                const priority: Record<string, number> = {
+                    'SICK_LEAVE': 1,
+                    'ANNUAL_LEAVE': 2,
+                    'MANUAL_PRESENT': 3,
+                    'MANUAL_ABSENT': 4,
+                    'MANUAL_LATE': 5,
+                    'MANUAL_EARLY_CHECKOUT': 6,
+                    'ALLOWED_MINUTES': 7,
+                    'MANUAL_OTHER_MINUTES': 8,
+                    'OFF': 9,
+                    'PUBLIC_HOLIDAY': 10,
+                    'SKIP_PUNCH': 11,
+                    'FULL_SKIP': 12,
+                    'GIFT_MINUTES': 14 // Always last
+                };
+
                 const dateException = matchingExceptions.length > 0
-                    ? matchingExceptions.sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0]
+                    ? matchingExceptions.sort((a: any, b: any) => {
+                        const pA = priority[a.type] || 13;
+                        const pB = priority[b.type] || 13;
+                        if (pA !== pB) return pA - pB;
+                        // Within same priority level, use newest first
+                        return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
+                    })[0]
                     : null;
 
                 if (dateException) {
