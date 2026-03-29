@@ -628,6 +628,60 @@ Deno.serve(async (req: Request) => {
                 return s;
             };
 
+            /**
+             * @Step3: Helper function to determine if double deduction should be skipped for a specific date.
+             * Returns true if either a per-employee SKIP_DOUBLE_DEDUCTION exception exists or
+             * if project-level double deduction skip is enabled (optionally within a date range).
+             */
+            const isDoubleDeductionSkipped = (dayDateStr: string, empEx: any[], proj: any): boolean => {
+                const targetDate = new Date(dayDateStr);
+                targetDate.setHours(0, 0, 0, 0);
+
+                /**
+                 * Condition 1 — Per-employee skip: The employeeExceptions array already loaded 
+                 * for this employee must be scanned for any exception of type SKIP_DOUBLE_DEDUCTION 
+                 * where use_in_analysis is true and the day being evaluated falls within 
+                 * the exception date_from to date_to range.
+                 */
+                const hasEmpSkip = empEx.filter(ex => ex.type === 'SKIP_DOUBLE_DEDUCTION' && ex.use_in_analysis !== false).some(ex => {
+                    try {
+                        const from = new Date(ex.date_from);
+                        const to = new Date(ex.date_to);
+                        from.setHours(0, 0, 0, 0);
+                        to.setHours(0, 0, 0, 0);
+                        return targetDate >= from && targetDate <= to;
+                    } catch {
+                        return false;
+                    }
+                });
+                if (hasEmpSkip) return true;
+
+                /**
+                 * Condition 2 — Project-level global skip: The project object must be checked for 
+                 * skip_double_deduction boolean. If true, also check if skip_double_deduction_date_from 
+                 * and skip_double_deduction_date_to are set. If they are set, only skip days that fall 
+                 * within that date range. If they are not set but skip_double_deduction is true, 
+                 * skip all double deduction for this employee entirely.
+                 */
+                if (proj.skip_double_deduction === true) {
+                    if (proj.skip_double_deduction_date_from && proj.skip_double_deduction_date_to) {
+                        try {
+                            const from = new Date(proj.skip_double_deduction_date_from);
+                            const to = new Date(proj.skip_double_deduction_date_to);
+                            from.setHours(0, 0, 0, 0);
+                            to.setHours(0, 0, 0, 0);
+                            return targetDate >= from && targetDate <= to;
+                        } catch {
+                            return false;
+                        }
+                    }
+                    /** If skip_double_deduction is true but no range is set, skip for all days in this project */
+                    return true;
+                }
+
+                return false;
+            };
+
             const dayAfterEnd = new Date(date_to);
             dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
             const dayAfterEndStr = toDateStr(dayAfterEnd);
@@ -1154,25 +1208,26 @@ Deno.serve(async (req: Request) => {
                 if (reportGeneratedException) {
                     // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
                     if (reportGeneratedException.type === 'MANUAL_PRESENT') {
-                        // Mark present (status mapping already handled, ensured dayLate/Early remain 0)
+                        // Mark present, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else if (reportGeneratedException.type === 'MANUAL_ABSENT') {
-                        // Mark absent LOP
+                        // Mark absent LOP, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else if (reportGeneratedException.type === 'SICK_LEAVE') {
-                        // Mark sick leave
+                        // Mark sick leave, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else if (reportGeneratedException.type === 'ANNUAL_LEAVE') {
-                        // Handle as annual leave
+                        // Handle as annual leave, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else {
                         // Read late_minutes, early_checkout_minutes, other_minutes directly from the reportGeneratedException record.
-                        dayLateMinutes = reportGeneratedException.late_minutes || 0;
-                        dayEarlyMinutes = reportGeneratedException.early_checkout_minutes || 0;
+                        // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
+                        dayLateMinutes = Math.abs(reportGeneratedException.late_minutes || 0);
+                        dayEarlyMinutes = Math.abs(reportGeneratedException.early_checkout_minutes || 0);
                         if (reportGeneratedException.other_minutes > 0) {
                             otherMinutes += reportGeneratedException.other_minutes;
                             otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + reportGeneratedException.other_minutes;
@@ -1391,7 +1446,15 @@ Deno.serve(async (req: Request) => {
                                 } catch { return false; }
                             });
 
-                            if (!isProtectedByLeave) {
+                            /** 
+                             * @Step2: Check if double deduction should be skipped for this specific day.
+                             * Logic follows two new conditions:
+                             * 1. Per-employee SKIP_DOUBLE_DEDUCTION exception override.
+                             * 2. Project-level global skip_double_deduction setting (with optional date range check).
+                             */
+                            const isDoubleDeductionSkippedForDay = isDoubleDeductionSkipped(dateStr, employeeExceptions, project);
+
+                            if (!isProtectedByLeave && !isDoubleDeductionSkippedForDay) {
                                 const originalStatus = (dateStatusMap as Record<string, string>)[dateStr];
                                 fullAbsenceCount++;
                                 lopAdjacentWeeklyOffCount++;
@@ -1401,7 +1464,10 @@ Deno.serve(async (req: Request) => {
                                 
                                 console.log(`[runAnalysis] LOP-adjacent deduction: Employee ${attendanceIdStr}, Date ${dateStr} (${originalStatus}) → LOP`);
                             } else {
-                                console.log(`[runAnalysis] LOP-adjacent bypass (Protected by ${employeeExceptions.find((ex: any) => dateStr >= ex.date_from && dateStr <= ex.date_to)?.type}): Employee ${attendanceIdStr}, Date ${dateStr}`);
+                                const skipReason = isProtectedByLeave 
+                                    ? `Protected by Leave (${employeeExceptions.find((ex: any) => dateStr >= ex.date_from && dateStr <= ex.date_to && (ex.type === 'ANNUAL_LEAVE' || ex.type === 'SICK_LEAVE'))?.type})`
+                                    : 'SKIP_DOUBLE_DEDUCTION (Exception or Project Setting)';
+                                console.log(`[runAnalysis] LOP-adjacent bypass (${skipReason}): Employee ${attendanceIdStr}, Date ${dateStr}`);
                             }
                         }
                     }

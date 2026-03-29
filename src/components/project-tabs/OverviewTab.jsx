@@ -46,6 +46,9 @@ export default function OverviewTab({ project }) {
         // Added: Gift minutes date range fields tracking
         gift_minutes_date_from: project.gift_minutes_date_from || '',
         gift_minutes_date_to: project.gift_minutes_date_to || '',
+        skip_double_deduction: project.skip_double_deduction || false,
+        skip_double_deduction_date_from: project.skip_double_deduction_date_from || '',
+        skip_double_deduction_date_to: project.skip_double_deduction_date_to || '',
         shift_blocks_count: project.shift_blocks_count || 2,
         sync_recurring_adjustments: false
     });
@@ -281,7 +284,8 @@ export default function OverviewTab({ project }) {
         mutationFn: (data) => base44.entities.Project.update(project.id, {
             ...data,
             use_gift_minutes: !!data.use_gift_minutes,
-            use_carried_grace_minutes: !!data.use_carried_grace_minutes
+            use_carried_grace_minutes: !!data.use_carried_grace_minutes,
+            skip_double_deduction: !!data.skip_double_deduction
         }),
         onSuccess: () => {
             queryClient.invalidateQueries(['project', project.id]);
@@ -405,6 +409,9 @@ export default function OverviewTab({ project }) {
                                        // Added: Include gift minutes dates when opening edit dialog
                                        gift_minutes_date_from: project.gift_minutes_date_from || '',
                                        gift_minutes_date_to: project.gift_minutes_date_to || '',
+                                       skip_double_deduction: project.skip_double_deduction || false,
+                                       skip_double_deduction_date_from: project.skip_double_deduction_date_from || '',
+                                       skip_double_deduction_date_to: project.skip_double_deduction_date_to || '',
                                        shift_blocks_count: project.shift_blocks_count || 2
                                     });
                                     setShowGiftDateWarning(true); // Reset warning dismissal state
@@ -768,21 +775,67 @@ export default function OverviewTab({ project }) {
                             </p>
                         </div>
 
-                        {project.status !== 'closed' && isAlMaraghiMotors && (
-                            <div className="flex items-center space-x-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100/50">
-                                <Checkbox 
-                                    id="sync_recurring_edit" 
-                                    checked={editData.sync_recurring_adjustments}
-                                    onCheckedChange={(checked) => setEditData({ ...editData, sync_recurring_adjustments: checked })}
-                                />
-                                <div className="flex-1">
-                                    <Label htmlFor="sync_recurring_edit" className="font-semibold text-indigo-900 cursor-pointer">
-                                        Sync Recurring Adjustments
-                                    </Label>
-                                    <p className="text-[10px] text-indigo-600 mt-0.5">
-                                        Fetch latest recurring variables (Housing, etc.) from employee master.
+                        {isAlMaraghiMotors && (
+                            <div className="space-y-3 pt-1">
+                                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id="skip_double_deduction" 
+                                            checked={editData.skip_double_deduction}
+                                            onCheckedChange={(checked) => setEditData({ ...editData, skip_double_deduction: !!checked })}
+                                        />
+                                        <Label htmlFor="skip_double_deduction" className="font-semibold text-slate-900 cursor-pointer">
+                                            Skip Double Deduction
+                                        </Label>
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 leading-tight">
+                                        When enabled, double deduction will be skipped for all employees in this project for the selected date range. Leave dates empty to skip for the entire project period.
                                     </p>
+                                    {editData.skip_double_deduction && (
+                                        <div className="grid grid-cols-2 gap-3 pl-6 pt-1">
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Skip From</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={editData.skip_double_deduction_date_from}
+                                                    onChange={(e) => setEditData({ ...editData, skip_double_deduction_date_from: e.target.value })}
+                                                    className="h-8 text-xs bg-white"
+                                                    min={project.date_from}
+                                                    max={project.date_to}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Skip To</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={editData.skip_double_deduction_date_to}
+                                                    onChange={(e) => setEditData({ ...editData, skip_double_deduction_date_to: e.target.value })}
+                                                    className="h-8 text-xs bg-white"
+                                                    min={editData.skip_double_deduction_date_from || project.date_from}
+                                                    max={project.date_to}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {project.status !== 'closed' && (
+                                    <div className="flex items-center space-x-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100/50">
+                                        <Checkbox 
+                                            id="sync_recurring_edit" 
+                                            checked={editData.sync_recurring_adjustments}
+                                            onCheckedChange={(checked) => setEditData({ ...editData, sync_recurring_adjustments: !!checked })}
+                                        />
+                                        <div className="flex-1">
+                                            <Label htmlFor="sync_recurring_edit" className="font-semibold text-indigo-900 cursor-pointer">
+                                                Sync Recurring Adjustments
+                                            </Label>
+                                            <p className="text-[10px] text-indigo-600 mt-0.5">
+                                                Fetch latest recurring variables (Housing, etc.) from employee master.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                         <div className="flex gap-3 pt-2">
