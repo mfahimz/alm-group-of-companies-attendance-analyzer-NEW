@@ -387,6 +387,58 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     }
                 };
                 
+                // Step 2: GIFT_MINUTES exception cleanup logic.
+                // These exceptions are created during the gift minutes batch save and are tied to attendance_ids
+                // within a report run. They must be cleaned up when a report is deleted to avoid "orphaned"
+                // exceptions interfering with future report generation or showing up in other reports.
+                const attendanceIds = [...new Set(resultsToDelete.map(r => String(r.attendance_id)).filter(Boolean))];
+                
+                if (attendanceIds.length > 0) {
+                    console.log(`[ReportTab] Checking for GIFT_MINUTES exceptions to clean up for ${attendanceIds.length} employees...`);
+                    
+                    // Fetch all GIFT_MINUTES exceptions for this project
+                    const allGiftExceptions = await fetchAllRecords(base44.entities.Exception, {
+                        project_id: project.id,
+                        type: 'GIFT_MINUTES'
+                    });
+                    
+                    // Filter exceptions that belong to the employees in the report being deleted
+                    const exceptionsToDelete = allGiftExceptions.filter(ex => 
+                        attendanceIds.includes(String(ex.attendance_id))
+                    );
+                    
+                    if (exceptionsToDelete.length > 0) {
+                        const EXCEPTION_BATCH_SIZE = 8;
+                        const EXCEPTION_BATCH_DELAY = 1500;
+                        const RETRY_DELAYS = [1000, 2000, 4000];
+                        
+                        // Recursive delete function with exponential backoff for 429 rate limits
+                        const deleteExceptionWithRetry = async (id, attempt = 0) => {
+                            try {
+                                await base44.entities.Exception.delete(id);
+                            } catch (error) {
+                                const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
+                                if (isRateLimit && attempt < RETRY_DELAYS.length) {
+                                    console.warn(`[ReportTab] Rate limited during exception deletion for ${id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
+                                    await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+                                    return deleteExceptionWithRetry(id, attempt + 1);
+                                }
+                                throw error;
+                            }
+                        };
+                        
+                        // Process deletions in batches of 8 with inter-batch delays
+                        for (let j = 0; j < exceptionsToDelete.length; j += EXCEPTION_BATCH_SIZE) {
+                            const batch = exceptionsToDelete.slice(j, j + EXCEPTION_BATCH_SIZE);
+                            await Promise.all(batch.map(ex => deleteExceptionWithRetry(ex.id)));
+                            if (j + EXCEPTION_BATCH_SIZE < exceptionsToDelete.length) {
+                                await new Promise(resolve => setTimeout(resolve, EXCEPTION_BATCH_DELAY));
+                            }
+                        }
+                        console.log(`[ReportTab] Successfully cleaned up ${exceptionsToDelete.length} GIFT_MINUTES exceptions`);
+                    }
+                }
+
                 // Delete results first
                 if (resultsToDelete.length > 0) {
                     await deleteInBatches(resultsToDelete, (id) => base44.entities.AnalysisResult.delete(id));
