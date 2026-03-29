@@ -807,7 +807,7 @@ Deno.serve(async (req: Request) => {
                         try {
                             const exFrom = new Date(ex.date_from);
                             const exTo = new Date(ex.date_to);
-                            return currentDate >= exFrom && currentDate <= exTo;
+                            return currentDate >= exFrom && currentDate <= exTo && ex.type !== 'GIFT_MINUTES';
                         } catch (dateError) {
                             // CRITICAL FIX: Log invalid exception dates instead of silently failing
                             console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
@@ -896,6 +896,17 @@ Deno.serve(async (req: Request) => {
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0]
                     : null;
+
+                // Step 1: Check for report-generated exceptions (created_from_report === true)
+                // Among all report-generated exceptions for this day, select the one with the highest priority.
+                const reportGeneratedException = matchingExceptions
+                    .filter(ex => ex.created_from_report === true)
+                    .sort((a: any, b: any) => {
+                        const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
+                        const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
+                        if (priA !== priB) return priB - priA;
+                        return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
+                    })[0];
 
                 if (dateException) {
                     if (dateException.type === 'MANUAL_PRESENT') {
@@ -1136,118 +1147,83 @@ Deno.serve(async (req: Request) => {
                     approvedMinutesForDay = 0;
                 }
 
-                // ----------------------------------------------------------------
-                // MANUAL_OTHER_MINUTES: scan ALL matching exceptions for this date
-                // and accumulate their allowed_minutes directly into otherMinutes.
-                //
-                // This is distinct from ALLOWED_MINUTES, which reduces deductible
-                // late/early minutes for the day. MANUAL_OTHER_MINUTES exceptions
-                // add purely to the other_minutes field in the AnalysisResult —
-                // they do NOT touch late or early checkout totals.
-                //
-                // Multiple MANUAL_OTHER_MINUTES exceptions on the same date are
-                // supported (e.g. one created by dept-head split + one manual edit).
-                // We use matchingExceptions (all exceptions for the date) rather than
-                // dateException (only the most recent one) so none are missed.
-                // ----------------------------------------------------------------
-                const manualOtherExceptions = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
-                for (const moEx of manualOtherExceptions) {
-                    const moMinutes = moEx.allowed_minutes || 0;
-                    if (moMinutes > 0) {
-                        otherMinutes += moMinutes;
-                        // Track that this date's other minutes came from an existing exception.
-                        // This prevents the post-analysis block from re-creating them.
-                        otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + moMinutes;
-                        console.log(`[runAnalysis] MANUAL_OTHER_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: adding ${moMinutes} to other_minutes`);
-                    }
-                }
-
-                const hasManualTimeException = dateException && (
-                    dateException.type === 'MANUAL_LATE' ||
-                    dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
-                    (dateException.late_minutes && dateException.late_minutes > 0) ||
-                    (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) ||
-                    (dateException.other_minutes && dateException.other_minutes > 0)
-                );
-
-                // MANUAL_OTHER_MINUTES is checked independently because it may not win the priority sort as dateException 
-                // but must still suppress punch calculation for that day.
-                const hasManualOtherInExceptions = matchingExceptions.some((ex: any) => ex.type === 'MANUAL_OTHER_MINUTES');
-
-                const shouldSkipTimeCalculation = (dateException && [
-                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_OTHER_MINUTES'
-                ].includes(dateException.type)) || hasManualOtherInExceptions;
-
+                // Step 2: Unified calculation logic for time minutes
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
 
-                if (hasManualTimeException) {
-                    if (dateException.late_minutes && dateException.late_minutes > 0) {
-                        dayLateMinutes += Math.abs(dateException.late_minutes);
-                    }
-                    if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
-                        dayEarlyMinutes += Math.abs(dateException.early_checkout_minutes);
-                    }
-                    if (dateException.other_minutes && dateException.other_minutes > 0 && !hasManualOtherInExceptions) {
-                        otherMinutes += Math.abs(dateException.other_minutes);
-                        // Track that these other minutes came FROM an existing exception
-                        // so we do NOT re-create them at the end of analysis.
-                        // Guard added to prevent double counting with MANUAL_OTHER_MINUTES check above.
-                        otherMinutesFromExceptions[dateStr] = Math.abs(dateException.other_minutes);
-                    }
-                } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
-                    // Track which shift points had actual punches matched
-                    const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
-                    
-                    for (const match of punchMatches) {
-                        if (!match.matchedTo) continue;
-
-                        const punchTime = match.punch.time;
-                        const shiftTime = match.shiftTime;
-
-                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                            if (punchTime > shiftTime) {
-                                const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
-                                dayLateMinutes += minutes;
-                            }
-                        }
-
-                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                            if (punchTime < shiftTime) {
-                                const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
-                                dayEarlyMinutes += minutes;
-                            }
+                if (reportGeneratedException) {
+                    // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
+                    if (reportGeneratedException.type === 'MANUAL_PRESENT') {
+                        // Mark present (status mapping already handled, ensured dayLate/Early remain 0)
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (reportGeneratedException.type === 'MANUAL_ABSENT') {
+                        // Mark absent LOP
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (reportGeneratedException.type === 'SICK_LEAVE') {
+                        // Mark sick leave
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (reportGeneratedException.type === 'ANNUAL_LEAVE') {
+                        // Handle as annual leave
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else {
+                        // Read late_minutes, early_checkout_minutes, other_minutes directly from the reportGeneratedException record.
+                        dayLateMinutes = reportGeneratedException.late_minutes || 0;
+                        dayEarlyMinutes = reportGeneratedException.early_checkout_minutes || 0;
+                        if (reportGeneratedException.other_minutes > 0) {
+                            otherMinutes += reportGeneratedException.other_minutes;
+                            otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + reportGeneratedException.other_minutes;
                         }
                     }
-                    
-                    // ================================================================
-                    // SKIP_PUNCH: Zero out specific minutes based on skip type
-                    // This runs AFTER punch calculation so we can correctly detect
-                    // which punches were missing and zero the right values.
-                    // ================================================================
-                    if (hasSkipPunchApplied && skipType) {
-                        const amStartMissing = !matchedShiftPoints.has('AM_START');
-                        const pmEndMissing = !matchedShiftPoints.has('PM_END');
+                    // Skip punch-based calculation for this day as report-generated values are applied directly
+                } else {
+                    // If no reportGeneratedException exists for this day: apply existing logic.
+                    // Check shouldSkipTimeCalculation using specific type list.
+                    const shouldSkipTimeCalculation = dateException && [
+                        'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                    ].includes(dateException.type);
+
+                    if (!shouldSkipTimeCalculation && shift && punchMatches.length > 0) {
+                        // Track which shift points had actual punches matched
+                        const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
                         
-                        if (skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') {
-                            // AM skip: zero late minutes if AM_START punch was missing
-                            if (amStartMissing) {
-                                console.log(`[runAnalysis] SKIP_PUNCH (${skipType}): Employee ${attendanceIdStr}, Date ${dateStr}: AM_START missing → zeroing late (was ${dayLateMinutes})`);
-                                dayLateMinutes = 0;
+                        for (const match of punchMatches) {
+                            if (!match.matchedTo) continue;
+
+                            const punchTime = match.punch.time;
+                            const shiftTime = match.shiftTime;
+
+                            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                                if (punchTime > shiftTime) {
+                                    const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                                    dayLateMinutes += minutes;
+                                }
+                            }
+
+                            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                                if (punchTime < shiftTime) {
+                                    const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                                    dayEarlyMinutes += minutes;
+                                }
                             }
                         }
-                        if (skipType === 'PM_PUNCH_OUT' || skipType === 'FULL_SKIP') {
-                            // PM skip: zero early checkout if PM_END punch was missing
-                            if (pmEndMissing) {
-                                console.log(`[runAnalysis] SKIP_PUNCH (${skipType}): Employee ${attendanceIdStr}, Date ${dateStr}: PM_END missing → zeroing early (was ${dayEarlyMinutes})`);
-                                dayEarlyMinutes = 0;
+                        
+                        // SKIP_PUNCH: Zero out specific minutes based on skip type
+                        if (hasSkipPunchApplied && skipType) {
+                            const amStartMissing = !matchedShiftPoints.has('AM_START');
+                            const pmEndMissing = !matchedShiftPoints.has('PM_END');
+                            
+                            if (skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') {
+                                if (amStartMissing) dayLateMinutes = 0;
+                            }
+                            if (skipType === 'PM_PUNCH_OUT' || skipType === 'FULL_SKIP') {
+                                if (pmEndMissing) dayEarlyMinutes = 0;
                             }
                         }
                     }
-                } else if (hasSkipPunchApplied && hasOnlyFakePunches && !shouldSkipTimeCalculation) {
-                    // SKIP_PUNCH with only fake punches (0 real punches + FULL_SKIP):
-                    // No time calculation needed — all minutes already 0
-                    console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 real punches, skip applied → no time calc needed`);
                 }
 
                 // FIX: Apply approved minutes PER-DAY before accumulating.
@@ -1267,6 +1243,20 @@ Deno.serve(async (req: Request) => {
 
                 lateMinutes += dayLateMinutes;
                 earlyCheckoutMinutes += dayEarlyMinutes;
+
+                // Step 5: Handle MANUAL_OTHER_MINUTES exceptions that are NOT report-generated separately.
+                // This handles manually created other minutes exceptions that were not from report edits.
+                const manualOtherNonReportEx = matchingExceptions.filter(ex => 
+                    ex.type === 'MANUAL_OTHER_MINUTES' && (ex.created_from_report === false || ex.created_from_report === null)
+                );
+                for (const moEx of manualOtherNonReportEx) {
+                    const moMinutes = moEx.allowed_minutes || 0;
+                    if (moMinutes > 0) {
+                        otherMinutes += moMinutes;
+                        otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + moMinutes;
+                        console.log(`[runAnalysis] MANUAL_OTHER_MINUTES (Non-Report): Employee ${attendanceIdStr}, Date ${dateStr}: adding ${moMinutes} to other_minutes`);
+                    }
+                }
 
                 const expectedPunches = isSingleShift ? 2 : 4;
 

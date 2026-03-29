@@ -331,6 +331,27 @@ export default function DailyBreakdownDialog({
                 })[0]
                 : null;
 
+            // Step 1: Check for report-generated exceptions (created_from_report === true)
+            // Select the highest priority one using the same PRIORITY_MAP as above.
+            const reportGeneratedException = matchingExceptions.length > 0
+                ? matchingExceptions.filter(ex => ex.created_from_report === true).sort((a, b) => {
+                    const PRIORITY_MAP = {
+                        'MANUAL_ABSENT': 10, 'MANUAL_PRESENT': 10, 'SICK_LEAVE': 10, 'ANNUAL_LEAVE': 10,
+                        'SHIFT_OVERRIDE': 9, 'SKIP_PUNCH': 9,
+                        'ALLOWED_MINUTES': 8, 'MANUAL_LATE': 8, 'MANUAL_EARLY_CHECKOUT': 8,
+                        'MANUAL_OTHER_MINUTES': 7, 'DAY_SWAP': 7, 'WEEKLY_OFF_OVERRIDE': 7,
+                        'HALF_DAY_HOLIDAY': 6,
+                        'CUSTOM': 5,
+                        'DISMISSED_MISMATCH': 3,
+                        'GIFT_MINUTES': 1
+                    };
+                    const pA = PRIORITY_MAP[a.type] || 5;
+                    const pB = PRIORITY_MAP[b.type] || 5;
+                    if (pA !== pB) return pB - pA;
+                    return new Date(b.created_date || 0) - new Date(a.created_date || 0);
+                })[0]
+                : null;
+
             // Get punches for this date
             let rawDayPunches = allEmployeePunchesExtended.filter(p => p.punch_date === dateStr)
                 .sort((a, b) => {
@@ -461,95 +482,84 @@ export default function DailyBreakdownDialog({
                 hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
             }
 
-            // Calculate late/early
+            // Step 2: Unified calculation logic for late/early minutes
             let lateInfo = '';
             let lateMinutesTotal = 0;
             let earlyCheckoutInfo = '';
             let currentOtherMinutes = 0;
-            const hasManualOtherInExceptions = matchingExceptions.some(ex => ex.type === 'MANUAL_OTHER_MINUTES');
-            let exceptionLateMinutes = 0;
-            let exceptionEarlyMinutes = 0;
-
-            if (dateException && !dayOverrides[dateStr]) {
-                if (!['OFF', 'PUBLIC_HOLIDAY', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE'].includes(dateException.type)) {
-                    if (dateException.late_minutes > 0) exceptionLateMinutes = dateException.late_minutes;
-                    if (dateException.early_checkout_minutes > 0) exceptionEarlyMinutes = dateException.early_checkout_minutes;
-                    
-                    // Only read dateException.other_minutes if no MANUAL_OTHER_MINUTES exception exists in matchingExceptions for that day.
-                    if (!hasManualOtherInExceptions && dateException.other_minutes > 0) {
-                        currentOtherMinutes = dateException.other_minutes;
-                    }
-                }
-            }
-
-            let allowedMinutesForDay = 0;
-            const allowedMinutesEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
-            if (allowedMinutesEx) {
-                allowedMinutesForDay = allowedMinutesEx.allowed_minutes || 0;
-            }
-
-            // This must stay in sync with runAnalysis shouldSkipTimeCalculation logic.
-            const shouldSkipTimeCalc = (dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'MANUAL_OTHER_MINUTES'
-            ].includes(dateException.type)) || hasManualOtherInExceptions;
-
-            const hasExceptionMinutes = exceptionLateMinutes > 0 || exceptionEarlyMinutes > 0 || currentOtherMinutes > 0;
-            // NOTE: isFinalized is intentionally NOT included here.
-            // This is a display-only breakdown — edit actions are already gated by project.status !== 'closed'.
-            // For closed/finalized projects, we still compute per-day late/early from punches so that
-            // department heads and admins can see *which day* the minutes came from, not just the stored total.
             let dayLateMinutes = 0;
             let dayEarlyMinutes = 0;
-
-            // 1. Calculation phase: Compute from punches if valid shift exists
-            if (shift && punchMatches.length > 0 && !shouldSkipTimeCalc) {
-                for (const match of punchMatches) {
-                    if (!match.matchedTo) continue;
-                    const punchTime = match.punch.time;
-                    const shiftTime = match.shiftTime;
-
-                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) {
-                            const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                            dayLateMinutes += minutes;
-                        }
-                    }
-
-                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) {
-                            const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                            dayEarlyMinutes += minutes;
-                        }
-                    }
-                }
-            }
-
-            // 2. Override phase: Specific manual adjustments (if present and > 0)
             let isLateOverridden = false;
             let isEarlyOverridden = false;
-            
-            if (dateException && !shouldSkipTimeCalc) {
-                if (exceptionLateMinutes > 0) {
-                    dayLateMinutes = exceptionLateMinutes;
+
+            if (reportGeneratedException && !dayOverrides[dateStr]) {
+                // REPORT GENERATED EXCEPTION: mirrors runAnalysis logic exactly - if HR edited this day in a previous report apply those values directly and skip punch computation.
+                if (['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'PUBLIC_HOLIDAY'].includes(reportGeneratedException.type)) {
+                    // Status handled in status section, ensure minutes remain 0
+                    dayLateMinutes = 0;
+                    dayEarlyMinutes = 0;
+                } else {
+                    // Read late_minutes, early_checkout_minutes, other_minutes directly from the reportGeneratedException record
+                    dayLateMinutes = reportGeneratedException.late_minutes || 0;
+                    dayEarlyMinutes = reportGeneratedException.early_checkout_minutes || 0;
+                    if (reportGeneratedException.other_minutes > 0) {
+                        currentOtherMinutes = reportGeneratedException.other_minutes;
+                    }
                     isLateOverridden = true;
-                }
-                if (exceptionEarlyMinutes > 0) {
-                    dayEarlyMinutes = exceptionEarlyMinutes;
                     isEarlyOverridden = true;
+                }
+                // Skip punch-based calculation for this day as report-generated values are applied directly
+            } else {
+                // If no reportGeneratedException exists: Run punch-based calculation if shift and punchMatches exist and shouldSkipTimeCalc is false
+                const shouldSkipTimeCalc = (dateException && [
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                ].includes(dateException.type));
+
+                if (!shouldSkipTimeCalc && shift && punchMatches.length > 0) {
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            if (punchTime > shiftTime) {
+                                const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
+                                dayLateMinutes += minutes;
+                            }
+                        }
+
+                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                            if (punchTime < shiftTime) {
+                                const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
+                                dayEarlyMinutes += minutes;
+                            }
+                        }
+                    }
                 }
             }
 
-            // 3. Deduction Reduction phase: Apply allowed minutes
+            // Step 3: After both branches apply ALLOWED_MINUTES reduction independently using the existing allowedMinutesForDay logic
             const rawDayMinutes = dayLateMinutes + dayEarlyMinutes;
             if (allowedMinutesForDay > 0 && rawDayMinutes > 0) {
                 const remaining = Math.max(0, rawDayMinutes - allowedMinutesForDay);
-                const lateRatio = dayLateMinutes / rawDayMinutes;
-                const earlyRatio = dayEarlyMinutes / rawDayMinutes;
+                const lateRatio = dayLateMinutes / (rawDayMinutes || 1);
+                const earlyRatio = dayEarlyMinutes / (rawDayMinutes || 1);
                 dayLateMinutes = Math.round(remaining * lateRatio);
                 dayEarlyMinutes = Math.round(remaining * earlyRatio);
             }
 
-            // 4. Formatting phase: Build info strings for UI display
+            // Step 4: Handle MANUAL_OTHER_MINUTES where created_from_report is false or null by scanning matchingExceptions and adding their allowed_minutes
+            const manualOtherNonReportEx = matchingExceptions.filter(ex => 
+                ex.type === 'MANUAL_OTHER_MINUTES' && (ex.created_from_report === false || ex.created_from_report === null)
+            );
+            for (const moEx of manualOtherNonReportEx) {
+                const moMinutes = moEx.allowed_minutes || 0;
+                if (moMinutes > 0) {
+                    currentOtherMinutes += moMinutes;
+                }
+            }
+
+            // Step 5: Formatting phase: Build info strings for UI display
             lateMinutesTotal = dayLateMinutes;
             if (dayLateMinutes > 0) {
                 const source = isLateOverridden ? '(from exception)' : (allowedMinutesForDay > 0 ? `(after ${allowedMinutesForDay} allowed)` : '');
