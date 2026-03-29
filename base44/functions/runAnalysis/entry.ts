@@ -865,31 +865,34 @@ Deno.serve(async (req: Request) => {
                 // Now it's safe to count as a working day
                 workingDays++;
 
-                // CRITICAL: Determine dateException using priority-based sorting.
-                // This prevents automated GIFT_MINUTES exceptions from overriding active operational 
-                // exceptions (like SICK_LEAVE or ALLOWED_MINUTES) regardless of creation date.
-                const priority: Record<string, number> = {
-                    'SICK_LEAVE': 1,
-                    'ANNUAL_LEAVE': 2,
-                    'MANUAL_PRESENT': 3,
-                    'MANUAL_ABSENT': 4,
-                    'MANUAL_LATE': 5,
-                    'MANUAL_EARLY_CHECKOUT': 6,
-                    'ALLOWED_MINUTES': 7,
-                    'MANUAL_OTHER_MINUTES': 8,
-                    'OFF': 9,
-                    'PUBLIC_HOLIDAY': 10,
-                    'SKIP_PUNCH': 11,
-                    'FULL_SKIP': 12,
-                    'GIFT_MINUTES': 14 // Always last
+                // PRIORITY-BASED EXCEPTION SORTING: Higher numbers win.
+                // GIFT_MINUTES is always the lowest priority at 1. Unknown types default to 5, 
+                // which is above GIFT_MINUTES but below most active operational exceptions.
+                const EXCEPTION_PRIORITY: Record<string, number> = {
+                    'MANUAL_ABSENT': 10,
+                    'MANUAL_PRESENT': 10,
+                    'SICK_LEAVE': 10,
+                    'ANNUAL_LEAVE': 10,
+                    'SHIFT_OVERRIDE': 9,
+                    'SKIP_PUNCH': 9,
+                    'ALLOWED_MINUTES': 8,
+                    'MANUAL_LATE': 8,
+                    'MANUAL_EARLY_CHECKOUT': 8,
+                    'MANUAL_OTHER_MINUTES': 7,
+                    'DAY_SWAP': 7,
+                    'WEEKLY_OFF_OVERRIDE': 7,
+                    'HALF_DAY_HOLIDAY': 6,
+                    'CUSTOM': 5,
+                    'DISMISSED_MISMATCH': 3,
+                    'GIFT_MINUTES': 1,
                 };
-
+                
                 const dateException = matchingExceptions.length > 0
                     ? matchingExceptions.sort((a: any, b: any) => {
-                        const pA = priority[a.type] || 13;
-                        const pB = priority[b.type] || 13;
-                        if (pA !== pB) return pA - pB;
-                        // Within same priority level, use newest first
+                        const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
+                        const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
+                        if (priA !== priB) return priB - priA; // Higher number wins
+                        // Within same priority level, newest (by creation date) wins
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0]
                     : null;
