@@ -1271,9 +1271,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
 
     /**
-     * Helper to save gift minutes in controlled batches.
-     * Implements controlled concurrency (8 records), 1500ms delay between batches,
-     * and a 429 rate-limit retry strategy with exponential backoff on individual updates.
+     * PHASES RESTRUCTURE: Separates primary AnalysisResult updates from secondary Exception sync.
+     * Phase 1 is blocking (UI awaits it), Phase 2 is background non-blocking.
      */
     const saveGiftMinutesBatch = async (data) => {
         // CONFIG: Batch size and throttle delay between batches
@@ -1290,111 +1289,41 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         // HELPER: Simple promise-based sleep
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        /**
-         * Individual processing logic with 429 retry implementation
-         */
-        const processSingleRecord = async (record) => {
+        // PHASE 1: Primary update of AnalysisResult records.
+        // This is the core data update. We await this fully in the UI handler.
+        const processUpdateOnly = async (record) => {
             let attempt = 0;
             const maxAttempts = 3;
 
             while (attempt <= maxAttempts) {
                 try {
-                    // PRIMARY OPERATION: Update AnalysisResult record directly.
-                    // This is the core requirement for gift minutes persistence.
                     await base44.entities.AnalysisResult.update(record.id, { 
                         ramadan_gift_minutes: record.ramadan_gift_minutes 
                     });
-
-                    // If primary update succeeds, count it as a success immediately
                     successCount++;
-
-                    // SECONDARY OPERATION: Sync with Exception entity (non-blocking).
-                    // This ensures the gift minutes are reflected as exceptions for future analysis runs.
-                    // If this fails, we log a warning but do not affect successCount or return false.
-                    try {
-                        const resultRow = results.find(r => r.id === record.id);
-                        if (resultRow) {
-                            const attId = String(resultRow.attendance_id);
-                            
-                            // SYNC: Find existing GIFT_MINUTES exception to avoid duplicates
-                            // RATE LIMIT PROTECTED READ: Ensure Exception.filter isn't failed by temporary 429 rate limit errors
-                            let existing = [];
-                            let filterAttempt = 0;
-                            while (filterAttempt < 3) {
-                                try {
-                                    existing = await base44.entities.Exception.filter({
-                                        type: 'GIFT_MINUTES',
-                                        attendance_id: attId,
-                                        project_id: project.id,
-                                        date_from: reportRun.date_from,
-                                        date_to: reportRun.date_to
-                                    });
-                                    break;
-                                } catch (error) {
-                                    const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
-                                    if (isRateLimit && filterAttempt < 2) {
-                                        await sleep(RETRY_DELAYS[filterAttempt]);
-                                        filterAttempt++;
-                                        continue;
-                                    }
-                                    throw error;
-                                }
-                            }
-
-                            if (record.ramadan_gift_minutes > 0) {
-                                // UPSERT: Create new or update existing exception
-                                const payload = {
-                                    type: 'GIFT_MINUTES',
-                                    attendance_id: attId,
-                                    project_id: project.id,
-                                    date_from: reportRun.date_from,
-                                    date_to: reportRun.date_to,
-                                    allowed_minutes: record.ramadan_gift_minutes,
-                                    use_in_analysis: true,
-                                    details: 'Automatically generated from Gift Minutes calculation'
-                                };
-
-                                if (existing.length > 0) {
-                                    await base44.entities.Exception.update(existing[0].id, { allowed_minutes: record.ramadan_gift_minutes });
-                                } else {
-                                    await base44.entities.Exception.create(payload);
-                                }
-                            } else if (existing.length > 0) {
-                                // CLEANUP: Remove exception if gift minutes value is now zero
-                                await base44.entities.Exception.delete(existing[0].id);
-                            }
-                        }
-                    } catch (syncError) {
-                        console.warn(`[SaveBatch] Exception sync failed for record ${record.id} (non-blocking):`, syncError);
-                    }
-
                     return true;
                 } catch (error) {
                     // RETRY logic for 429 Rate Limit responses (applies to primary update)
                     const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
                     if (isRateLimit && attempt < maxAttempts) {
-                        console.warn(`[SaveBatch] Rate limited for record ${record.id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
+                        console.warn(`[Phase1Update] Rate limited for record ${record.id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
                         await sleep(RETRY_DELAYS[attempt]);
                         attempt++;
                         continue;
                     }
                     
                     // TERMINAL failure for this record (primary update failed)
-                    console.error(`[SaveBatch] Permanent failure for record ${record.id}:`, error);
+                    console.error(`[Phase1Update] Permanent failure for record ${record.id}:`, error);
                     failCount++;
                     return false;
                 }
             }
         };
 
-        // BATCH CYCLE: Loop through data in chunks of BATCH_SIZE
+        // Execute Phase 1 BATCH CYCLE: Loop through data in chunks of BATCH_SIZE
         for (let i = 0; i < data.length; i += BATCH_SIZE) {
             const currentBatch = data.slice(i, i + BATCH_SIZE);
-            
-            // CONCURRENCY: Fire all updates in current batch simultaneously
-            await Promise.all(currentBatch.map(item => processSingleRecord(item)));
-
-            // THROTTLE: Delay before starting next batch to sustain database stability
+            await Promise.all(currentBatch.map(item => processUpdateOnly(item)));
             if (i + BATCH_SIZE < data.length) {
                 await sleep(BATCH_DELAY);
             }
@@ -1404,15 +1333,94 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     /**
+     * Phase 2: Background Synchronized Exception Batch
+     * This runs completely in the background without blocking the UI or showing loaders.
+     * It uses the same batching pattern for database stability.
+     */
+    const syncGiftMinutesExceptionsBatch = async (data) => {
+        const BATCH_SIZE = 8;
+        const BATCH_DELAY = 1500;
+        const RETRY_DELAYS = [1000, 2000, 4000];
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        const processSingleSync = async (record) => {
+            try {
+                const resultRow = results.find(r => r.id === record.id);
+                if (!resultRow) return;
+                const attId = String(resultRow.attendance_id);
+                
+                // Read current exceptions (with retry for 429s to sustain stability)
+                let existing = [];
+                let filterAttempt = 0;
+                while (filterAttempt < 3) {
+                    try {
+                        existing = await base44.entities.Exception.filter({
+                            type: 'GIFT_MINUTES',
+                            attendance_id: attId,
+                            project_id: project.id,
+                            date_from: reportRun.date_from,
+                            date_to: reportRun.date_to
+                        });
+                        break;
+                    } catch (error) {
+                        const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
+                        if (isRateLimit && filterAttempt < 2) {
+                            await sleep(RETRY_DELAYS[filterAttempt]);
+                            filterAttempt++;
+                            continue;
+                        }
+                        throw error;
+                    }
+                }
+
+                if (record.ramadan_gift_minutes > 0) {
+                    // UPSERT: Create new or update existing exception
+                    const payload = {
+                        type: 'GIFT_MINUTES',
+                        attendance_id: attId,
+                        project_id: project.id,
+                        date_from: reportRun.date_from,
+                        date_to: reportRun.date_to,
+                        allowed_minutes: record.ramadan_gift_minutes,
+                        use_in_analysis: true,
+                        details: 'Automatically generated from Gift Minutes calculation'
+                    };
+
+                    if (existing.length > 0) {
+                        await base44.entities.Exception.update(existing[0].id, { allowed_minutes: record.ramadan_gift_minutes });
+                    } else {
+                        await base44.entities.Exception.create(payload);
+                    }
+                } else if (existing.length > 0) {
+                    // CLEANUP: Remove exception if gift minutes value is now zero
+                    await base44.entities.Exception.delete(existing[0].id);
+                }
+            } catch (err) {
+                // Background process: Log errors to console only as requested
+                console.warn(`[Phase2Sync] Exception sync failed for record ${record.id} in background:`, err);
+            }
+        };
+
+        // BATCH CYCLE: Execute Phase 2
+        for (let i = 0; i < data.length; i += BATCH_SIZE) {
+            const currentBatch = data.slice(i, i + BATCH_SIZE);
+            await Promise.all(currentBatch.map(item => processSingleSync(item)));
+            if (i + BATCH_SIZE < data.length) {
+                await sleep(BATCH_DELAY);
+            }
+        }
+    };
+
+    /**
      * Change 2 - Calculate Gift Minutes Logic
      * Applies the rule: deductible < 30 ? full amount : 15 mins to every employee.
-     * This updates the UI overrides state immediately, then synchronizes to DB in one batched operation.
+     * This updates the UI overrides state immediately, then synchronizes to DB in two phases.
      */
     const handleCalculateAllGiftMinutes = async () => {
         const updated = { ...giftMinutesOverrides };
         const recordsToSave = [];
 
-        // 1. CALCULATE: Iterate through results and determine gift minutes based on raw attendance
+        // 1. CALCULATE: Determine gift minutes based on raw attendance
         results.forEach(r => {
             const rawMinutes = Math.max(0, r.late_minutes ?? 0) + Math.max(0, r.early_checkout_minutes ?? 0);
             const calculated = rawMinutes < 30 ? rawMinutes : 15;
@@ -1435,34 +1443,38 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const loadingToastId = toast.loading('Calculating and saving gift minutes for all employees...');
 
         try {
-            // 4. DB SYNC: Execute the batched save operation
+            // 4. DB SYNC - PHASE 1: Execute the primary batched save operation (blocking)
             const outcome = await saveGiftMinutesBatch(recordsToSave);
 
-            // 5. CACHE REFRESH: Invalidate queries to ensure UI data stays consistent with DB
-            // DELAY: Wait 2000ms before refetching to ensure read-after-write consistency 
+            // 5. RESULT FEEDBACK: Immediately provide feedback and refresh UI for Phase 1
+            toast.dismiss(loadingToastId);
+            if (outcome.failed > 0) {
+                toast.warning(`Saved ${outcome.success} employee gift minutes, but ${outcome.failed} failed after retries.`, { 
+                    duration: 5000 
+                });
+            } else {
+                toast.success(`Successfully saved gift minutes for all ${outcome.success} employees.`, { 
+                    duration: 4000 
+                });
+            }
+
+            // DELAY & REFRESH: Wait 2000ms for read-after-write consistency then invalidate
             // and allow database commitment of batch writes to stabilize.
             await new Promise(resolve => setTimeout(resolve, 2000));
             queryClient.invalidateQueries(['exceptions', project.id]);
             queryClient.invalidateQueries(['results', reportRun.id, project.id]);
 
-            // 6. RESULT FEEDBACK: Inform user of success or partial failures
-            if (outcome.failed > 0) {
-                toast.warning(`Saved ${outcome.success} employee gift minutes, but ${outcome.failed} failed after retries.`, {
-                    id: loadingToastId,
-                    duration: 5000
-                });
-            } else {
-                toast.success(`Successfully saved gift minutes for all ${outcome.success} employees.`, {
-                    id: loadingToastId,
-                    duration: 4000
-                });
-            }
+            // 6. PHASE 2: Trigger Exception sync in the background (non-blocking)
+            // This is a background non-blocking sync that doesn't show a loading indicator.
+            syncGiftMinutesExceptionsBatch(recordsToSave).catch(e => {
+                console.error('[Phase2Background] Exception sync encountered a handled error:', e);
+            });
+
         } catch (error) {
             // CATASTROPHIC FAILURE: Alert user to process-level errors
             console.error('[GiftMinutesBatch] Catastrophic failure:', error);
-            toast.error('An unexpected error occurred while saving gift minutes batch.', { 
-                id: loadingToastId 
-            });
+            toast.dismiss(loadingToastId);
+            toast.error('An unexpected error occurred while saving gift minutes batch.');
         }
     };
 

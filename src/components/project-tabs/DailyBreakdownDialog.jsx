@@ -147,7 +147,10 @@ export default function DailyBreakdownDialog({
         const employeeExceptions = exceptions.filter(e =>
             (e.attendance_id === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
             e.use_in_analysis !== false &&
-            e.is_custom_type !== true
+            e.is_custom_type !== true &&
+            // GIFT_MINUTES is a period-level summary exception (saved for the whole report range)
+            // and must not be displayed against individual days in the breakdown.
+            e.type !== 'GIFT_MINUTES'
         );
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
 
