@@ -166,6 +166,7 @@ export default function ExcelPreviewDialog({
                                 </Table>
                             </div>
                             <ScrollBar orientation="horizontal" />
+                            <ScrollBar orientation="vertical" />
                         </ScrollArea>
                     </div>
                 </div>
