@@ -83,7 +83,6 @@ export default function InlineEditableCell({
                     onChange={(e) => {
                         const next = e.target.value;
                         setEditValue(next);
-                        onValueChange?.(Number(next));
                     }}
                     onKeyDown={handleKeyDown}
                     className="h-7 w-20 text-sm"

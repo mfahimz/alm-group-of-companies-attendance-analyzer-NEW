@@ -1013,7 +1013,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                                 Final
                                                             </Badge>
                                                         )}
-                                                        {run.is_saved && (
+                                                        {project.last_saved_report_id === run.id && (
                                                             <Badge className="bg-blue-100 text-blue-700 border-blue-300">
                                                                 <Save className="w-3 h-3 mr-1" />
                                                                 Saved

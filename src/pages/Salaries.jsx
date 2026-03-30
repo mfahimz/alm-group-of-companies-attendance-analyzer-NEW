@@ -331,7 +331,6 @@ export default function Salaries() {
             const workbook = XLSX.read(data);
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
-            */
 
             if (jsonData.length === 0) {
                 toast.error('No data found in file');
@@ -347,7 +346,6 @@ export default function Salaries() {
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 
-                // Map Excel columns to fields
                 const hrmsId = String(row['EMPLOYEE ID'] || row['employee_id'] || '').trim();
                 const name = String(row['EMPLOYEE NAME'] || row['name'] || '').trim();
                 const workingHoursRaw = row['ACTUAL WORKING HOURS'] || row['working_hours'];
@@ -366,7 +364,6 @@ export default function Salaries() {
                 if (!hrmsId || !name) {
                     error = 'Missing EMPLOYEE ID or EMPLOYEE NAME';
                 } else {
-                    // Find employee by hrms_id
                     employee = employees.find(e => String(e.hrms_id) === hrmsId);
 
                     if (!employee) {
@@ -410,18 +407,15 @@ export default function Salaries() {
 
             setUploadProgress(null);
             
-            // Separate unmatched HRMS IDs from other errors
             const unmatchedHrmsRecords = errorRecords.filter(r => r.error === 'Employee not found in master data (check HRMS ID)');
             const otherErrors = errorRecords.filter(r => r.error !== 'Employee not found in master data (check HRMS ID)');
             
             if (unmatchedHrmsRecords.length > 0) {
-                // Show unmatched dialog for manual correction
                 setUnmatchedRecords(unmatchedHrmsRecords.map(r => ({ ...r, correctedHrmsId: r.hrmsId })));
                 setPendingValidRecords(validRecords);
                 setPreviewData({ valid: validRecords, errors: otherErrors });
                 setShowUnmatchedDialog(true);
             } else {
-                // No unmatched records, go directly to preview
                 setPreviewData({ valid: validRecords, errors: otherErrors });
                 setShowPreview(true);
             }
@@ -429,6 +423,7 @@ export default function Salaries() {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
+            */
         } catch (error) {
             toast.error('Failed to process file: ' + error.message);
             setUploadProgress(null);
