@@ -2,7 +2,6 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Clock, FileText, FolderKanban, Building2, AlertCircle, ArrowRight, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { createPageUrl } from '../../utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -49,7 +48,7 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
         <div className="space-y-6">
             {/* Attendance Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Link to={createPageUrl('Projects')} className="block">
+                <Link to="/projects" className="block">
                     <Card className="border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer bg-gradient-to-br from-indigo-50 to-indigo-100">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between">
@@ -66,7 +65,7 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                     </Card>
                 </Link>
 
-                <Link to={createPageUrl('Projects')} className="block">
+                <Link to="/projects" className="block">
                     <Card className="border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer bg-gradient-to-br from-amber-50 to-amber-100">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between">
@@ -83,7 +82,7 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                     </Card>
                 </Link>
 
-                <Link to={createPageUrl('Employees')} className="block">
+                <Link to="/employees" className="block">
                     <Card className="border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer bg-gradient-to-br from-blue-50 to-blue-100">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between">
@@ -100,7 +99,7 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                     </Card>
                 </Link>
 
-                <Link to={createPageUrl('Projects')} className="block">
+                <Link to="/projects" className="block">
                     <Card className="border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer bg-gradient-to-br from-purple-50 to-purple-100">
                         <CardContent className="p-5">
                             <div className="flex items-center justify-between">
@@ -179,7 +178,7 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                                 </div>
                                 <CardTitle className="text-lg">Needs Attention</CardTitle>
                             </div>
-                            <Link to={createPageUrl('Projects')}>
+                            <Link to="/projects">
                                 <Button variant="ghost" size="sm" className="text-indigo-600">
                                     View all <ArrowRight className="w-4 h-4 ml-1" />
                                 </Button>
@@ -194,9 +193,9 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                                 <>
                                     {draftProjects.slice(0, 4).map((project) => (
                                         <Link
-                                            key={project.id}
-                                            to={createPageUrl(`ProjectDetail?projectId=${project.id}`)}
-                                            className="flex items-center justify-between p-3 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors"
+                                           key={project.id}
+                                           to={`/projectdetail?projectId=${project.id}`}
+                                           className="flex items-center justify-between p-3 rounded-lg bg-amber-50 hover:bg-amber-100 transition-colors"
                                         >
                                             <div>
                                                 <p className="font-medium text-slate-900">{project.name}</p>
@@ -207,9 +206,9 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                                     ))}
                                     {analyzedProjects.slice(0, 4).map((project) => (
                                         <Link
-                                            key={project.id}
-                                            to={createPageUrl(`ProjectDetail?projectId=${project.id}`)}
-                                            className="flex items-center justify-between p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors"
+                                           key={project.id}
+                                           to={`/projectdetail?projectId=${project.id}`}
+                                           className="flex items-center justify-between p-3 rounded-lg bg-green-50 hover:bg-green-100 transition-colors"
                                         >
                                             <div>
                                                 <p className="font-medium text-slate-900">{project.name}</p>
@@ -236,33 +235,33 @@ export default function SupervisorDashboard({ currentUser, projects, employees }
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-3">
-                            <Link to={createPageUrl('Projects')}>
+                            <Link to="/projects">
                                 <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-indigo-50 hover:border-indigo-200">
                                     <FolderKanban className="w-5 h-5 text-indigo-600" />
                                     <span className="text-sm">New Project</span>
                                 </Button>
                             </Link>
-                            <Link to={createPageUrl('Employees')}>
+                            <Link to="/employees">
                                 <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-blue-50 hover:border-blue-200">
                                     <Users className="w-5 h-5 text-blue-600" />
                                     <span className="text-sm">Employees</span>
                                 </Button>
                             </Link>
-                            <Link to={createPageUrl('Reports')}>
+                            <Link to="/projects">
                                 <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-green-50 hover:border-green-200">
                                     <FileText className="w-5 h-5 text-green-600" />
-                                    <span className="text-sm">Reports</span>
+                                    <span className="text-sm">Projects</span>
                                 </Button>
                             </Link>
                             {hasPayrollCompany ? (
-                                <Link to={createPageUrl('Salaries')}>
+                                <Link to="/salaries">
                                     <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-green-50 hover:border-green-200">
                                         <DollarSign className="w-5 h-5 text-green-600" />
                                         <span className="text-sm">Salaries</span>
                                     </Button>
                                 </Link>
                             ) : (
-                                <Link to={createPageUrl('Projects')}>
+                                <Link to="/projects">
                                     <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-slate-50 hover:border-slate-200">
                                         <FolderKanban className="w-5 h-5 text-slate-600" />
                                         <span className="text-sm">All Projects</span>
