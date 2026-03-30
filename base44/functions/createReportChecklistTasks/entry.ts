@@ -86,6 +86,14 @@ Deno.serve(async (req) => {
         const analysisResults = await fetchAllRecords(base44.asServiceRole.entities.AnalysisResult, { report_run_id: reportRunId });
         if (analysisResults.length === 0) return Response.json({ success: true, message: 'No analysis results found' });
 
+        const attendanceRecords = await fetchAllRecords(base44.asServiceRole.entities.Attendance, { project_id: projectId });
+        const attendanceNameMap: Record<string, string> = {};
+        for (const record of attendanceRecords) {
+            if (record.attendance_id != null) {
+                attendanceNameMap[String(record.attendance_id)] = record.name || '';
+            }
+        }
+
         const otherMinutesExceptions = await fetchAllRecords(base44.asServiceRole.entities.Exception, {
             project_id: projectId,
             type: 'MANUAL_OTHER_MINUTES'
@@ -106,8 +114,8 @@ Deno.serve(async (req) => {
         const expectedTasks: Array<{ fingerprint: string, type: string, description: string, notes: string }> = [];
 
         for (const res of analysisResults) {
-            const name = res.employee_name || res.attendance_id || 'Unknown';
             const attId = res.attendance_id || '';
+            const name = attendanceNameMap[String(attId)] || attId || 'Unknown';
             const lop = Number(res.full_absence_count) || 0;
             const other = Number(res.other_minutes) || 0;
             const lopAdj = Number(res.lop_adjacent_weekly_off_count) || 0;
@@ -117,10 +125,12 @@ Deno.serve(async (req) => {
                 const fp = `LopDays_${projectId}_${attId}_${lop}_${nameKey}`;
 
                 let lopDatesStr = '';
+                let lopDateRange = reportPeriod;
                 if (res.lop_dates) {
                     const lopArray = String(res.lop_dates).split(',').map(d => d.trim()).filter(d => d);
                     if (lopArray.length > 0) {
                         lopDatesStr = lopArray.map(d => `- ${d}`).join('\n') + '\n';
+                        lopDateRange = lopArray.length === 1 ? lopArray[0] : `${lopArray[0]} to ${lopArray[lopArray.length - 1]}`;
                     }
                 }
                 
@@ -135,7 +145,7 @@ Deno.serve(async (req) => {
                 expectedTasks.push({
                     fingerprint: fp,
                     type: 'LOP Days',
-                    description: `${name} | LOP Days: ${lop} | Report: ${reportName}`,
+                    description: `${name} | LOP Days: ${lop} | ${lopDateRange}`,
                     notes: `Employee: ${name}\nID: ${attId}\nLOP Days:\n${lopDatesStr}${doubleDedStr}Total LOP Days: ${lop}\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
                 });
             }
@@ -144,16 +154,19 @@ Deno.serve(async (req) => {
                 const fp = `OtherMinutes_${projectId}_${attId}_${other}_${nameKey}`;
                 
                 let otherNotesStr = '';
+                let otherDateRange = reportPeriod;
                 const employeeOtherEx = otherMinutesMap[String(attId)] || [];
                 if (employeeOtherEx.length > 0) {
                     const sortedEx = [...employeeOtherEx].sort((a, b) => new Date(a.date_from).getTime() - new Date(b.date_from).getTime());
                     otherNotesStr = sortedEx.map(ex => `- ${ex.date_from}: ${ex.allowed_minutes} min`).join('\n') + '\n';
+                    const dates = sortedEx.map(ex => ex.date_from);
+                    otherDateRange = dates.length === 1 ? dates[0] : `${dates[0]} to ${dates[dates.length - 1]}`;
                 }
 
                 expectedTasks.push({
                     fingerprint: fp,
                     type: 'Other Minutes',
-                    description: `${name} | Other Minutes: ${other} min | Report: ${reportName}`,
+                    description: `${name} | Other Minutes: ${other} min | ${otherDateRange}`,
                     notes: `Employee: ${name}\nID: ${attId}\nOther Minutes Breakdown:\n${otherNotesStr}Total Other Minutes: ${other} min\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
                 });
             }
@@ -163,17 +176,19 @@ Deno.serve(async (req) => {
                 const fp = `DoubleDeduction_${projectId}_${attId}_${lopAdj}_${nameKey}`;
                 
                 let doubleDedNotes = '';
+                let dedDateRange = reportPeriod;
                 if (res.lop_adjacent_weekly_off_dates) {
                     const dedArray = String(res.lop_adjacent_weekly_off_dates).split(',').map(d => d.trim()).filter(d => d);
                     if (dedArray.length > 0) {
                         doubleDedNotes = dedArray.map(d => `- ${d}`).join('\n') + '\n';
+                        dedDateRange = dedArray.length === 1 ? dedArray[0] : `${dedArray[0]} to ${dedArray[dedArray.length - 1]}`;
                     }
                 }
 
                 expectedTasks.push({
                     fingerprint: fp,
                     type: 'Double Deduction Days',
-                    description: `${name} | Double Deduction Days: ${lopAdj} | Report: ${reportName}`,
+                    description: `${name} | Double Deduction Days: ${lopAdj} | ${dedDateRange}`,
                     notes: `Employee: ${name}\nID: ${attId}\nDouble Deduction Days:\n${doubleDedNotes}Total Double Deduction Days: ${lopAdj}\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
                 });
             }
