@@ -76,8 +76,85 @@ export default function ExcelPreviewDialog({
                     </div>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-hidden px-6 py-6 bg-slate-50/40">
+                <div className="flex-1 overflow-hidden px-6 py-4 bg-slate-50/40">
                     <div className="border border-slate-200 rounded-xl bg-white shadow-sm overflow-auto max-h-[50vh]">
+                        <Table className="border-collapse table-auto w-full">
+                            <TableHeader className="bg-slate-50 sticky top-0 z-20">
+                                <TableRow className="hover:bg-transparent border-b border-slate-200">
+                                    <TableHead className="w-[60px] text-center border-r border-slate-200 font-bold text-slate-500 bg-slate-50 sticky left-0 z-30 px-3">
+                                        #
+                                    </TableHead>
+                                    {headers.map((header, idx) => (
+                                        <TableHead 
+                                            key={idx} 
+                                            className="whitespace-nowrap px-4 py-4 font-bold text-slate-700 border-r border-slate-200 last:border-r-0 min-w-[120px]"
+                                        >
+                                            {header}
+                                        </TableHead>
+                                    ))}
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {previewRows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={headers.length + 1} className="h-48 text-center">
+                                            <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+                                                <FileSpreadsheet className="w-8 h-8 opacity-20" />
+                                                <p className="italic font-medium">No data available to preview</p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    previewRows.map((row, rowIdx) => (
+                                        <TableRow key={rowIdx} className="hover:bg-blue-50/40 transition-colors border-b border-slate-100 last:border-0">
+                                            <TableCell className="text-center text-slate-400 text-[10px] border-r border-slate-100 bg-slate-50/30 sticky left-0 z-10 font-mono">
+                                                {(rowIdx + 1).toString().padStart(2, '0')}
+                                            </TableCell>
+                                            {headers.map((header, colIdx) => {
+                                                let value;
+                                                if (Array.isArray(row)) {
+                                                    value = row[colIdx];
+                                                } else {
+                                                    value = row[header];
+                                                }
+                                                const isMergedColumn = simulateMergeColumns.includes(header);
+                                                let shouldHideValue = false;
+                                                if (isMergedColumn && rowIdx > 0) {
+                                                    const prevRow = previewRows[rowIdx - 1];
+                                                    const prevValue = Array.isArray(prevRow) ? prevRow[colIdx] : prevRow[header];
+                                                    if (value === prevValue && value !== null && value !== undefined) {
+                                                        shouldHideValue = true;
+                                                    }
+                                                }
+                                                return (
+                                                    <TableCell key={colIdx} className="whitespace-nowrap px-4 py-3 border-r border-slate-100 last:border-r-0 text-sm text-slate-600 font-medium">
+                                                        {shouldHideValue ? (
+                                                            <span className="opacity-0">&mdash;</span>
+                                                        ) : value === null || value === undefined ? (
+                                                            <span className="text-slate-300">-</span>
+                                                        ) : typeof value === 'number' ? (
+                                                            <span className="font-mono text-slate-800">
+                                                                {value % 1 === 0 ? value : value.toFixed(2)}
+                                                            </span>
+                                                        ) : String(value)}
+                                                    </TableCell>
+                                                );
+                                            })}
+                                        </TableRow>
+                                    ))
+                                )}
+                                {hasMoreRows && (
+                                    <TableRow>
+                                        <TableCell 
+                                            colSpan={headers.length + 1} 
+                                            className="bg-slate-50/50 text-center py-6 text-slate-500 italic text-sm font-medium border-t border-slate-200"
+                                        >
+                                            ... showing only first {displayLimit} of {data.length.toLocaleString()} total rows ...
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
                 </div>
 
