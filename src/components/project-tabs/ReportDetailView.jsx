@@ -779,6 +779,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
+            // STEP 3: Create checklist tasks for LOP and Other Minutes
+            try {
+                await base44.functions.invoke('createReportChecklistTasks', {
+                    reportRunId: reportRun.id,
+                    action: 'upsert'
+                });
+                console.log('[ReportDetailView] Auto-checklist tasks created successfully');
+            } catch (checklistError) {
+                console.warn('[ReportDetailView] Failed to create checklist tasks:', checklistError.message);
+            }
+
             return markResult.data;
         },
         onSuccess: async () => {
