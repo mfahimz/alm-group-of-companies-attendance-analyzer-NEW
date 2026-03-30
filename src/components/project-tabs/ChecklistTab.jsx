@@ -82,6 +82,7 @@ export default function ChecklistTab({ project }) {
         due_date: '',
         notes: ''
     });
+    const [selectedTaskType, setSelectedTaskType] = useState(null);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -254,6 +255,10 @@ export default function ChecklistTab({ project }) {
         }
     });
 
+    const filteredChecklistItems = selectedTaskType 
+        ? checklistItems.filter(t => t.task_type === selectedTaskType)
+        : checklistItems;
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-12">
@@ -268,33 +273,50 @@ export default function ChecklistTab({ project }) {
             {checklistItems.length > 0 && (
                 <Card className="border-0 shadow-sm">
                     <CardContent className="py-4">
-                        <div className="flex items-center gap-2 overflow-x-auto">
-                            <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
-                            <div className="flex flex-wrap gap-2">
-                                {Object.entries(taskTypeStats).map(([taskType, stats]) => {
-                                    const isComplete = stats.completed === stats.total;
-                                    return (
-                                        <div
-                                            key={taskType}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
-                                                isComplete 
-                                                    ? 'bg-green-50 border-green-200 text-green-700' 
-                                                    : 'bg-white border-slate-200 text-slate-700'
-                                            }`}
-                                        >
-                                            {isComplete ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                                            ) : (
-                                                <Circle className="w-3.5 h-3.5 text-slate-400" />
-                                            )}
-                                            <span className="whitespace-nowrap">{taskType}</span>
-                                            <span className={`ml-1 ${isComplete ? 'text-green-600' : 'text-slate-500'}`}>
-                                                {stats.completed}/{stats.total}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.entries(taskTypeStats).map(([taskType, stats]) => {
+                                        const isComplete = stats.completed === stats.total;
+                                        const isSelected = selectedTaskType === taskType;
+                                        return (
+                                            <div
+                                                key={taskType}
+                                                onClick={() => setSelectedTaskType(prev => prev === taskType ? null : taskType)}
+                                                title="Click to filter"
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all cursor-pointer ${
+                                                    isSelected
+                                                        ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-500 bg-indigo-50'
+                                                        : isComplete 
+                                                            ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
+                                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {isComplete ? (
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                                ) : (
+                                                    <Circle className="w-3.5 h-3.5 text-slate-400" />
+                                                )}
+                                                <span className="whitespace-nowrap">{taskType}</span>
+                                                <span className={`ml-1 ${isComplete ? 'text-green-600' : 'text-slate-500'}`}>
+                                                    {stats.completed}/{stats.total}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
+                            {selectedTaskType && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setSelectedTaskType(null)}
+                                    className="text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 shrink-0 ml-4"
+                                >
+                                    Clear Filter
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -394,7 +416,7 @@ export default function ChecklistTab({ project }) {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {checklistItems.map((task) => (
+                                    {filteredChecklistItems.map((task) => (
                                         <TableRow
                                             key={task.id}
                                             className={[
