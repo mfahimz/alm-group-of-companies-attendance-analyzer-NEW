@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
             while (has_more) {
                 try {
                     console.log(`[adminFinalizeReport] Calling createSalarySnapshots batch: batch_start=${batch_start}, batch_size=${batch_size}`);
-                    const batchResult = await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
+                    const batchResult = await base44.functions.invoke('createSalarySnapshots', {
                         project_id,
                         report_run_id,
                         batch_mode: true,
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
 
         // --- NEW: Create Checklist Tasks for LOP and Other Minutes ---
         try {
-            await base44.asServiceRole.functions.invoke('createReportChecklistTasks', {
+            await base44.functions.invoke('createReportChecklistTasks', {
                 reportRunId: report_run_id,
                 action: 'upsert'
             });
