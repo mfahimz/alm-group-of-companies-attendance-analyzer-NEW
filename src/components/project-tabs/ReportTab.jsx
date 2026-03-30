@@ -933,7 +933,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                             />
                                         </TableHead>
                                         <TableHead>Report Name</TableHead>
-                                        <TableHead>Generated On</TableHead>
                                         <TableHead>Period</TableHead>
                                         <TableHead>{isDepartmentHead ? 'Your Team' : 'Employees'}</TableHead>
                                         <TableHead>Verified</TableHead>
@@ -968,17 +967,6 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                             <Pencil className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
                                                         </Button>
                                                     </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {new Date(run.created_date).toLocaleString('en-US', {
-                                                        day: '2-digit',
-                                                        month: '2-digit',
-                                                        year: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                        timeZone: 'Asia/Dubai'
-                                                    })}
                                                 </TableCell>
                                                 <TableCell>
                                                     {new Date(run.date_from).toLocaleDateString()} - {new Date(run.date_to).toLocaleDateString()}
