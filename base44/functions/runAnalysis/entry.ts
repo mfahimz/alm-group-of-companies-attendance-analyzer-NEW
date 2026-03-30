@@ -715,6 +715,7 @@ Deno.serve(async (req: Request) => {
             const abnormal_dates_set = new Set();
             const critical_abnormal_dates_set = new Set();
             const auto_resolutions: any[] = [];
+            const lopDatesSet = new Set<string>();
             // Track per-date status for LOP-adjacent weekly off calculation (done after main loop)
             const dateStatusMap: Record<string, string> = {}; // dateStr -> 'LOP' | 'SICK_LEAVE' | 'PRESENT' | 'ANNUAL_LEAVE' | 'OTHER'
 
@@ -883,6 +884,7 @@ Deno.serve(async (req: Request) => {
                     if (hasManualAbsent) {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
                     } else {
                         dateStatusMap[dateStr] = 'PUBLIC_HOLIDAY';
                     }
@@ -970,6 +972,7 @@ Deno.serve(async (req: Request) => {
                     } else if (dateException.type === 'MANUAL_ABSENT') {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
                         continue;
                     } else if (dateException.type === 'SICK_LEAVE') {
                         // Sick leave counts as WORKING DAY (no deduction from working_days)
@@ -1176,6 +1179,7 @@ Deno.serve(async (req: Request) => {
                     if (!dateException || (dateException.type !== 'MANUAL_PRESENT')) {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
                     } else {
                         presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT';
@@ -1536,6 +1540,8 @@ Deno.serve(async (req: Request) => {
                 .sort()
                 .join(', ');
 
+            const lopDatesStr = [...lopDatesSet].sort().join(', ');
+
             return {
                 attendance_id,
                 working_days: Math.max(0, workingDays),
@@ -1555,6 +1561,7 @@ Deno.serve(async (req: Request) => {
                 auto_resolutions: autoResolutionNotes,
                 lop_adjacent_weekly_off_count: Math.max(0, lopAdjacentWeeklyOffCount),
                 lop_adjacent_weekly_off_dates: lopAdjacentWeeklyOffDates,
+                lop_dates: lopDatesStr,
                 // CRITICAL: Only include other minutes that did NOT come from existing exceptions.
                 // Other minutes from existing exceptions are already in the DB — do NOT re-create them.
                 // otherMinutesByDate = from NON-exception sources (should be created as new exceptions)
