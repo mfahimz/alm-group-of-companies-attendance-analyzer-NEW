@@ -1,0 +1,77 @@
+{
+  "name": "ChecklistItem",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Reference to project"
+    },
+    "task_description": {
+      "type": "string",
+      "description": "Description of the checklist task"
+    },
+    "task_type": {
+      "type": "string",
+      "description": "Type/category of the task (e.g., 'Punch Verification', 'Exception Review', 'Annual Leave', 'Rejoining Date', 'LOP Days', 'Other Minutes')"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed"
+      ],
+      "default": "pending",
+      "description": "Current status of the task"
+    },
+    "is_predefined": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this is a system-defined task, false if custom user-added"
+    },
+    "is_auto_created": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if this task was automatically created by an entity automation (e.g., from an AnnualLeave or SalaryReport change). Auto-created tasks are deleted and recreated on source record changes and should not be manually deleted."
+    },
+    "fingerprint": {
+      "type": "string",
+      "description": "Unique fingerprint string used to deduplicate auto-created tasks (e.g., LopDays_projectId_attId_count_name)"
+    },
+    "linked_annual_leave_id": {
+      "type": "string",
+      "description": "Reference to the AnnualLeave entity record that triggered creation of this task. Used to find and delete stale tasks when the leave record is updated or deleted."
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Optional due date for the task"
+    },
+    "assigned_to": {
+      "type": "string",
+      "description": "Email of user assigned to this task"
+    },
+    "completed_by": {
+      "type": "string",
+      "description": "Email of user who completed the task"
+    },
+    "completed_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the task was completed"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes or comments about the task"
+    },
+    "linked_exception_id": {
+      "type": "string",
+      "description": "Reference to Exception entity if this task is linked to an exception (e.g., other minutes approval)"
+    }
+  },
+  "required": [
+    "project_id",
+    "task_description",
+    "task_type"
+  ]
+}

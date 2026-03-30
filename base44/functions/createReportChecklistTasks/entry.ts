@@ -86,9 +86,9 @@ Deno.serve(async (req) => {
         const analysisResults = await fetchAllRecords(base44.asServiceRole.entities.AnalysisResult, { report_run_id: reportRunId });
         if (analysisResults.length === 0) return Response.json({ success: true, message: 'No analysis results found' });
 
-        const attendanceRecords = await fetchAllRecords(base44.asServiceRole.entities.Attendance, { project_id: projectId });
+        const employeeRecords = await fetchAllRecords(base44.asServiceRole.entities.Employee, { company: project.company });
         const attendanceNameMap: Record<string, string> = {};
-        for (const record of attendanceRecords) {
+        for (const record of employeeRecords) {
             if (record.attendance_id != null) {
                 attendanceNameMap[String(record.attendance_id)] = record.name || '';
             }
