@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatInUAE } from '@/components/ui/timezone';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { useNavigate } from 'react-router-dom';
@@ -536,21 +537,13 @@ export default function EmployeeProfile() {
                             <div>
                                 <label className="text-sm text-slate-500">Created On</label>
                                 <p className="font-medium text-slate-900">
-                                    {new Date(employee.created_date).toLocaleString('en-US', {
-                                        day: '2-digit', month: '2-digit', year: 'numeric',
-                                        hour: '2-digit', minute: '2-digit', hour12: true,
-                                        timeZone: 'Asia/Dubai'
-                                    })}
+                                    {formatInUAE(employee.created_date, 'dd/MM/yyyy hh:mm a')}
                                 </p>
                             </div>
                             <div>
                                 <label className="text-sm text-slate-500">Last Updated</label>
                                 <p className="font-medium text-slate-900">
-                                    {new Date(employee.updated_date).toLocaleString('en-US', {
-                                        day: '2-digit', month: '2-digit', year: 'numeric',
-                                        hour: '2-digit', minute: '2-digit', hour12: true,
-                                        timeZone: 'Asia/Dubai'
-                                    })}
+                                    {formatInUAE(employee.updated_date, 'dd/MM/yyyy hh:mm a')}
                                 </p>
                             </div>
                         </div>

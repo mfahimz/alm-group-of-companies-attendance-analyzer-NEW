@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { formatInUAE } from '@/components/ui/timezone';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -525,15 +526,7 @@ export default function SalaryTab({ project }) {
                                             <TableRow key={report.id} className="hover:bg-slate-100/50 transition-colors duration-200">
                                                 <TableCell className="font-medium">{report.report_name}</TableCell>
                                                 <TableCell className="text-slate-600">
-                                                    {new Date(report.created_date).toLocaleString('en-US', {
-                                                        day: '2-digit',
-                                                        month: '2-digit',
-                                                        year: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                        hour12: true,
-                                                        timeZone: 'Asia/Dubai'
-                                                    })}
+                                                    {formatInUAE(report.created_date, 'dd/MM/yyyy hh:mm a')}
                                                 </TableCell>
                                                 <TableCell>{report.date_from} - {report.date_to}</TableCell>
                                                 <TableCell>{report.employee_count}</TableCell>

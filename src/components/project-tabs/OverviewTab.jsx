@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { formatInUAE } from '@/components/ui/timezone';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -449,30 +450,14 @@ export default function OverviewTab({ project }) {
                         <div>
                             <p className="text-sm text-slate-600">Created Date</p>
                             <p className="font-medium text-slate-900 mt-1">
-                                {new Date(project.created_date).toLocaleString('en-US', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: true,
-                                    timeZone: 'Asia/Dubai'
-                                })}
+                                {formatInUAE(project.created_date, 'dd/MM/yyyy hh:mm a')}
                             </p>
                         </div>
                         {project.updated_date && (
                             <div>
                                 <p className="text-sm text-slate-600">Last Analysis</p>
                                 <p className="font-medium text-slate-900 mt-1">
-                                    {new Date(project.updated_date).toLocaleString('en-US', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: true,
-                                        timeZone: 'Asia/Dubai'
-                                    })}
+                                    {formatInUAE(project.updated_date, 'dd/MM/yyyy hh:mm a')}
                                 </p>
                             </div>
                         )}
