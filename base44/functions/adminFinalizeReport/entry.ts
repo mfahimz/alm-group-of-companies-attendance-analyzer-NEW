@@ -55,18 +55,47 @@ Deno.serve(async (req) => {
         });
 
         // Create salary snapshots for Al Maraghi Motors ONLY
+        // Uses a batch loop identical to the frontend finalizeReportMutation pattern.
+        // This is required for projects with more than 10 employees to avoid
+        // timeout errors that occur with a single non-batch invocation.
         const project = projects[0];
         if (project.company === 'Al Maraghi Motors') {
-            try {
-                await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
-                    project_id,
-                    report_run_id
-                });
-                console.log('[adminFinalizeReport] Salary snapshots created for Al Maraghi Motors');
-            } catch (salaryError) {
-                console.warn('[adminFinalizeReport] Failed to create salary snapshots:', salaryError.message);
-                // Don't block finalization if salary snapshot creation fails
+            let batch_start = 0;
+            const batch_size = 10;
+            let has_more = true;
+            let totalProcessed = 0;
+
+            while (has_more) {
+                try {
+                    // Each batch processes up to batch_size employees starting from batch_start.
+                    // batch_mode=true tells createSalarySnapshots to use paginated processing.
+                    const batchResult = await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
+                        project_id,
+                        report_run_id,
+                        batch_mode: true,
+                        batch_start,
+                        batch_size
+                    });
+
+                    const batchData = batchResult?.data || batchResult || {};
+                    has_more = batchData.has_more === true;
+                    batch_start = batchData.current_position ?? (batch_start + batch_size);
+                    totalProcessed = batch_start;
+
+                    console.log(`[adminFinalizeReport] Salary snapshot batch completed: processed up to position ${batch_start}, has_more=${has_more}`);
+
+                    // Wait 300ms between batches to avoid overloading the function
+                    if (has_more) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } catch (salaryError) {
+                    console.error('[adminFinalizeReport] Salary snapshot batch failed:', salaryError.message);
+                    // Break the loop on error — don't block finalization
+                    break;
+                }
             }
+
+            console.log(`[adminFinalizeReport] Salary snapshots completed for Al Maraghi Motors. Total employees processed: ${totalProcessed}`);
         }
 
         // Log audit (with error handling to not block finalization)
