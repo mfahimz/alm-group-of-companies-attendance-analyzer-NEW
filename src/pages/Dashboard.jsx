@@ -30,6 +30,18 @@ export default function Dashboard() {
     }, [currentUser, isDeptHead, navigate]);
 
     const { data: allProjects = [], isLoading: projectsLoading } = useQuery({
+        queryKey: ['projects', selectedCompany],
+        queryFn: async () => {
+            if (selectedCompany) {
+                return base44.entities.Project.filter({ company: selectedCompany }, '-created_date', 100);
+            }
+            return base44.entities.Project.list('-created_date', 100);
+        },
+        enabled: !!currentUser,
+        staleTime: 5 * 60 * 1000
+    });
+
+    const { data: allEmployees = [], isLoading: employeesLoading } = useQuery({
         queryKey: ['employees', selectedCompany],
         queryFn: async () => {
             if (selectedCompany) {
