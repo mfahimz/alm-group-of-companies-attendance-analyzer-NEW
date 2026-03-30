@@ -212,33 +212,7 @@ Deno.serve(async (req) => {
 
             console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSnapshots} existing snapshots`);
 
-            // Return appropriate response based on mode
-            if (batch_mode) {
-                // Batch mode: Return batch-style response indicating completion
-                return Response.json({
-                    success: true,
-                    batch_mode: true,
-                    batch_completed: 0,
-                    total_employees: existingSnapshots.length,
-                    current_position: existingSnapshots.length,
-                    has_more: false,
-                    repaired_snapshots: repairedSnapshots,
-                    message: `Snapshots already exist (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`,
-                    current_batch: []
-                });
-
-                if (changed) {
-                    await base44.asServiceRole.entities.SalaryReport.update(salaryReport.id, {
-                        snapshot_data: JSON.stringify(repairedData)
-                    });
-                    repairedSalaryReports++;
-                }
-            }
-
-            console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSalaryReports} salary reports`);
-
-            // Return early only for non-batch mode.
-            // In batch mode we must continue processing remaining employees, not stop at first partial batch.
+            // NON-BATCH MODE: Return early — all employees already processed
             if (!batch_mode) {
                 return Response.json({
                     success: true,
@@ -247,16 +221,12 @@ Deno.serve(async (req) => {
                     repaired_snapshots: repairedSnapshots,
                     message: `Snapshots already exist for this report (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`
                 });
-
-                if (changed) {
-                    await base44.asServiceRole.entities.SalaryReport.update(salaryReport.id, {
-                        snapshot_data: JSON.stringify(repairedData)
-                    });
-                    repairedSalaryReports++;
-                }
             }
 
-            console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: existing snapshots repaired; continuing with remaining employees`);
+            // BATCH MODE: Do NOT return early. The existingSnapshotKeys set already tracks
+            // which employees have snapshots. The main loop below will skip them via the
+            // existingSnapshotKeys.has() check and only create snapshots for NEW employees.
+            console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: ${existingSnapshots.length} existing snapshots tracked; continuing to process remaining employees`);
         }
 
         console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: proceeding with snapshot creation flow`);
