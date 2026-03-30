@@ -45,7 +45,8 @@
         "CUSTOM",
         "DISMISSED_MISMATCH",
         "HALF_DAY_HOLIDAY",
-        "SKIP_DOUBLE_DEDUCTION"
+        "SKIP_DOUBLE_DEDUCTION",
+        "WORK_FROM_HOME"
       ],
       "description": "Exception type"
     },
