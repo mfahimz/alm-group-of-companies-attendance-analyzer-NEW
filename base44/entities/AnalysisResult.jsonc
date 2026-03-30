@@ -1,0 +1,135 @@
+{
+  "name": "AnalysisResult",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Reference to project"
+    },
+    "calendar_period_id": {
+      "type": "string",
+      "description": "Reference to CalendarPeriod (used when operating under calendar-based payroll system)"
+    },
+    "report_run_id": {
+      "type": "string",
+      "description": "Reference to the report run that generated this result"
+    },
+    "attendance_id": {
+      "type": "string",
+      "description": "Employee attendance ID"
+    },
+    "working_days": {
+      "type": "number",
+      "description": "Total working days in period"
+    },
+    "present_days": {
+      "type": "number",
+      "description": "Days marked as present"
+    },
+    "full_absence_count": {
+      "type": "number",
+      "description": "Full day absences (LOP) - includes LOP-adjacent weekly off days"
+    },
+    "half_absence_count": {
+      "type": "number",
+      "description": "Half day absences"
+    },
+    "sick_leave_count": {
+      "type": "number",
+      "description": "Sick leave days"
+    },
+    "annual_leave_count": {
+      "type": "number",
+      "description": "Annual leave / vacation days"
+    },
+    "late_minutes": {
+      "type": "number",
+      "description": "Total late minutes for both AM and PM shifts"
+    },
+    "early_checkout_minutes": {
+      "type": "number",
+      "description": "Total early checkout minutes"
+    },
+    "other_minutes": {
+      "type": "number",
+      "description": "Other manually added minutes not captured by regular calculations"
+    },
+    "approved_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Minutes approved by department head from quarterly allowance"
+    },
+    "deductible_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Deductible minutes for salary = (late + early) - grace - approved (stored from report for salary calculation)"
+    },
+    "grace_minutes": {
+      "type": "number",
+      "default": 15,
+      "description": "Grace minutes allowed for this employee"
+    },
+    "ramadan_gift_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Ramadan gift minutes granted to this employee for this specific report only. Reduces deductible_minutes. Scoped to report_run_id \u2014 no carryover."
+    },
+    "lop_adjacent_weekly_off_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of weekly off days adjacent to LOP that were also counted as LOP (double deduction)"
+    },
+    "lop_adjacent_weekly_off_dates": {
+      "type": "string",
+      "description": "Comma-separated dates of weekly off days that were counted as LOP due to LOP adjacency"
+    },
+    "lop_dates": {
+      "type": "string",
+      "description": "Comma-separated list of specific dates marked as LOP for this employee in this report run. Format matches lop_adjacent_weekly_off_dates."
+    },
+    "abnormal_dates": {
+      "type": "string",
+      "description": "Comma-separated dates with abnormalities"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Critical issues only (RED abnormalities)"
+    },
+    "auto_resolutions": {
+      "type": "string",
+      "description": "Auto-resolved issues like missing punches and partial days"
+    },
+    "day_overrides": {
+      "type": "string",
+      "description": "JSON string of per-day manual overrides for this specific report"
+    },
+    "exception_offsets": {
+      "type": "string",
+      "description": "JSON string tracking per-day allowed minutes exceptions and what they offset. Format: {date: {exception_id, offset_late, offset_early, exception_type}}"
+    },
+    "manual_present_days": {
+      "type": "number",
+      "description": "Admin manual override for present days - used for salary calculation when set"
+    },
+    "manual_annual_leave_count": {
+      "type": "number",
+      "description": "Admin manual override for annual leave days - used for salary calculation when set"
+    },
+    "manual_sick_leave_count": {
+      "type": "number",
+      "description": "Admin manual override for sick leave days - used for salary calculation when set"
+    },
+    "manual_full_absence_count": {
+      "type": "number",
+      "description": "Admin manual override for LOP days - used for salary calculation when set"
+    },
+    "manual_deductible_minutes": {
+      "type": "number",
+      "description": "Admin manual override for total deductible minutes - used for salary calculation when set"
+    }
+  },
+  "required": [
+    "project_id",
+    "attendance_id"
+  ]
+}
