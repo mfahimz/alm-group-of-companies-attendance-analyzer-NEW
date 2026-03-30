@@ -494,7 +494,7 @@ export default function DailyBreakdownDialog({
 
             if (reportGeneratedException && !dayOverrides[dateStr]) {
                 // REPORT GENERATED EXCEPTION: mirrors runAnalysis logic exactly - if HR edited this day in a previous report apply those values directly and skip punch computation.
-                if (['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'PUBLIC_HOLIDAY'].includes(reportGeneratedException.type)) {
+                if (['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME'].includes(reportGeneratedException.type)) {
                     // Status handled in status section, ensure minutes remain 0
                     dayLateMinutes = 0;
                     dayEarlyMinutes = 0;
@@ -512,7 +512,7 @@ export default function DailyBreakdownDialog({
             } else {
                 // If no reportGeneratedException exists: Run punch-based calculation if shift and punchMatches exist and shouldSkipTimeCalc is false
                 const shouldSkipTimeCalc = (dateException && [
-                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME'
                 ].includes(dateException.type));
 
                 if (!shouldSkipTimeCalc && shift && punchMatches.length > 0) {
@@ -598,6 +598,7 @@ export default function DailyBreakdownDialog({
                 else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
                 else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
                 else if (dateException.type === 'ANNUAL_LEAVE') status = dayPunches.length > 0 ? 'Present' : 'Annual Leave';
+                else if (dateException.type === 'WORK_FROM_HOME') status = 'Work From Home';
                 else if (dateException.type === 'MANUAL_LATE' || dateException.type === 'MANUAL_EARLY_CHECKOUT') {
                     status = dayPunches.length > 0 ? 'Present' : 'Present (Manual)';
                 } else if (dayPunches.length > 0) {
@@ -676,6 +677,7 @@ export default function DailyBreakdownDialog({
                 else if (dayOverride.type === 'MANUAL_ABSENT') status = 'Absent (Edited)';
                 else if (dayOverride.type === 'OFF') status = 'Off (Edited)';
                 else if (dayOverride.type === 'SICK_LEAVE') status = 'Sick Leave (Admin)';
+                else if (dayOverride.type === 'WORK_FROM_HOME') status = 'Work From Home (Edited)';
 
                 if (dayOverride.lateMinutes !== undefined) {
                     lateMinutesTotal = Math.max(0, dayOverride.lateMinutes);

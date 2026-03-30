@@ -20,6 +20,11 @@ export const EXCEPTION_TYPES = [
         categories: ['general', 'filter', 'report_filter', 'day_override'] 
     },
     { 
+        value: 'WORK_FROM_HOME', 
+        label: 'Work From Home', 
+        categories: ['general', 'filter', 'report_filter', 'day_override'] 
+    },
+    { 
         value: 'MANUAL_ABSENT', 
         label: 'Manual Absent', 
         categories: ['general', 'filter', 'report_filter', 'day_override'] 

@@ -969,6 +969,11 @@ Deno.serve(async (req: Request) => {
                         presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT';
                         continue;  // Skip punch-based counting to prevent double-counting
+                    } else if (dateException.type === 'WORK_FROM_HOME') {
+                        // WORK_FROM_HOME marks present with zero deductible minutes regardless of punches.
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'WORK_FROM_HOME';
+                        continue;
                     } else if (dateException.type === 'MANUAL_ABSENT') {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
