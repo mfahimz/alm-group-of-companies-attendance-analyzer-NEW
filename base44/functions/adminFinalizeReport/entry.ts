@@ -67,8 +67,7 @@ Deno.serve(async (req) => {
 
             while (has_more) {
                 try {
-                    // Each batch processes up to batch_size employees starting from batch_start.
-                    // batch_mode=true tells createSalarySnapshots to use paginated processing.
+                    console.log(`[adminFinalizeReport] Calling createSalarySnapshots batch: batch_start=${batch_start}, batch_size=${batch_size}`);
                     const batchResult = await base44.asServiceRole.functions.invoke('createSalarySnapshots', {
                         project_id,
                         report_run_id,
@@ -77,7 +76,13 @@ Deno.serve(async (req) => {
                         batch_size
                     });
 
+                    console.log(`[adminFinalizeReport] Raw batchResult type: ${typeof batchResult}`);
+                    console.log(`[adminFinalizeReport] Raw batchResult keys: ${batchResult ? Object.keys(batchResult).join(',') : 'null'}`);
+                    console.log(`[adminFinalizeReport] batchResult.data type: ${typeof batchResult?.data}`);
+
                     const batchData = batchResult?.data || batchResult || {};
+                    console.log(`[adminFinalizeReport] Parsed batchData:`, JSON.stringify(batchData).substring(0, 500));
+
                     has_more = batchData.has_more === true;
                     batch_start = batchData.current_position ?? (batch_start + batch_size);
                     totalProcessed = batch_start;
@@ -90,6 +95,7 @@ Deno.serve(async (req) => {
                     }
                 } catch (salaryError) {
                     console.error('[adminFinalizeReport] Salary snapshot batch failed:', salaryError.message);
+                    console.error('[adminFinalizeReport] Salary snapshot batch error stack:', salaryError.stack);
                     // Break the loop on error — don't block finalization
                     break;
                 }
