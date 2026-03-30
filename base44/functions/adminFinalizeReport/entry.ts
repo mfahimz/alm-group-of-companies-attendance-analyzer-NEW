@@ -68,6 +68,8 @@ Deno.serve(async (req) => {
             while (has_more) {
                 try {
                     console.log(`[adminFinalizeReport] Calling createSalarySnapshots batch: batch_start=${batch_start}, batch_size=${batch_size}`);
+                    // Each batch processes up to batch_size employees starting from batch_start.
+                    // batch_mode=true tells createSalarySnapshots to use paginated processing.
                     const batchResult = await base44.functions.invoke('createSalarySnapshots', {
                         project_id,
                         report_run_id,
