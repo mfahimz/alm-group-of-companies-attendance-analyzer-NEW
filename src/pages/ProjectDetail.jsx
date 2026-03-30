@@ -14,7 +14,7 @@ import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
-import ChecklistTab from '../components/project-tabs/ChecklistTab';
+
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -342,13 +342,7 @@ export default function ProjectDetail() {
                                 Salary
                             </TabsTrigger>
             }
-                        {isAlMaraghiMotors &&
-            <TabsTrigger
-              value="checklist"
-              className="data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:ring-1 data-[state=active]:ring-purple-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
-                                Checklist
-                            </TabsTrigger>
-            }
+
                     </TabsList>
                 </div>
 
@@ -381,9 +375,7 @@ export default function ProjectDetail() {
                         {activeTab === 'salary' && <SalaryTab project={project} />}
                     </TabsContent>
 
-                    <TabsContent value="checklist">
-                        {activeTab === 'checklist' && <ChecklistTab project={project} />}
-                    </TabsContent>
+
                 </div>
             </Tabs>
             )}
