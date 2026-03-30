@@ -89,7 +89,8 @@ export default function ExceptionsTab({ project }) {
         dateTo: '',
         department: 'all',
         createdFromReport: 'all',
-        useInAnalysis: 'all'
+        useInAnalysis: 'all',
+        approvalStatus: 'all' // Fix 1: Added approval status to filter state
     });
     const [reportFilter, setReportFilter] = useState({ search: '', type: 'all' });
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
@@ -469,13 +470,22 @@ export default function ExceptionsTab({ project }) {
             dateTo: '',
             department: 'all',
             createdFromReport: 'all',
-            useInAnalysis: 'all'
+            useInAnalysis: 'all',
+            approvalStatus: 'all'
         });
     };
 
+    // Fix 4: Updated active filter condition to include new filters
     const hasActiveFilters = filter.search || filter.type !== 'all' || filter.dateFrom || 
                              filter.dateTo || filter.department !== 'all' || 
-                             filter.createdFromReport !== 'all' || filter.useInAnalysis !== 'all';
+                             filter.createdFromReport !== 'all' || filter.useInAnalysis !== 'all' ||
+                             filter.approvalStatus !== 'all';
+
+    // Condition for advanced filter indicator (excluding search)
+    const hasAdvancedFiltersActive = filter.type !== 'all' || filter.dateFrom || 
+                                     filter.dateTo || filter.department !== 'all' || 
+                                     filter.createdFromReport !== 'all' || filter.useInAnalysis !== 'all' ||
+                                     filter.approvalStatus !== 'all';
 
     const downloadTemplate = () => {
         const template = `attendance_id,name,date_from,date_to,type,details,other_minutes
@@ -812,25 +822,31 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
 
     const filteredExceptions = exceptions
         .filter(ex => {
-            // Search filter
+            // Search filter with type label check
             if (filter.search) {
                 const searchLower = filter.search.toLowerCase();
                 const matchesId = String(ex.attendance_id).toLowerCase().includes(searchLower);
                 const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
                 const matchesName = employee?.name?.toLowerCase().includes(searchLower);
                 const matchesDetails = ex.details?.toLowerCase().includes(searchLower);
-                if (!matchesId && !matchesName && !matchesDetails) return false;
+                // Fix 3: Add type label check to search functionality
+                const matchesType = ex.type.toLowerCase().includes(searchLower);
+                
+                if (!matchesId && !matchesName && !matchesDetails && !matchesType) return false;
             }
             
             // Type filter
             if (filter.type && filter.type !== 'all' && ex.type !== filter.type) return false;
             
-            // Date range filter
-            if (filter.dateFrom) {
-                if (new Date(ex.date_from) < new Date(filter.dateFrom)) return false;
-            }
-            if (filter.dateTo) {
-                if (new Date(ex.date_to) > new Date(filter.dateTo)) return false;
+            // Fix 2: Updated date range overlap logic
+            // An exception overlaps the filter range if its date_from is <= filter.dateTo AND its date_to is >= filter.dateFrom.
+            // This ensures exceptions spanning across the filter range are included correctly.
+            if (filter.dateFrom || filter.dateTo) {
+                const exStart = ex.date_from;
+                const exEnd = ex.date_to;
+                
+                if (filter.dateTo && exStart > filter.dateTo) return false;
+                if (filter.dateFrom && exEnd < filter.dateFrom) return false;
             }
             
             // Department filter
@@ -852,6 +868,11 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 const isUsed = ex.use_in_analysis !== false;
                 if (filter.useInAnalysis === 'yes' && !isUsed) return false;
                 if (filter.useInAnalysis === 'no' && isUsed) return false;
+            }
+            
+            // Fix 6: Added approval status filtering logic
+            if (filter.approvalStatus !== 'all') {
+                if (ex.approval_status !== filter.approvalStatus) return false;
             }
             
             return true;
@@ -1653,9 +1674,17 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                                className="relative"
                             >
                                 <Filter className="w-4 h-4 mr-2" />
                                 {showAdvancedFilters ? 'Hide' : 'Show'} Filters
+                                {/* Fix 5: Active filter indicator dot when any advanced filter is applied */}
+                                {hasAdvancedFiltersActive && (
+                                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                    </span>
+                                )}
                             </Button>
                             {hasActiveFilters && (
                                 <Button
@@ -1755,6 +1784,41 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             <SelectItem value="all">All</SelectItem>
                                             <SelectItem value="yes">Yes</SelectItem>
                                             <SelectItem value="no">No</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {/* Fix 6: Added Use in Analysis and Approval Status advanced filters */}
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Use in Analysis</Label>
+                                    <Select
+                                        value={filter.useInAnalysis}
+                                        onValueChange={(value) => setFilter({ ...filter, useInAnalysis: value })}
+                                    >
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100 h-9">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="yes">Yes</SelectItem>
+                                            <SelectItem value="no">No</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Approval Status</Label>
+                                    <Select
+                                        value={filter.approvalStatus}
+                                        onValueChange={(value) => setFilter({ ...filter, approvalStatus: value })}
+                                    >
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100 h-9">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="pending_dept_head">Pending Dept Head</SelectItem>
+                                            <SelectItem value="approved_dept_head">Approved Dept Head</SelectItem>
+                                            <SelectItem value="pending_hr">Pending HR</SelectItem>
+                                            <SelectItem value="approved_hr">Approved HR</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
