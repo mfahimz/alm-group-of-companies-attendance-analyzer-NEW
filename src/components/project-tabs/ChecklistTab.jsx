@@ -238,13 +238,8 @@ export default function ChecklistTab({ project }) {
         });
     };
 
-    // Group tasks by type for overview - include all predefined task types
-    const taskTypeStats = PREDEFINED_TASKS.reduce((acc, predefinedTask) => {
-        acc[predefinedTask.task_type] = { total: 0, completed: 0 };
-        return acc;
-    }, {});
-
-    // Update stats based on actual checklist items
+    // Group tasks by type for overview - only include types that have actual items
+    const taskTypeStats = {};
     checklistItems.forEach(task => {
         if (!taskTypeStats[task.task_type]) {
             taskTypeStats[task.task_type] = { total: 0, completed: 0 };
@@ -270,7 +265,7 @@ export default function ChecklistTab({ project }) {
     return (
         <div className="space-y-6">
             {/* Task Type Overview Bar */}
-            {checklistItems.length > 0 && (
+            {checklistItems.length > 0 && Object.keys(taskTypeStats).length > 0 && (
                 <Card className="border-0 shadow-sm">
                     <CardContent className="py-4">
                         <div className="flex items-center justify-between">
@@ -278,16 +273,17 @@ export default function ChecklistTab({ project }) {
                                 <span className="text-xs font-medium text-slate-600 whitespace-nowrap mr-2">Quick View:</span>
                                 <div className="flex flex-wrap gap-2">
                                     {Object.entries(taskTypeStats).map(([taskType, stats]) => {
-                                        const isComplete = stats.completed === stats.total;
+                                        const isComplete = stats.total > 0 && stats.completed === stats.total;
                                         const isSelected = selectedTaskType === taskType;
                                         return (
-                                            <div
+                                            <button
                                                 key={taskType}
+                                                type="button"
                                                 onClick={() => setSelectedTaskType(prev => prev === taskType ? null : taskType)}
-                                                title="Click to filter"
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all cursor-pointer ${
+                                                title={`Click to filter by ${taskType}`}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all cursor-pointer select-none ${
                                                     isSelected
-                                                        ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-500 bg-indigo-50'
+                                                        ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-500 bg-indigo-50 text-indigo-700'
                                                         : isComplete 
                                                             ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' 
                                                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -302,7 +298,7 @@ export default function ChecklistTab({ project }) {
                                                 <span className={`ml-1 ${isComplete ? 'text-green-600' : 'text-slate-500'}`}>
                                                     {stats.completed}/{stats.total}
                                                 </span>
-                                            </div>
+                                            </button>
                                         );
                                     })}
                                 </div>
