@@ -11,6 +11,7 @@ export default function ReportDetailPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const reportRunId = urlParams.get('id');
     const projectId = urlParams.get('project_id');
+    const fromTab = urlParams.get('from_tab') || 'overview';
 
     const queryClient = useQueryClient();
 
@@ -90,7 +91,8 @@ export default function ReportDetailPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Link to={createPageUrl('ProjectDetail') + `?id=${projectId}`}>
+                    {/* preserve context: from_tab query parameter tells us which tab we came from (default: overview) */}
+                    <Link to={createPageUrl('ProjectDetail') + `?id=${projectId}&tab=${fromTab}`}>
                         <Button variant="ghost" size="sm">
                             <ArrowLeft className="w-4 h-4 mr-2" />
                             Back to Project
