@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +24,15 @@ export default function ProjectDetail() {
   const projectId = urlParams.get('id');
   const tabFromUrl = urlParams.get('tab');
   const [activeTab, setActiveTab] = useState(tabFromUrl || 'overview');
+
+  // Sync activeTab when React Router navigates to this page without unmounting the component
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
   const navigate = useNavigate();
 
   // Update URL when tab changes (without full page reload)
