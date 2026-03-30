@@ -1683,7 +1683,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         <Save className="w-4 h-4 mr-2" />
                                         {isSaving ? 'Saving...' : 'Save Report'}
                                     </Button>
-                                    {(isAdmin || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
+                                    {(isAdmin || isSupervisor || isHRManager || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
                                         <Button
                                             onClick={() => finalizeReportMutation.mutate()}
                                             disabled={finalizeReportMutation.isPending}
@@ -1703,7 +1703,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             )}
                                         </Button>
                                     )}
-                                    {isAdmin && reportRun.is_final && (
+                                    {(isAdmin || isSupervisor || isHRManager) && reportRun.is_final && (
                                         <Button
                                             onClick={() => unfinalizeReportMutation.mutate()}
                                             disabled={unfinalizeReportMutation.isPending}
