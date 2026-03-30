@@ -1596,12 +1596,12 @@ Deno.serve(async (req) => {
             const totalOtSalary = normalOtSalary + specialOtSalary;
 
             // Get adjustment values from OvertimeData
-            const bonus = otRecord?.bonus || 0;
-            const incentive = otRecord?.incentive || 0;
+            const bonus = Math.max(0, Number(otRecord?.bonus || 0));
+            const incentive = Math.max(0, Number(otRecord?.incentive || 0));
             const openLeaveSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.open_leave_salary || 0)) : 0;
             const variableSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.variable_salary || 0)) : 0;
-            const otherDeduction = otRecord?.otherDeduction || 0;
-            const advanceSalaryDeduction = otRecord?.advanceSalaryDeduction || 0;
+            const otherDeduction = Math.max(0, Number(otRecord?.otherDeduction || 0));
+            const advanceSalaryDeduction = Math.max(0, Number(otRecord?.advanceSalaryDeduction || 0));
 
             // ============================================================
             // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
