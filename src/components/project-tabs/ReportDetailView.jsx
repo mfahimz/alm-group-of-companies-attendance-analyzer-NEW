@@ -1760,6 +1760,24 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             <CheckCircle className="w-4 h-4 mr-2" />
                             Verify All Clean
                         </Button>
+                        {isAdmin && (
+                            <Button
+                                onClick={() => {
+                                    if (!window.confirm(`Verify ALL ${enrichedResults.length} employees? This will mark every employee as verified.`)) return;
+                                    const allIds = enrichedResults.map(r => String(r.attendance_id));
+                                    const newVerified = [...new Set(allIds)];
+                                    setVerifiedEmployees(newVerified);
+                                    updateVerificationMutation.mutate(newVerified);
+                                    toast.success(`All ${newVerified.length} employees verified`);
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Verify All
+                            </Button>
+                        )}
                         {/* 
                             Change 2 - Calculate Gift Minutes Button
                             Triggers bulk calculation based on deductible minutes rule.
