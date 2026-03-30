@@ -78,7 +78,7 @@ export default function ExcelPreviewDialog({
 
                 <div className="flex-1 overflow-hidden px-6 py-6 bg-slate-50/40">
                     <div className="border border-slate-200 rounded-xl h-full bg-white shadow-sm overflow-hidden flex flex-col">
-                        <ScrollArea className="flex-1 w-full">
+                        <ScrollArea className="flex-1 w-full max-h-[50vh]">
                             <div className="min-w-full inline-block align-middle">
                                 <Table className="border-collapse table-auto w-full">
                                     <TableHeader className="bg-slate-50 sticky top-0 z-20">
