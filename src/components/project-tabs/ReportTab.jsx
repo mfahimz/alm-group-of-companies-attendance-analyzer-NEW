@@ -1023,7 +1023,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex gap-1 justify-end">
-                                                        <Link to={createPageUrl('ReportDetail') + `?id=${run.id}&project_id=${project.id}&from_tab=attendance`}>
+                                                        <Link to={createPageUrl('ReportDetail') + `?id=${run.id}&project_id=${project.id}&from_tab=report`}>
                                                             <Button size="sm" variant="ghost" title="View report">
                                                                 <Eye className="w-4 h-4 text-indigo-600" />
                                                             </Button>
