@@ -368,6 +368,35 @@ Deno.serve(async (req) => {
             }
         }
 
+        // Helper: Parse OvertimeData adjustment arrays or legacy numbers
+        // OvertimeData stores these fields as either JSON arrays of amount+desc objects 
+        // or plain numbers depending on whether recurring adjustments are merged.
+        const parseAdjustmentValue = (value: any): number => {
+            if (value === null || value === undefined) return 0;
+            if (typeof value === 'number') return Math.max(0, value);
+            
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        if (Array.isArray(parsed)) {
+                            const total = parsed.reduce((sum: number, item: any) => {
+                                const amount = Number(item?.amount);
+                                return sum + (isNaN(amount) ? 0 : amount);
+                            }, 0);
+                            return Math.max(0, total);
+                        }
+                    } catch (e) {
+                        // Parsing failed, fall through to numeric parse
+                    }
+                }
+                const num = parseFloat(trimmed);
+                return isNaN(num) ? 0 : Math.max(0, num);
+            }
+            return 0;
+        };
+
         // Helper: Parse time string to Date object
         const parseTime = (timeStr) => {
             try {
@@ -1596,12 +1625,12 @@ Deno.serve(async (req) => {
             const totalOtSalary = normalOtSalary + specialOtSalary;
 
             // Get adjustment values from OvertimeData
-            const bonus = Math.max(0, Number(otRecord?.bonus || 0));
-            const incentive = Math.max(0, Number(otRecord?.incentive || 0));
-            const openLeaveSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.open_leave_salary || 0)) : 0;
-            const variableSalary = isAlMaraghi ? Math.max(0, Number(otRecord?.variable_salary || 0)) : 0;
-            const otherDeduction = Math.max(0, Number(otRecord?.otherDeduction || 0));
-            const advanceSalaryDeduction = Math.max(0, Number(otRecord?.advanceSalaryDeduction || 0));
+            const bonus = parseAdjustmentValue(otRecord?.bonus);
+            const incentive = parseAdjustmentValue(otRecord?.incentive);
+            const openLeaveSalary = isAlMaraghi ? parseAdjustmentValue(otRecord?.open_leave_salary) : 0;
+            const variableSalary = isAlMaraghi ? parseAdjustmentValue(otRecord?.variable_salary) : 0;
+            const otherDeduction = parseAdjustmentValue(otRecord?.otherDeduction);
+            const advanceSalaryDeduction = parseAdjustmentValue(otRecord?.advanceSalaryDeduction);
 
             // ============================================================
             // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
