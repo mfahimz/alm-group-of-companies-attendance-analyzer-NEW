@@ -1,5 +1,50 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+// Helper: Parse OvertimeData adjustment arrays or legacy numbers
+// MUST STAY IN SYNC exactly with the same helper in createSalarySnapshots
+const parseAdjustmentValue = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return Math.max(0, value);
+    
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    const total = parsed.reduce((sum: number, item: any) => {
+                        const amount = Number(item?.amount);
+                        return sum + (isNaN(amount) ? 0 : amount);
+                    }, 0);
+                    return Math.max(0, total);
+                }
+            } catch (e) {
+                // Parsing failed, fall through to numeric parse
+            }
+        }
+        const num = parseFloat(trimmed);
+        return isNaN(num) ? 0 : Math.max(0, num);
+    }
+    return 0;
+};
+
+// Helper: 429 Retry with Exponential Backoff
+const retryWithBackoff = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const delays = [1000, 2000, 4000];
+    for (let i = 0; i <= delays.length; i++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            if (error?.response?.status === 429 && i < delays.length) {
+                await new Promise(resolve => setTimeout(resolve, delays[i]));
+            } else {
+                throw error;
+            }
+        }
+    }
+    throw new Error("Unreachable");
+};
+
 /**
  * RECALCULATE SALARY SNAPSHOT
  * 
@@ -60,7 +105,7 @@ Deno.serve(async (req) => {
         // ============================================================
         // FETCH PROJECT
         // ============================================================
-        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 1);
+        const projects = await retryWithBackoff(() => base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 1));
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
@@ -93,11 +138,11 @@ Deno.serve(async (req) => {
         // ============================================================
         // FETCH SALARY SNAPSHOT
         // ============================================================
-        const snapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({ 
+        const snapshots = await retryWithBackoff(() => base44.asServiceRole.entities.SalarySnapshot.filter({ 
             project_id: project_id,
             report_run_id: report_run_id,
             attendance_id: String(attendance_id)
-        }, null, 1);
+        }, null, 1));
         
         if (snapshots.length === 0) {
             return Response.json({ 
@@ -113,11 +158,11 @@ Deno.serve(async (req) => {
         
         // Try by HRMS ID first if available
         if (snapshot.hrms_id) {
-            const salariesByHrms = await base44.asServiceRole.entities.EmployeeSalary.filter({
+            const salariesByHrms = await retryWithBackoff(() => base44.asServiceRole.entities.EmployeeSalary.filter({
                 employee_id: snapshot.hrms_id,
                 company: project.company,
                 active: true
-            }, null, 1);
+            }, null, 1));
             if (salariesByHrms.length > 0) {
                 salaryRecord = salariesByHrms[0];
             }
@@ -125,11 +170,11 @@ Deno.serve(async (req) => {
         
         // Fallback to attendance_id
         if (!salaryRecord) {
-            const salariesByAttendance = await base44.asServiceRole.entities.EmployeeSalary.filter({
+            const salariesByAttendance = await retryWithBackoff(() => base44.asServiceRole.entities.EmployeeSalary.filter({
                 attendance_id: String(attendance_id),
                 company: project.company,
                 active: true
-            }, null, 1);
+            }, null, 1));
             if (salariesByAttendance.length > 0) {
                 salaryRecord = salariesByAttendance[0];
             }
@@ -150,10 +195,10 @@ Deno.serve(async (req) => {
         
         if (isAlMaraghi) {
             // Fetch salary increments
-            const salaryIncrements = await base44.asServiceRole.entities.SalaryIncrement.filter({ 
+            const salaryIncrements = await retryWithBackoff(() => base44.asServiceRole.entities.SalaryIncrement.filter({ 
                 company: 'Al Maraghi Motors', 
                 active: true 
-            }, null, 5000);
+            }, null, 5000));
             
             // Get increments for this employee
             const empIncrements = salaryIncrements.filter(inc => 
@@ -236,12 +281,12 @@ Deno.serve(async (req) => {
         const adjustmentValues = {
             normalOtHours: snapshot.normalOtHours || 0,
             specialOtHours: snapshot.specialOtHours || 0,
-            bonus: snapshot.bonus || 0,
-            incentive: snapshot.incentive || 0,
-            open_leave_salary: Math.max(0, Number(snapshot.open_leave_salary || 0)),
-            variable_salary: Math.max(0, Number(snapshot.variable_salary || 0)),
-            otherDeduction: snapshot.otherDeduction || 0,
-            advanceSalaryDeduction: snapshot.advanceSalaryDeduction || 0
+            bonus: parseAdjustmentValue(snapshot.bonus),
+            incentive: parseAdjustmentValue(snapshot.incentive),
+            open_leave_salary: parseAdjustmentValue(snapshot.open_leave_salary),
+            variable_salary: parseAdjustmentValue(snapshot.variable_salary),
+            otherDeduction: parseAdjustmentValue(snapshot.otherDeduction),
+            advanceSalaryDeduction: parseAdjustmentValue(snapshot.advanceSalaryDeduction)
         };
 
         // ============================================================
