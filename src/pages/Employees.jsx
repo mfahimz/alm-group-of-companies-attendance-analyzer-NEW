@@ -516,6 +516,14 @@ export default function Employees() {
                     <p className="text-slate-600 mt-2">Manage employee master list</p>
                 </div>
                 <div className="flex gap-3">
+                    <Button
+                        onClick={handleExportExcel}
+                        variant="outline"
+                        disabled={filteredEmployees.length === 0}
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export Excel
+                    </Button>
                     {isAdmin && selectedEmployeeIds.length > 0 && (
                         <Button 
                             onClick={handleBulkDelete}
@@ -535,14 +543,6 @@ export default function Employees() {
                             Bulk Edit ({selectedEmployeeIds.length})
                         </Button>
                     )}
-                    <Button
-                        onClick={handleExportExcel}
-                        variant="outline"
-                        disabled={filteredEmployees.length === 0}
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        Export Excel
-                    </Button>
                     {isAdmin && (
                         <>
                             <label>
