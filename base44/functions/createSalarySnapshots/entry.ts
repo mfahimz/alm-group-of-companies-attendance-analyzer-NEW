@@ -1,5 +1,22 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+// Helper: 429 Retry with Exponential Backoff (covers self-heal loop and others)
+const retryWithBackoff = async <T>(fn: () => Promise<T>): Promise<T> => {
+    const delays = [1000, 2000, 4000];
+    for (let i = 0; i <= delays.length; i++) {
+        try {
+            return await fn();
+        } catch (error: any) {
+            if (error?.response?.status === 429 && i < delays.length) {
+                await new Promise(resolve => setTimeout(resolve, delays[i]));
+            } else {
+                throw error;
+            }
+        }
+    }
+    throw new Error("Unreachable");
+};
+
 /**
  * DATA ACCESS LAYER - EXPLICIT LIMITS ENFORCED
  * 
@@ -144,7 +161,11 @@ Deno.serve(async (req) => {
             }, null, 5000);
 
             let repairedSnapshots = 0;
-            for (const snapshot of existingSnapshots) {
+            for (let i = 0; i < existingSnapshots.length; i++) {
+                if (i > 0 && i % 8 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+                const snapshot = existingSnapshots[i];
                 if (!snapshot.attendance_id) continue; // Salary-only employee (no AnalysisResult)
 
                 const analysisResult = analysisResultsForRepair.find(r =>
@@ -195,7 +216,7 @@ Deno.serve(async (req) => {
                         repairedBalance = 0;
                     }
 
-                    await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
+                    await retryWithBackoff(() => base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
                         deductible_minutes: finalizedDeductibleMinutes,
                         ramadan_gift_minutes: ramadanGiftMinutes,
                         other_minutes: finalizedOtherMinutes,
@@ -205,7 +226,7 @@ Deno.serve(async (req) => {
                         wpsPay: repairedWpsPay,
                         balance: repairedBalance,
                         wps_cap_applied: repairedWpsCapApplied
-                    });
+                    }));
                     repairedSnapshots++;
                 }
             }
