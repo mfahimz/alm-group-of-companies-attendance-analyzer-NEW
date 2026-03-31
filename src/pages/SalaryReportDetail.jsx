@@ -541,34 +541,55 @@ export default function SalaryReportDetail() {
         const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         
         try {
+            const retryOnRateLimit = async (fn) => {
+                const delays = [1000, 2000, 4000];
+                for (let i = 0; i <= delays.length; i++) {
+                    try {
+                        return await fn();
+                    } catch (error) {
+                        if (error.response?.status === 429 && i < delays.length) {
+                            await delay(delays[i]);
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+            };
+
             // Get all attendance_ids from the current report data
             const attendanceIds = salaryData.map(row => row.attendance_id);
             
-            for (let i = 0; i < attendanceIds.length; i++) {
-                const attendanceId = attendanceIds[i];
+            // Process in batches of 8
+            const BATCH_SIZE = 8;
+            for (let i = 0; i < attendanceIds.length; i += BATCH_SIZE) {
+                const batch = attendanceIds.slice(i, i + BATCH_SIZE);
                 
-                try {
-                    const response = await base44.functions.invoke('recalculateSalarySnapshot', {
-                        salary_report_id: reportId,
-                        report_run_id: report?.report_run_id,
-                        project_id: report?.project_id,
-                        attendance_id: attendanceId,
-                        mode: 'APPLY'
-                    });
-                    
-                    if (response.data?.success) {
-                        successCount++;
-                    } else {
+                await Promise.all(batch.map(async (attendanceId) => {
+                    try {
+                        const response = await retryOnRateLimit(() => 
+                            base44.functions.invoke('recalculateSalarySnapshot', {
+                                salary_report_id: reportId,
+                                report_run_id: report?.report_run_id,
+                                project_id: report?.project_id,
+                                attendance_id: attendanceId,
+                                mode: 'APPLY'
+                            })
+                        );
+                        
+                        if (response.data?.success) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                            errors.push(`${attendanceId}: ${response.data?.error || 'Unknown error'}`);
+                        }
+                    } catch (error) {
                         errorCount++;
-                        errors.push(`${attendanceId}: ${response.data?.error || 'Unknown error'}`);
+                        errors.push(`${attendanceId}: ${error.response?.data?.error || error.message}`);
                     }
-                } catch (error) {
-                    errorCount++;
-                    errors.push(`${attendanceId}: ${error.response?.data?.error || error.message}`);
-                }
+                }));
                 
-                // Add 1.5s delay between calls to avoid rate limiting
-                if (i < attendanceIds.length - 1) {
+                // Add 1.5s delay between batches to avoid rate limiting
+                if (i + BATCH_SIZE < attendanceIds.length) {
                     await delay(1500);
                 }
             }
