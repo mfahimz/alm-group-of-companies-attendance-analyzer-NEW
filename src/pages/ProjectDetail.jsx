@@ -14,6 +14,7 @@ import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
+import AstraImportTab from '../components/project-tabs/AstraImportTab';
 
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Input } from '@/components/ui/input';
@@ -91,6 +92,12 @@ export default function ProjectDetail() {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false
+  });
+  
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees', project?.company],
+    queryFn: () => base44.entities.Employee.filter({ company: project.company }, null, 5000),
+    enabled: !!project?.company
   });
 
   // NOTE: finalReport is no longer needed at this level - SalaryTab and OvertimeTab
@@ -335,6 +342,13 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:ring-1 data-[state=active]:ring-indigo-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Attendance {isReadOnly && '🔒'}
                         </TabsTrigger>
+                        {project?.company === 'Astra Auto Parts' &&
+                        <TabsTrigger
+                          value="astra-import"
+                          className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:ring-1 data-[state=active]:ring-indigo-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
+                            Punch Import
+                        </TabsTrigger>
+                        }
                         {isAlMaraghiMotors &&
             <TabsTrigger
               value="salary"
@@ -370,6 +384,12 @@ export default function ProjectDetail() {
                     <TabsContent value="report">
                         {activeTab === 'report' && <ReportTab project={project} />}
                     </TabsContent>
+
+                    {project?.company === 'Astra Auto Parts' && (
+                    <TabsContent value="astra-import">
+                        {activeTab === 'astra-import' && <AstraImportTab project={project} employees={employees} />}
+                    </TabsContent>
+                    )}
 
                     <TabsContent value="salary">
                         {activeTab === 'salary' && <SalaryTab project={project} />}
