@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit, UserCheck, Eye } from 'lucide-react';
+import { Plus, Search, Pencil, Upload, Trash2, Filter, AlertCircle, Edit, UserCheck, Eye, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Checkbox } from '@/components/ui/checkbox';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import { toast } from 'sonner';
@@ -34,6 +35,28 @@ export default function Employees() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const { selectedCompany } = useCompanyFilter();
+
+    const handleExportExcel = () => {
+        const exportData = filteredEmployees.map(emp => ({
+            'HRMS ID': emp.hrms_id || '',
+            'Attendance ID': emp.attendance_id || '',
+            'Name': emp.name || '',
+            'Company': emp.company || '',
+            'Department': emp.department || '',
+            'Weekly Off': emp.weekly_off || '',
+            'Status': emp.active ? 'Active' : 'Inactive',
+            'Grace Minutes': emp.carried_grace_minutes || 0,
+            'Other Minutes Limit': emp.approved_other_minutes_limit || 120
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const colWidths = [12, 14, 25, 20, 18, 12, 10, 14, 18];
+        ws['!cols'] = colWidths.map(w => ({ wch: w }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+        const companyTag = selectedCompany ? `_${selectedCompany.replace(/\s+/g, '_')}` : '';
+        XLSX.writeFile(wb, `Employee_Master${companyTag}.xlsx`);
+        toast.success(`Exported ${exportData.length} employees to Excel`);
+    };
 
     // Check page access
     const { data: currentUser } = useQuery({
@@ -512,6 +535,14 @@ export default function Employees() {
                             Bulk Edit ({selectedEmployeeIds.length})
                         </Button>
                     )}
+                    <Button
+                        onClick={handleExportExcel}
+                        variant="outline"
+                        disabled={filteredEmployees.length === 0}
+                    >
+                        <Download className="w-4 h-4 mr-2" />
+                        Export Excel
+                    </Button>
                     {isAdmin && (
                         <>
                             <label>
