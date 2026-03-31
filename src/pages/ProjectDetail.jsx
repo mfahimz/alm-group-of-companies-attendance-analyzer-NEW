@@ -74,6 +74,7 @@ export default function ProjectDetail() {
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
   const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
+  const isAstraAutoParts = project?.company === 'Astra Auto Parts';
 
   // CRITICAL: Department heads can only access CLOSED projects
   React.useEffect(() => {
@@ -342,7 +343,7 @@ export default function ProjectDetail() {
               className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:ring-1 data-[state=active]:ring-indigo-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
                             Attendance {isReadOnly && '🔒'}
                         </TabsTrigger>
-                        {project?.company === 'Astra Auto Parts' &&
+                        {isAstraAutoParts &&
                         <TabsTrigger
                           value="astra-import"
                           className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:ring-1 data-[state=active]:ring-indigo-200 data-[state=active]:shadow-md text-xs sm:text-sm font-bold rounded-full px-6 py-2 transition-all duration-300">
@@ -385,7 +386,7 @@ export default function ProjectDetail() {
                         {activeTab === 'report' && <ReportTab project={project} />}
                     </TabsContent>
 
-                    {project?.company === 'Astra Auto Parts' && (
+                    {isAstraAutoParts && (
                     <TabsContent value="astra-import">
                         {activeTab === 'astra-import' && <AstraImportTab project={project} employees={employees} />}
                     </TabsContent>
