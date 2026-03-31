@@ -295,6 +295,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return date;
             }
 
+            // Handles Astra Auto Parts YYYY-MM-DD HH:MM:SS punch timestamp format
+            const isoDateTimeMatch = timeStr.match(/^\d{4}-\d{2}-\d{2}\s+(\d{1,2}):(\d{2}):(\d{2})/);
+            if (isoDateTimeMatch) {
+                const hours = parseInt(isoDateTimeMatch[1]);
+                const minutes = parseInt(isoDateTimeMatch[2]);
+                const seconds = parseInt(isoDateTimeMatch[3]);
+                const date = new Date();
+                date.setHours(hours, minutes, seconds, 0);
+                return date;
+            }
+
             return null;
         } catch {
             return null;
