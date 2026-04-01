@@ -23,7 +23,6 @@ import PINLock from '../components/ui/PINLock';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { fetchAllRecords } from '../components/utils/paginatedFetch';
 
 
 export default function SalaryReportDetail() {
@@ -82,7 +81,7 @@ export default function SalaryReportDetail() {
     // Fetch live SalarySnapshot data for the most recent adjustment values
     const { data: liveSalarySnapshots = [] } = useQuery({
         queryKey: ['liveSalarySnapshots', report?.report_run_id],
-        queryFn: () => fetchAllRecords(base44.entities.SalarySnapshot, { report_run_id: report.report_run_id }),
+        queryFn: () => base44.entities.SalarySnapshot.filter({ report_run_id: report.report_run_id }),
         enabled: !!report?.report_run_id,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
@@ -148,54 +147,23 @@ export default function SalaryReportDetail() {
         try {
             const data = JSON.parse(report.snapshot_data);
             return data.map(row => {
-                // Get live snapshot for this employee for the latest adjustments and recalculated values
-                const live = liveSalarySnapshots.find(s => 
+                // Get live snapshot for this employee for the latest adjustments (OT/bonus/deductions only)
+                const liveSnapshot = liveSalarySnapshots.find(s => 
                     String(s.attendance_id) === String(row.attendance_id)
                 );
                 
                 return {
                     ...row,
-                    // ============================================
-                    // CORE CALCULATED TOTALS (Live Entity)
-                    // ============================================
-                    total: live?.total ?? row.total ?? 0,
-                    wpsPay: live?.wpsPay ?? row.wpsPay ?? 0,
-                    balance: live?.balance ?? row.balance ?? 0,
-                    
-                    // ============================================
-                    // DEDUCTIONS & LOP (Live Entity)
-                    // ============================================
-                    deductibleHours: live?.deductibleHours ?? row.deductibleHours ?? 0,
-                    deductibleHoursPay: live?.deductibleHoursPay ?? row.deductibleHoursPay ?? 0,
-                    netDeduction: live?.netDeduction ?? row.netDeduction ?? 0,
-                    salaryLeaveAmount: live?.salaryLeaveAmount ?? row.salaryLeaveAmount ?? 0,
-                    leavePay: live?.leavePay ?? row.leavePay ?? 0,
-                    salary_leave_days: live?.salary_leave_days ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0,
-                    
-                    // ============================================
-                    // OVERTIME & ADJUSTMENTS (Live Entity + Admin Edits)
-                    // ============================================
-                    normalOtHours: editableData[row.hrms_id]?.normalOtHours ?? live?.normalOtHours ?? row.normalOtHours ?? 0,
-                    specialOtHours: editableData[row.hrms_id]?.specialOtHours ?? live?.specialOtHours ?? row.specialOtHours ?? 0,
-                    normalOtSalary: live?.normalOtSalary ?? row.normalOtSalary ?? 0,
-                    specialOtSalary: live?.specialOtSalary ?? row.specialOtSalary ?? 0,
-                    totalOtSalary: live?.totalOtSalary ?? row.totalOtSalary ?? 0,
-
-                    otherDeduction: editableData[row.hrms_id]?.otherDeduction ?? live?.otherDeduction ?? row.otherDeduction ?? 0,
-                    bonus: editableData[row.hrms_id]?.bonus ?? live?.bonus ?? row.bonus ?? 0,
-                    incentive: editableData[row.hrms_id]?.incentive ?? live?.incentive ?? row.incentive ?? 0,
-                    open_leave_salary: editableData[row.hrms_id]?.open_leave_salary ?? live?.open_leave_salary ?? row.open_leave_salary ?? 0,
-                    variable_salary: editableData[row.hrms_id]?.variable_salary ?? live?.variable_salary ?? row.variable_salary ?? 0,
-                    advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? live?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0,
-                    
-                    // ============================================
-                    // STRUCTURAL & COUNTS (Live Entity)
-                    // ============================================
-                    working_days: live?.working_days ?? row.working_days ?? 0,
-                    present_days: live?.present_days ?? row.present_days ?? 0,
-                    full_absence_count: live?.full_absence_count ?? row.full_absence_count ?? 0,
-                    annual_leave_count: live?.annual_leave_count ?? row.annual_leave_count ?? 0,
-
+                    // Use stored snapshot values for attendance (immutable after finalization)
+                    normalOtHours: editableData[row.hrms_id]?.normalOtHours ?? row.normalOtHours ?? 0,
+                    specialOtHours: editableData[row.hrms_id]?.specialOtHours ?? row.specialOtHours ?? 0,
+                    // Use live snapshot values for adjustments (can be edited in Overtime & Adjustments tab)
+                    otherDeduction: editableData[row.hrms_id]?.otherDeduction ?? liveSnapshot?.otherDeduction ?? row.otherDeduction ?? 0,
+                    bonus: editableData[row.hrms_id]?.bonus ?? liveSnapshot?.bonus ?? row.bonus ?? 0,
+                    incentive: editableData[row.hrms_id]?.incentive ?? liveSnapshot?.incentive ?? row.incentive ?? 0,
+                    open_leave_salary: editableData[row.hrms_id]?.open_leave_salary ?? liveSnapshot?.open_leave_salary ?? row.open_leave_salary ?? 0,
+                    variable_salary: editableData[row.hrms_id]?.variable_salary ?? liveSnapshot?.variable_salary ?? row.variable_salary ?? 0,
+                    advanceSalaryDeduction: editableData[row.hrms_id]?.advanceSalaryDeduction ?? liveSnapshot?.advanceSalaryDeduction ?? row.advanceSalaryDeduction ?? 0,
                     isVerified: verifiedEmployees.includes(String(row.attendance_id))
                 };
             });

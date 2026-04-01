@@ -42,9 +42,17 @@ Deno.serve(async (req) => {
             }
         }
 
-        // [MOVE_HINT: Target finalization was moved to the end of the function]
+        // Mark the selected report as final
+        await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+            is_final: true,
+            finalized_by: user.email,
+            finalized_date: new Date().toISOString()
+        });
 
-        // [MOVE_HINT: This was moved to the end of the function to ensure data integrity]
+        // Update project's last_saved_report_id to track which report was finalized
+        await base44.asServiceRole.entities.Project.update(project_id, {
+            last_saved_report_id: report_run_id
+        });
 
         // Create salary snapshots for Al Maraghi Motors ONLY
         // Uses a batch loop identical to the frontend finalizeReportMutation pattern.
@@ -70,12 +78,12 @@ Deno.serve(async (req) => {
                         batch_size
                     });
 
+                    console.log(`[adminFinalizeReport] Raw batchResult type: ${typeof batchResult}`);
+                    console.log(`[adminFinalizeReport] Raw batchResult keys: ${batchResult ? Object.keys(batchResult).join(',') : 'null'}`);
+                    console.log(`[adminFinalizeReport] batchResult.data type: ${typeof batchResult?.data}`);
+
                     const batchData = batchResult?.data || batchResult || {};
-                    
-                    // Check for internal success if the function returns progress data
-                    if (batchData.error) {
-                        throw new Error(`Batch creation failed: ${batchData.error}`);
-                    }
+                    console.log(`[adminFinalizeReport] Parsed batchData:`, JSON.stringify(batchData).substring(0, 500));
 
                     has_more = batchData.has_more === true;
                     batch_start = batchData.current_position ?? (batch_start + batch_size);
@@ -88,10 +96,10 @@ Deno.serve(async (req) => {
                         await new Promise(resolve => setTimeout(resolve, 300));
                     }
                 } catch (salaryError) {
-                    const message = salaryError instanceof Error ? salaryError.message : String(salaryError);
-                    console.error('[adminFinalizeReport] Salary snapshot batch failed:', message);
-                    // CRITICAL: Throw error to trigger main catch and prevent is_final=true
-                    throw new Error(`Salary snapshot creation failed. Finalization aborted to protect data integrity. Error: ${message}`);
+                    console.error('[adminFinalizeReport] Salary snapshot batch failed:', salaryError.message);
+                    console.error('[adminFinalizeReport] Salary snapshot batch error stack:', salaryError.stack);
+                    // Break the loop on error — don't block finalization
+                    break;
                 }
             }
 
@@ -107,12 +115,10 @@ Deno.serve(async (req) => {
                 details: `Admin finalized report without saving (skipped approval link generation) for project ${project_id}`
             });
         } catch (auditError) {
-            const message = auditError instanceof Error ? auditError.message : String(auditError);
-            console.warn('Failed to log audit:', message);
+            console.warn('Failed to log audit:', auditError.message);
         }
 
-        // --- Create Checklist Tasks for LOP and Other Minutes ---
-        // Errors here now propagate to prevent false finalization status
+        // --- NEW: Create Checklist Tasks for LOP and Other Minutes ---
         try {
             await base44.functions.invoke('createReportChecklistTasks', {
                 reportRunId: report_run_id,
@@ -120,39 +126,8 @@ Deno.serve(async (req) => {
             });
             console.log('[adminFinalizeReport] Auto-checklist tasks triggered successfully');
         } catch (checklistError) {
-            const message = checklistError instanceof Error ? checklistError.message : String(checklistError);
-            console.error('[adminFinalizeReport] Failed to trigger auto-checklist tasks:', message);
-            throw new Error(`Checklist task creation failed. Finalization aborted. Error: ${message}`);
+            console.warn('[adminFinalizeReport] Failed to trigger auto-checklist tasks:', checklistError.message);
         }
-
-        // --- OPTIONAL: Run consistency check (Snapshots vs Employee Count) ---
-        if (project.company === 'Al Maraghi Motors') {
-            const snapshotCount = await base44.asServiceRole.entities.SalarySnapshot.filter({
-                project_id,
-                report_run_id
-            }).then((res: any[]) => res.length);
-            
-            const expectedCount = reports[0].employee_count || 0;
-            
-            if (expectedCount > 0 && snapshotCount < expectedCount) {
-                console.warn(`[adminFinalizeReport] Consistency check failed: Snapshots (${snapshotCount}) < Expected (${expectedCount})`);
-                throw new Error(`Data integrity check failed: Only ${snapshotCount}/${expectedCount} salary snapshots were created. Finalization aborted.`);
-            }
-            console.log(`[adminFinalizeReport] Consistency check passed: ${snapshotCount} snapshots verified.`);
-        }
-
-        // --- FINAL STEP: Mark the report as final and update project metadata ---
-        // This only executes if all previous side effects (snapshots, checklist) succeeded.
-        await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-            is_final: true,
-            finalized_by: user.email,
-            finalized_date: new Date().toISOString(),
-            is_saved: true
-        });
-
-        await base44.asServiceRole.entities.Project.update(project_id, {
-            last_saved_report_id: report_run_id
-        });
 
         return Response.json({ 
             success: true,
@@ -161,10 +136,9 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('Admin finalize report error:', message);
+        console.error('Admin finalize report error:', error);
         return Response.json({ 
-            error: message 
+            error: error.message 
         }, { status: 500 });
     }
 });

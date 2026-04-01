@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
         }, null, 5000);
 
         // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
-        const targetReport = allReports.find((r: any) => r.id === report_run_id);
+        const targetReport = allReports.find(r => r.id === report_run_id);
         if (targetReport) {
             const newFrom = new Date(targetReport.date_from);
             const newTo = new Date(targetReport.date_to);
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
                 newTo.toISOString().split('T')[0] === projectTo.toISOString().split('T')[0];
 
             if (!isFullProjectRange) {
-                const overlappingReport = allReports.find((run: any) => {
+                const overlappingReport = allReports.find(run => {
                     if (!run.is_saved || run.id === report_run_id) return false;
                     const savedFrom = new Date(run.date_from);
                     const savedTo = new Date(run.date_to);
@@ -78,10 +78,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // --- FINAL STEP: Mark the selected report as final ---
-        // NOTE: markFinalReport does not create salary snapshots or checklist tasks.
-        // This function is purely for status marking. Ensure snapshots are already present
-        // or not needed for this flow. Use adminFinalizeReport for full orchestration.
+        // Mark the selected report as final
         const nowUAE = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dubai' })).toISOString();
         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
             is_final: true,
@@ -104,8 +101,7 @@ Deno.serve(async (req) => {
                 details: `Marked report as final for project ${project_id}. UI values already synced to AnalysisResult by frontend.`
             });
         } catch (auditError) {
-            const message = auditError instanceof Error ? auditError.message : String(auditError);
-            console.warn('[markFinalReport] Audit log failed:', message);
+            console.warn('[markFinalReport] Audit log failed:', auditError.message);
         }
 
         return Response.json({ 
@@ -115,8 +111,7 @@ Deno.serve(async (req) => {
         });
 
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('Mark final report error:', message);
-        return Response.json({ error: message }, { status: 500 });
+        console.error('Mark final report error:', error);
+        return Response.json({ error: error.message }, { status: 500 });
     }
 });
