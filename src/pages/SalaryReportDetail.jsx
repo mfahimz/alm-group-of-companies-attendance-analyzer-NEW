@@ -533,77 +533,32 @@ export default function SalaryReportDetail() {
         setRecalculatingAll(true);
         setConfirmRecalcAll(false);
         
-        let successCount = 0;
-        let errorCount = 0;
-        const errors = [];
-        
-        // Helper to add delay between calls to avoid rate limiting
-        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        
         try {
-            const retryOnRateLimit = async (fn) => {
-                const delays = [1000, 2000, 4000];
-                for (let i = 0; i <= delays.length; i++) {
-                    try {
-                        return await fn();
-                    } catch (error) {
-                        if (error.response?.status === 429 && i < delays.length) {
-                            await delay(delays[i]);
-                        } else {
-                            throw error;
-                        }
-                    }
-                }
-            };
+            // Call the backend orchestrator which handles batching and rate limiting server-side
+            const response = await base44.functions.invoke('recalculateAllSnapshots', {
+                project_id: report?.project_id || project?.id,
+                report_run_id: report?.report_run_id,
+                salary_report_id: report?.id || reportId
+            });
 
-            // Get all attendance_ids from the current report data
-            const attendanceIds = salaryData.map(row => row.attendance_id);
-            
-            // Process in batches of 8
-            const BATCH_SIZE = 8;
-            for (let i = 0; i < attendanceIds.length; i += BATCH_SIZE) {
-                const batch = attendanceIds.slice(i, i + BATCH_SIZE);
+            if (response.data?.success) {
+                const { processed, failed } = response.data;
                 
-                await Promise.all(batch.map(async (attendanceId) => {
-                    try {
-                        const response = await retryOnRateLimit(() => 
-                            base44.functions.invoke('recalculateSalarySnapshot', {
-                                salary_report_id: reportId,
-                                report_run_id: report?.report_run_id,
-                                project_id: report?.project_id,
-                                attendance_id: attendanceId,
-                                mode: 'APPLY'
-                            })
-                        );
-                        
-                        if (response.data?.success) {
-                            successCount++;
-                        } else {
-                            errorCount++;
-                            errors.push(`${attendanceId}: ${response.data?.error || 'Unknown error'}`);
-                        }
-                    } catch (error) {
-                        errorCount++;
-                        errors.push(`${attendanceId}: ${error.response?.data?.error || error.message}`);
+                // Refresh data with staggered invalidation to ensure the table reflects new values
+                queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+                await new Promise(r => setTimeout(r, 1000));
+                queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+
+                if (failed === 0) {
+                    toast.success(`Recalculated ${processed} employees.`);
+                } else {
+                    toast.warning(`Recalculated ${processed} employees. ${failed} failed.`);
+                    if (response.data.failures?.length > 0) {
+                        console.error('Recalculation failures:', response.data.failures);
                     }
-                }));
-                
-                // Add 1.5s delay between batches to avoid rate limiting
-                if (i + BATCH_SIZE < attendanceIds.length) {
-                    await delay(1500);
                 }
-            }
-            
-            // Refresh data with staggered invalidation
-            queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
-            await delay(1000);
-            queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
-            
-            if (errorCount === 0) {
-                toast.success(`All ${successCount} employees recalculated successfully`);
             } else {
-                toast.warning(`Recalculated ${successCount} employees. ${errorCount} failed.`);
-                console.error('Recalculation errors:', errors);
+                toast.error(response.data?.error || 'Failed to recalculate all snapshots');
             }
         } catch (error) {
             toast.error('Error: ' + (error.message || 'Failed to recalculate'));
