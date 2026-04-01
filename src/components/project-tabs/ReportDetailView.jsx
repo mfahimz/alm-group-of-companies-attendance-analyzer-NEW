@@ -465,7 +465,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
      * Ensuring the column is visible to all users when project setting is active
      * or if there's any data, while edit permissions remain role-restricted.
      */
-    const showGiftMinutesColumn = (project?.use_gift_minutes || hasAnyGiftMinutes);
+    const showGiftMinutesColumn = !isDepartmentHead && (project?.use_gift_minutes || hasAnyGiftMinutes);
 
     // ALWAYS use stored AnalysisResult values for the summary table.
     // No client-side recalculation from raw punch data.
@@ -1861,7 +1861,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <table className="w-full min-w-max caption-bottom text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-50">
                                 <tr className="border-b">
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>
+                                    {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>}
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[48px] z-20">
                                         ID
                                     </SortableTableHead>

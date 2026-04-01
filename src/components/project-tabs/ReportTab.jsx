@@ -935,7 +935,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                         <TableHead>Report Name</TableHead>
                                         <TableHead>Period</TableHead>
                                         <TableHead>{isDepartmentHead ? 'Your Team' : 'Employees'}</TableHead>
-                                        <TableHead>Verified</TableHead>
+                                        {!isDepartmentHead && <TableHead>Verified</TableHead>}
                                         <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
@@ -958,14 +958,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 <TableCell className="font-medium">
                                                     <div className="flex items-center gap-2">
                                                         {run.report_name || 'Unnamed Report'}
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="sm" 
-                                                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            onClick={() => handleRenameReport(run.id, run.report_name)}
-                                                        >
-                                                            <Pencil className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
-                                                        </Button>
+                                                        {!isDepartmentHead && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                onClick={() => handleRenameReport(run.id, run.report_name)}
+                                                            >
+                                                                <Pencil className="w-3 h-3 text-slate-400 hover:text-indigo-600" />
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
@@ -974,19 +976,18 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 <TableCell>
                                                     {isDepartmentHead ? departmentEmployees.length : run.employee_count}
                                                 </TableCell>
+                                                {!isDepartmentHead && (
                                                 <TableCell>
                                                     <div className="flex items-center gap-2">
-                                                        <span className={isDepartmentHead 
-                                                            ? 'text-slate-600' 
-                                                            : (verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600')
-                                                        }>
-                                                            {isDepartmentHead ? runResults.length : verifiedCount} / {isDepartmentHead ? departmentEmployees.length : run.employee_count}
+                                                        <span className={verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600'}>
+                                                            {verifiedCount} / {run.employee_count}
                                                         </span>
-                                                        {!isDepartmentHead && verifiedCount === run.employee_count && (
+                                                        {verifiedCount === run.employee_count && (
                                                             <CheckCircle className="w-4 h-4 text-green-600" />
                                                         )}
                                                     </div>
                                                 </TableCell>
+                                                )}
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
                                                         {/* 
