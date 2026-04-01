@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
                 if (entries.length > 0) {
                     payload[field] = JSON.stringify(entries);
                 } else {
-                    payload[field] = 0;
+                    payload[field] = "0";
                 }
             });
 
