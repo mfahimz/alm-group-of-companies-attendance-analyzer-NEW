@@ -93,6 +93,10 @@ export default function DesktopNav({ navStructure, currentPageName, canAccessPag
 
             {/* Dropdown Menus */}
             {Object.entries(navStructure.dropdowns || {}).map(([key, dropdown]) => {
+                // Hide Employees and HR Management sections for department heads
+                const isDeptHead = userRole === 'department_head' || userRole === 'assistant_gm';
+                if (isDeptHead && (key === 'HRManagement' || key === 'Employees')) return null;
+
                 const accessibleItems = dropdown.items.filter(item => canAccessPage(item.name));
                 if (accessibleItems.length === 0) return null;
 
