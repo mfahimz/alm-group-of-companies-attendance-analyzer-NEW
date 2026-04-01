@@ -69,7 +69,7 @@ export default function ProjectDetail() {
   const isCEO = userRole === 'ceo';
   const isHRManager = userRole === 'hr_manager';
   const isUser = userRole === 'user';
-  const isDepartmentHead = userRole === 'department_head';
+  const isDepartmentHead = userRole === 'department_head' || userRole === 'assistant_gm';
   const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager || isUser;
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
