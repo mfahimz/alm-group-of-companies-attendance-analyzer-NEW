@@ -106,7 +106,11 @@ export const usePermissions = () => {
         if (permission) {
             // PagePermission record exists — use its allowed_roles
             const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
-            return allowedRoles.includes(userRole);
+            if (allowedRoles.includes(userRole)) return true;
+            // SUPPLEMENTAL FALLBACK: If role not in DB record, check defaultRoles
+            // (handles new roles like assistant_gm not yet synced to PagePermission DB)
+            if (pageConfig.defaultRoles && pageConfig.defaultRoles.includes(userRole)) return true;
+            return false;
         }
 
         // FALLBACK: If no PagePermission records loaded (rate limit / empty DB),
