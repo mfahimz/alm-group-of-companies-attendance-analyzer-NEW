@@ -69,14 +69,14 @@ export default function ProjectDetail() {
   const isCEO = userRole === 'ceo';
   const isHRManager = userRole === 'hr_manager';
   const isUser = userRole === 'user';
-  const isDepartmentHead = userRole === 'department_head' || userRole === 'assistant_gm';
+  const isDepartmentHead = userRole === 'department_head';
   const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager || isUser;
   const isReadOnly = project?.status === 'closed' && !isAdminOrSupervisor;
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
   const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
   const isAstraAutoParts = project?.company === 'Astra Auto Parts';
 
-  // CRITICAL: Department heads / assistant GMs can only access CLOSED projects
+  // CRITICAL: Department heads can only access CLOSED projects
   React.useEffect(() => {
     if (project && isDepartmentHead && project.status !== 'closed') {
       toast.error('Access denied. Department heads can only view closed projects.');
