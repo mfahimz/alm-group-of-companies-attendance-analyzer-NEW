@@ -1797,7 +1797,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             Change 2 - Calculate Gift Minutes Button Gate Logic
                             Button is gated by project settings and report date overlap.
                         */}
-                        {project?.use_gift_minutes && (() => {
+                        {!isDepartmentHead && project?.use_gift_minutes && (() => {
                             const hasGiftDates = project.gift_minutes_date_from && project.gift_minutes_date_to;
                             const overlaps = hasGiftDates && 
                                              reportRun.date_from <= project.gift_minutes_date_to && 
