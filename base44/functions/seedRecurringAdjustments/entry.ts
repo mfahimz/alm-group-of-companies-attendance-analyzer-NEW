@@ -14,7 +14,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
  * 5. For each employee:
  *    - Resolve active recurring adjustments for that period.
  *    - Update/Create OvertimeData with these adjustments as JSON entries.
- *    - ENSURE IDEMPOTENCY: Filter out existing (Recurring) entries before adding.
+ *    - ENSURE IDEMPOTENCY: Filter out existing recurring entries (by source field or legacy desc suffix) before re-adding.
+ *    - SEED-ONCE: If a user deleted a seeded entry, do not re-add it on subsequent seed runs.
+ *    - Each seeded entry carries { source: "recurring", recurring_id: ra.id } for traceability.
  */
 Deno.serve(async (req) => {
     try {
@@ -122,6 +124,9 @@ Deno.serve(async (req) => {
             };
 
             // Map recurring adjustments to fields
+            // isNewRecord: true when no existing OvertimeData row exists for this employee/project.
+            const isNewRecord = !otRecord;
+
             targetFields.forEach(field => {
                 // Get existing entries from record
                 let entries: any[] = [];
@@ -143,16 +148,39 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // IDEMPOTENCY: Filter out automated (Recurring) entries
-                entries = entries.filter((e: any) => !e.desc?.includes('(Recurring)'));
+                // SEED-ONCE LOGIC:
+                // Before stripping, collect recurring_ids that are currently present.
+                // If the record already existed and a recurring_id is NOT in this set,
+                // it means the user previously deleted that seeded entry — do not re-add it.
+                const previousRecurringIds = new Set(
+                    entries
+                        .filter((e: any) => e.source === 'recurring' && e.recurring_id)
+                        .map((e: any) => e.recurring_id)
+                );
 
-                // Add new recurring entries
+                // IDEMPOTENCY: Strip existing recurring entries (by source field or legacy desc suffix).
+                // This removes all current seeded entries so they can be re-added with fresh master data.
+                entries = entries.filter((e: any) =>
+                    e.source !== 'recurring' && !(e.desc && e.desc.includes('(Recurring)'))
+                );
+
+                // Add new recurring entries for this field
                 const recurringForField = empAdjustments.filter((ra: any) => categoryToField[ra.category] === field);
-                
+
                 recurringForField.forEach((ra: any) => {
+                    // SEED-ONCE: For existing records, only re-add entries that were previously present.
+                    // If the record existed and this recurring_id was NOT in the previous set,
+                    // the user deleted it — respect that deletion and skip.
+                    // For brand-new OvertimeData records, always seed all applicable rules.
+                    if (!isNewRecord && !previousRecurringIds.has(ra.id)) {
+                        return; // User deleted this entry; respect the deletion
+                    }
+
                     entries.push({
                         amount: ra.amount,
-                        desc: `${ra.description || ra.category} (Recurring)`
+                        desc: `${ra.label || ra.description || ra.category} (Recurring)`,
+                        source: 'recurring',
+                        recurring_id: ra.id
                     });
                 });
 

@@ -16,23 +16,14 @@ import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 /**
  * Multi-Entry Cell Component
- * Handles the display of total and the popover for multiple entries
+ * Handles the display of total and the popover for multiple entries.
+ * All entries (manual + seeded recurring) are shown in one unified editable list.
  */
-/**
- * Multi-Entry Cell Component
- * Handles the display of total and the popover for multiple entries, 
- * now including read-only Recurring Adjustments.
- */
-function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
-    const entries = Array.isArray(value) ? value : (value ? [{ amount: parseFloat(value), desc: '' }] : []);
+function EntryCell({ value, onSave, title, disabled }) {
+    const allEntries = Array.isArray(value) ? value : (value ? [{ amount: parseFloat(value), desc: '' }] : []);
+    const grandTotal = allEntries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
     
-    // Split entries to avoid double-counting if recurring ones are already stored in the JSON
-    const manualEntries = entries.filter(e => !e.desc || !e.desc.includes('(Recurring)'));
-    const manualTotal = manualEntries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const recurringTotal = recurringEntries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const grandTotal = manualTotal + recurringTotal;
-    
-    const [localEntries, setLocalEntries] = useState(manualEntries);
+    const [localEntries, setLocalEntries] = useState(allEntries);
     const [isOpen, setIsOpen] = useState(false);
 
     const handleAdd = () => {
@@ -55,13 +46,15 @@ function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
     };
 
     const handleCancel = () => {
-        setLocalEntries(manualEntries);
+        setLocalEntries(allEntries);
         setIsOpen(false);
     };
 
+    const currentTotal = localEntries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
     return (
         <Popover open={isOpen} onOpenChange={(open) => {
-            if (open) setLocalEntries(manualEntries);
+            if (open) setLocalEntries(allEntries);
             setIsOpen(open);
         }}>
             <PopoverTrigger asChild>
@@ -94,70 +87,47 @@ function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
                         <span className="text-[10px] uppercase font-bold text-slate-400">Payroll Adjustments</span>
                     </div>
                     
-                    <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1">
-                        {/* Recurring Adjustments Section (Read-Only) */}
-                        {recurringEntries.length > 0 && (
-                            <div className="space-y-2 border-b pb-3 border-indigo-100 bg-indigo-50/30 p-2 rounded-lg">
-                                <p className="text-[10px] font-bold text-indigo-600 uppercase flex items-center gap-1 mb-2">
-                                    <Clock className="w-3 h-3" />
-                                    Automated Recurring
-                                </p>
-                                {recurringEntries.map((re, idx) => (
-                                    <div key={`rec-${idx}`} className="flex items-center justify-between text-[11px] py-1 px-2 bg-white/50 rounded border border-indigo-100/50 shadow-sm">
-                                        <span className="text-slate-600 font-bold">+{re.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        <span className="text-slate-400 italic truncate ml-2 max-w-[150px]">{re.description || re.label || 'Recurring adjustment'}</span>
-                                    </div>
-                                ))}
-                                <p className="text-[9px] text-indigo-400 mt-1.5 px-1 leading-tight">Recurring rules are managed from the Salary Adjustments page. Edit or delete them there.</p>
-                            </div>
-                        )}
+                    <div className="max-h-[300px] overflow-y-auto space-y-3 pr-1">
+                        {localEntries.length === 0 ? (
+                            <p className="text-center py-4 text-xs text-slate-500 italic">No adjustments applied. Click &quot;Add Entry&quot; below.</p>
+                        ) : null}
 
-                        {/* Manual Entries Section */}
-                        <div className="space-y-3">
-                            {localEntries.length === 0 && recurringEntries.length === 0 ? (
-                                <p className="text-center py-4 text-xs text-slate-500 italic">No adjustments applied. Click "Add Manual" below.</p>
-                            ) : null}
-                            
-                            {localEntries.length > 0 && (
-                                <p className="text-[10px] items-center gap-1 font-bold text-slate-500 uppercase px-1">
-                                    Manual Corrections
-                                </p>
-                            )}
-
-                            {localEntries.map((entry, idx) => (
-                                <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100 relative group">
-                                    <div className="flex items-center gap-2">
-                                        <div className="flex-1">
-                                            <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Amount</Label>
-                                            <Input className="border-slate-200 focus:ring-indigo-100" 
-                                                type="number" 
-                                                value={entry.amount} 
-                                                onChange={(e) => handleEntryChange(idx, 'amount', e.target.value)}
-                                                className="h-8 text-xs font-semibold"
-                                                placeholder="0.00"
-                                            />
-                                        </div>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            onClick={() => handleRemove(idx)}
-                                            className="mt-5 h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
-                                    </div>
-                                    <div>
-                                        <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Description</Label>
-                                        <Input className="border-slate-200 focus:ring-indigo-100" 
-                                            value={entry.desc} 
-                                            onChange={(e) => handleEntryChange(idx, 'desc', e.target.value)}
-                                            className="h-8 text-xs bg-white"
-                                            placeholder="Adjustment reason..."
+                        {localEntries.map((entry, idx) => (
+                            <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100 relative group">
+                                {entry.source === 'recurring' && (
+                                    <span className="absolute top-1.5 right-1.5 text-[8px] font-bold uppercase bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">Auto</span>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1">
+                                        <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Amount</Label>
+                                        <Input 
+                                            type="number" 
+                                            value={entry.amount} 
+                                            onChange={(e) => handleEntryChange(idx, 'amount', e.target.value)}
+                                            className="h-8 text-xs font-semibold"
+                                            placeholder="0.00"
                                         />
                                     </div>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => handleRemove(idx)}
+                                        className="mt-5 h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
                                 </div>
-                            ))}
-                        </div>
+                                <div>
+                                    <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Description</Label>
+                                    <Input 
+                                        value={entry.desc || ''} 
+                                        onChange={(e) => handleEntryChange(idx, 'desc', e.target.value)}
+                                        className="h-8 text-xs bg-white"
+                                        placeholder="Adjustment reason..."
+                                    />
+                                </div>
+                            </div>
+                        ))}
                     </div>
 
                     <Button 
@@ -167,20 +137,14 @@ function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
                         className="w-full border-dashed border-slate-300 text-slate-500 hover:text-indigo-600 hover:border-indigo-300"
                     >
                         <Plus className="w-3.5 h-3.5 mr-1" />
-                        Add Manual Correction
+                        Add Entry
                     </Button>
 
-                    <div className="pt-2 border-t flex flex-col gap-2">
-                        {recurringTotal > 0 && (
-                             <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                                <span>Recurring Sub-Total: </span>
-                                <span className="font-semibold text-slate-700">{recurringTotal.toFixed(2)}</span>
-                            </div>
-                        )}
+                    <div className="pt-2 border-t">
                         <div className="flex items-center justify-between gap-2 bg-indigo-50 p-2 rounded border border-indigo-100">
                             <div className="text-xs">
-                                <span className="text-indigo-600/70 font-semibold">Grand Total: </span>
-                                <span className="font-bold text-indigo-700">{grandTotal.toFixed(2)}</span>
+                                <span className="text-indigo-600/70 font-semibold">Total: </span>
+                                <span className="font-bold text-indigo-700">{currentTotal.toFixed(2)}</span>
                             </div>
                             <div className="flex gap-2">
                                 <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
@@ -384,33 +348,7 @@ export default function OvertimeTab({ project }) {
         });
     }, [overtimeData, searchQuery, sortColumn]);
 
-    // Fetch active recurring adjustments for this company
-    const { data: recurringAdjustments = [], isLoading: loadingRecurring } = useQuery({
-        queryKey: ['recurringAdjustments', project?.company],
-        queryFn: () => base44.entities.RecurringAdjustment.filter({ company: project.company, is_active: true }),
-        enabled: !!project?.company,
-        staleTime: 5 * 60 * 1000
-    });
 
-    /**
-     * Filters active recurring adjustments for a specific employee within the project period.
-     */
-    const getEmployeeRecurring = (empId, hrmsId, category) => {
-        return (recurringAdjustments || []).filter(ra => {
-            const isEmployee = ra.employee_id && (String(ra.employee_id) === String(empId) || String(ra.employee_id) === String(hrmsId));
-            if (!isEmployee) return false;
-            
-            // Period check
-            const isInPeriod = ra.start_date <= project.date_to && (!ra.end_date || ra.end_date >= project.date_from);
-            if (!isInPeriod) return false;
-
-            // Category match (with allowance -> incentive mapping)
-            if (ra.category === category) return true;
-            if (category === 'incentive' && ra.category === 'allowance') return true;
-            
-            return false;
-        });
-    };
     const handleChange = (attendanceId, field, value) => {
         setEditableData(prev => ({
             ...prev,
@@ -623,33 +561,10 @@ export default function OvertimeTab({ project }) {
                     advanceSalaryDeduction: JSON.stringify(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction)
                 };
 
-                /**
-                 * Merges manual edits with current recurring adjustments for SalarySnapshot persistence.
-                 * Ensures that (Recurring) descriptions are identifiable on final reports.
-                 */
-                const getMergedValue = (manualVal, category) => {
-                    const manualEntries = Array.isArray(manualVal) ? manualVal : (manualVal ? [{ amount: parseFloat(manualVal), desc: '' }] : []);
-                    const recurring = getEmployeeRecurring(attendanceId, employee.hrms_id, category);
-                    
-                    const merged = [...manualEntries.filter(e => !e.desc?.includes('(Recurring)'))];
-                    recurring.forEach(ra => merged.push({
-                        amount: ra.amount || 0,
-                        desc: `${ra.label || ra.category} (Recurring)`
-                    }));
-
-                    return merged.length > 1 || recurring.length > 0 
-                        ? JSON.stringify(merged) 
-                        : (merged.length === 1 ? merged[0].amount : 0);
-                };
-
-                const snapshotAdjustmentData = {
-                    bonus: getMergedValue(edits.bonus ?? employee.bonus, 'bonus'),
-                    incentive: getMergedValue(edits.incentive ?? employee.incentive, 'incentive'),
-                    open_leave_salary: getMergedValue(edits.open_leave_salary ?? employee.open_leave_salary, 'open_leave_salary'),
-                    variable_salary: getMergedValue(edits.variable_salary ?? employee.variable_salary, 'variable_salary'),
-                    otherDeduction: getMergedValue(edits.otherDeduction ?? employee.otherDeduction, 'otherDeduction'),
-                    advanceSalaryDeduction: getMergedValue(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction, 'advanceSalaryDeduction')
-                };
+                // SalarySnapshot receives the same adjustment data as OvertimeData.
+                // Seeded recurring entries are already materialized in the entries arrays,
+                // so no re-injection from live RecurringAdjustment rules is needed.
+                const snapshotAdjustmentData = { ...otAdjustmentData };
 
                 // Save to OvertimeData (always)
                 if (employee.otRecordId) {
@@ -1100,7 +1015,6 @@ export default function OvertimeTab({ project }) {
                                                 <EntryCell 
                                                     title="Bonus"
                                                     value={getAdjustmentValue(row, 'bonus')}
-                                                    recurringEntries={getEmployeeRecurring(row.attendance_id, row.hrms_id, 'bonus')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'bonus', entries)}
                                                     disabled={!canEditAdjustments}
                                                 />
@@ -1109,7 +1023,6 @@ export default function OvertimeTab({ project }) {
                                                 <EntryCell 
                                                     title="Incentive"
                                                     value={getAdjustmentValue(row, 'incentive')}
-                                                    recurringEntries={getEmployeeRecurring(row.attendance_id, row.hrms_id, 'incentive')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'incentive', entries)}
                                                     disabled={!canEditAdjustments}
                                                 />
@@ -1119,7 +1032,6 @@ export default function OvertimeTab({ project }) {
                                                     <EntryCell 
                                                         title="Open Leave Salary"
                                                         value={getAdjustmentValue(row, 'open_leave_salary')}
-                                                        recurringEntries={getEmployeeRecurring(row.attendance_id, row.hrms_id, 'open_leave_salary')}
                                                         onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'open_leave_salary', entries)}
                                                         disabled={!canEditAdjustments}
                                                     />
@@ -1130,7 +1042,6 @@ export default function OvertimeTab({ project }) {
                                                     <EntryCell 
                                                         title="Variable Salary"
                                                         value={getAdjustmentValue(row, 'variable_salary')}
-                                                        recurringEntries={getEmployeeRecurring(row.attendance_id, row.hrms_id, 'variable_salary')}
                                                         onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'variable_salary', entries)}
                                                         disabled={!canEditAdjustments}
                                                     />
@@ -1140,7 +1051,6 @@ export default function OvertimeTab({ project }) {
                                                 <EntryCell 
                                                     title="Other Deduction"
                                                     value={getAdjustmentValue(row, 'otherDeduction')}
-                                                    recurringEntries={getEmployeeRecurring(row.attendance_id, row.hrms_id, 'otherDeduction')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', entries)}
                                                     disabled={!canEditAdjustments}
                                                 />
@@ -1149,7 +1059,6 @@ export default function OvertimeTab({ project }) {
                                                 <EntryCell 
                                                     title="Advance Salary Deduction"
                                                     value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
-                                                    recurringEntries={getEmployeeRecurring(row.attendance_id, row.hrms_id, 'advanceSalaryDeduction')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', entries)}
                                                     disabled={!canEditAdjustments}
                                                 />

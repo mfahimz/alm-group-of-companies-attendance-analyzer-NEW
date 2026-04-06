@@ -173,7 +173,8 @@ export default function SalaryAdjustments() {
         }
         mutation.mutate({
             ...formData,
-            amount: parseFloat(formData.amount) || 0
+            amount: parseFloat(formData.amount) || 0,
+            description: formData.label
         });
     };
 
