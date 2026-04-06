@@ -1,32 +1,10 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { 
+    calculateEmployeeSalary, 
+    parseAdjustmentValue 
+} from '../_shared/salary/calculateEmployeeSalary.ts';
 
-// Helper: Parse OvertimeData adjustment arrays or legacy numbers
-// MUST STAY IN SYNC exactly with the same helper in createSalarySnapshots
-const parseAdjustmentValue = (value: any): number => {
-    if (value === null || value === undefined) return 0;
-    if (typeof value === 'number') return Math.max(0, value);
-    
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-            try {
-                const parsed = JSON.parse(trimmed);
-                if (Array.isArray(parsed)) {
-                    const total = parsed.reduce((sum: number, item: any) => {
-                        const amount = Number(item?.amount);
-                        return sum + (isNaN(amount) ? 0 : amount);
-                    }, 0);
-                    return Math.max(0, total);
-                }
-            } catch (e) {
-                // Parsing failed, fall through to numeric parse
-            }
-        }
-        const num = parseFloat(trimmed);
-        return isNaN(num) ? 0 : Math.max(0, num);
-    }
-    return 0;
-};
+// parseAdjustmentValue helper removed in favor of shared module
 
 // Helper: 429 Retry with Exponential Backoff
 const retryWithBackoff = async <T>(fn: () => Promise<T>): Promise<T> => {
@@ -59,7 +37,7 @@ const retryWithBackoff = async <T>(fn: () => Promise<T>): Promise<T> => {
  * - Supports PREVIEW mode (no DB changes) and APPLY mode (updates DB)
  */
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
     try {
         const base44 = createClientFromRequest(req);
         
@@ -83,7 +61,7 @@ Deno.serve(async (req) => {
             project_id,        // Required: Project.id
             attendance_id,     // Required: employee attendance_id (string or number)
             mode = 'APPLY'     // Optional: 'PREVIEW' or 'APPLY'
-        } = await req.json();
+        } = await req.json() as any;
 
         // Validate required fields
         if (!report_run_id) {
@@ -105,7 +83,7 @@ Deno.serve(async (req) => {
         // ============================================================
         // FETCH PROJECT
         // ============================================================
-        const projects = await retryWithBackoff(() => base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 1));
+        const projects = await retryWithBackoff(() => base44.asServiceRole.entities.Project.filter({ id: project_id }, null, 1)) as any[];
         if (projects.length === 0) {
             return Response.json({ error: 'Project not found' }, { status: 404 });
         }
@@ -142,7 +120,7 @@ Deno.serve(async (req) => {
             project_id: project_id,
             report_run_id: report_run_id,
             attendance_id: String(attendance_id)
-        }, null, 1));
+        }, null, 1)) as any[];
         
         if (snapshots.length === 0) {
             return Response.json({ 
@@ -162,7 +140,7 @@ Deno.serve(async (req) => {
                 employee_id: snapshot.hrms_id,
                 company: project.company,
                 active: true
-            }, null, 1));
+            }, null, 1)) as any[];
             if (salariesByHrms.length > 0) {
                 salaryRecord = salariesByHrms[0];
             }
@@ -174,7 +152,7 @@ Deno.serve(async (req) => {
                 attendance_id: String(attendance_id),
                 company: project.company,
                 active: true
-            }, null, 1));
+            }, null, 1)) as any[];
             if (salariesByAttendance.length > 0) {
                 salaryRecord = salariesByAttendance[0];
             }
@@ -198,10 +176,10 @@ Deno.serve(async (req) => {
             const salaryIncrements = await retryWithBackoff(() => base44.asServiceRole.entities.SalaryIncrement.filter({ 
                 company: 'Al Maraghi Motors', 
                 active: true 
-            }, null, 5000));
+            }, null, 5000)) as any[];
             
             // Get increments for this employee
-            const empIncrements = salaryIncrements.filter(inc => 
+            const empIncrements = salaryIncrements.filter((inc: any) => 
                 String(inc.employee_id) === String(snapshot.hrms_id) ||
                 String(inc.attendance_id) === String(attendance_id)
             );
@@ -214,8 +192,8 @@ Deno.serve(async (req) => {
                 
                 // Find the increment effective for previous month (latest increment on or before prev month)
                 const applicablePrevIncrements = empIncrements
-                    .filter(inc => inc.effective_month <= prevMonthStr)
-                    .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
+                    .filter((inc: any) => inc.effective_month <= prevMonthStr)
+                    .sort((a: any, b: any) => (new Date(b.effective_month) as any) - (new Date(a.effective_month) as any));
                 
                 if (applicablePrevIncrements.length > 0) {
                     const prevInc = applicablePrevIncrements[0];
@@ -332,173 +310,99 @@ Deno.serve(async (req) => {
         // RECALCULATE DERIVED FIELDS
         // ============================================================
 
-        // Leave Days = Annual Leave + LOP (excludes sick leave per Al Maraghi rule)
-        const leaveDays = attendanceValues.annual_leave_count + attendanceValues.full_absence_count;
-
-        // Leave Pay = (Total Salary / Divisor) * Leave Days - conventional round
-        const leavePay = leaveDays > 0 ? Math.round((totalSalary / divisor) * leaveDays) : 0;
-        
-        // ============================================================
-        // SALARY LEAVE AMOUNT FORMULA (NON-NEGOTIABLE)
-        // Base = Basic Salary + Allowances ONLY (NO BONUS, NO allowances_with_bonus)
-        // Formula: (Basic + Allowances) / salary_divisor × salary_leave_days
-        // For 9-working-hour employees: round up to nearest multiple of 5
-        // ============================================================
-        let salaryLeaveAmount = 0;
-        const salaryLeaveDays = snapshot.override_salary_leave_days ?? snapshot.salary_leave_days ?? snapshot.annual_leave_count ?? 0;
-        
-        if (salaryLeaveDays > 0) {
-            const salaryBaseForLeave = basicSalary + allowances;
-            const rawSalaryLeaveAmount = (salaryBaseForLeave / divisor) * salaryLeaveDays;
-            const is9HourEmployee = workingHours === 9;
-            salaryLeaveAmount = is9HourEmployee
-                ? Math.ceil(rawSalaryLeaveAmount / 5) * 5
-                : Math.round(rawSalaryLeaveAmount);
-        }
-        
-        // Net Deduction = max(0, Leave Pay - Salary Leave Amount)
-        const netDeduction = Math.max(0, leavePay - salaryLeaveAmount);
-
-        // Deductible Hours = (Deductible Minutes + Other Minutes) / 60
-        // CRITICAL: other_minutes must be included in deductible calculation (same as createSalarySnapshots)
-        const payrollDeductibleMinutes = (attendanceValues.deductible_minutes || 0) + (attendanceValues.other_minutes || 0);
-        const deductibleHours = Math.round((payrollDeductibleMinutes / 60) * 100) / 100;
-        
-        // Current month hourly rate (uses salary divisor)
-        const hourlyRateDeduction = totalSalary / divisor / workingHours;
-        
-        // Current month Deductible Hours Pay - conventional rounding
-        const currentMonthDeductibleHoursPay = Math.round(hourlyRateDeduction * deductibleHours);
-
-        // OT Hourly Rate (uses OT Divisor and PREVIOUS MONTH SALARY for Al Maraghi)
-        const otHourlyRate = prevMonthSalaryForOT / otDivisor / workingHours;
-        
-        // ============================================================
-        // DISABLED: Previous month deduction logic
-        // Previous month deductions have been removed from Al Maraghi Motors
-        // to eliminate hidden deductions from salary totals.
-        // ============================================================
-        const extraPrevMonthLopPay = 0;
-        const extraPrevMonthDeductibleHoursPay = 0;
-        
-        // Total deductible hours = current month only (no prev month)
-        const totalDeductibleHours = deductibleHours;
-        
-        // Total deductible hours pay = current month only (no prev month)
-        const deductibleHoursPay = currentMonthDeductibleHoursPay;
-        
-        // Normal OT Salary - conventional rounding
-        const normalOtSalary = Math.round(otHourlyRate * 1.25 * adjustmentValues.normalOtHours);
-
-        // Special OT Salary - conventional rounding
-        const specialOtSalary = Math.round(otHourlyRate * 1.5 * adjustmentValues.specialOtHours);
-
-        // Total OT Salary
-        const totalOtSalary = normalOtSalary + specialOtSalary;
-
-        // Final Total = Total Salary + Bonus + effectiveOtOrIncentive + OpenLeave + Variable
-        //             - Net Deduction (current month leave)
-        //             - Current Month Deductible Hours Pay
-        //             - Other Deduction - Advance
-        // effectiveOtOrIncentive = max(OT, Incentive) for Operations dept,
-        //                          OT + Incentive for all other departments.
-        // NO PREVIOUS MONTH DEDUCTIONS
-        // ============================================================
-        // INCENTIVE vs OVERTIME RULE (Al Maraghi Motors — Operations Department Only)
-        // ============================================================
-        // For employees in the "Operations" department (across all companies,
-        // but noted specifically for Al Maraghi Motors): pay only the HIGHER
-        // of overtime vs incentive — not both added together.
-        // For all other employees outside the Operations department: both
-        // incentive and overtime are added together in full with no comparison.
-        // ============================================================
-        const isOperationsDept = snapshot.department === 'Operations';
-        const effectiveOtOrIncentive = isOperationsDept
-            ? Math.max(
-                Math.round(totalOtSalary * 100) / 100,
-                Math.round(adjustmentValues.incentive * 100) / 100
-            )
-            : Math.round(totalOtSalary * 100) / 100 + Math.round(adjustmentValues.incentive * 100) / 100;
-        let finalTotal = totalSalary 
-            + effectiveOtOrIncentive 
-            + adjustmentValues.bonus 
-            + adjustmentValues.open_leave_salary
-            + adjustmentValues.variable_salary
-            - netDeduction 
-            - currentMonthDeductibleHoursPay
-            - adjustmentValues.otherDeduction 
-            - adjustmentValues.advanceSalaryDeduction;
-
-        // Conditional rounding: Only round final total if bonus has NO decimal values
-        const bonusHasDecimals = (adjustmentValues.bonus || 0) % 1 !== 0;
-        if (!bonusHasDecimals) {
-            finalTotal = Math.round(finalTotal);
-        }
-
-        // ============================================================
-        // WPS SPLIT LOGIC (Al Maraghi Motors only)
-        // Balance must always be a multiple of 100 (round down)
-        // ============================================================
-        let wpsPay = finalTotal;
-        let balance = 0;
-        let wpsCapApplied = false;
         const wpsCapEnabled = salaryRecord?.wps_cap_enabled || false;
         const wpsCapAmount = salaryRecord?.wps_cap_amount ?? 4900;
 
-        if (wpsCapEnabled) {
-            if (finalTotal <= 0) {
-                wpsPay = 0;
-                balance = 0;
-                wpsCapApplied = false;
-            } else {
-                const cap = wpsCapAmount != null ? wpsCapAmount : 4900;
-                // Calculate raw excess over cap
-                const rawExcess = Math.max(0, finalTotal - cap);
-                // Round balance DOWN to nearest 100 (only if bonus has no decimals)
-                if (!bonusHasDecimals) {
-                    balance = Math.floor(rawExcess / 100) * 100;
-                } else {
-                    balance = rawExcess;
-                }
-                // WPS gets the rest (total - balance)
-                wpsPay = finalTotal - balance;
-                wpsCapApplied = rawExcess > 0;
+        // ============================================================
+        // RECALCULATE VIA SHARED CANONICAL HELPER
+        // ============================================================
+        const salaryInput = {
+            employee: {
+                department: snapshot.department
+            },
+            salary: {
+                basic_salary: basicSalary,
+                allowances: allowances,
+                allowances_with_bonus: snapshot.allowances_with_bonus || Number(salaryRecord.allowances_with_bonus) || 0,
+                total_salary: totalSalary,
+                working_hours: workingHours
+            },
+            prevMonthSalary: {
+                total_salary: prevMonthSalaryForOT
+            },
+            attendance: {
+                workingDays: attendanceValues.working_days,
+                presentDays: attendanceValues.present_days,
+                fullAbsenceCount: attendanceValues.full_absence_count,
+                halfAbsenceCount: snapshot.half_absence_count || 0,
+                sickLeaveCount: attendanceValues.sick_leave_count,
+                annualLeaveCount: attendanceValues.annual_leave_count,
+                lateMinutes: attendanceValues.late_minutes,
+                earlyCheckoutMinutes: attendanceValues.early_checkout_minutes,
+                otherMinutes: attendanceValues.other_minutes,
+                approvedMinutes: attendanceValues.approved_minutes,
+                deductibleMinutes: attendanceValues.deductible_minutes,
+                ramadanGiftMinutes: snapshot.ramadan_gift_minutes || 0,
+                graceMinutes: attendanceValues.grace_minutes,
+                salaryLeaveDays: attendanceValues.salary_leave_days
+            },
+            adjustments: {
+                normalOtHours: adjustmentValues.normalOtHours,
+                specialOtHours: adjustmentValues.specialOtHours,
+                bonus: adjustmentValues.bonus,
+                incentive: adjustmentValues.incentive,
+                open_leave_salary: adjustmentValues.open_leave_salary,
+                variable_salary: adjustmentValues.variable_salary,
+                otherDeduction: adjustmentValues.otherDeduction,
+                advanceSalaryDeduction: adjustmentValues.advanceSalaryDeduction
+            },
+            settings: {
+                isAlMaraghi,
+                divisor,
+                otDivisor,
+                prevMonthDivisor,
+                otNormalRate: 1.25, // Standard rates
+                otSpecialRate: 1.5,
+                wpsCapEnabled: wpsCapEnabled,
+                wpsCapAmount: wpsCapAmount,
+                balanceRoundingRule: 'UP_TO_100', // Unify with createSalarySnapshots canonical logic
+                leavePayFormula: 'TOTAL_SALARY',
+                salaryLeaveFormula: 'BASIC_PLUS_ALLOWANCES'
             }
-        } else if (finalTotal <= 0) {
-            wpsPay = 0;
-            balance = 0;
-        }
+        };
+
+        const computed = calculateEmployeeSalary(salaryInput);
 
         // ============================================================
         // AFTER VALUES (computed)
         // ============================================================
         const afterValues = {
-            leaveDays: leaveDays,
-            leavePay: leavePay,
-            salaryLeaveAmount: salaryLeaveAmount,
-            netDeduction: netDeduction,
-            deductibleHours: totalDeductibleHours,
-            deductibleHoursPay: deductibleHoursPay,
-            extra_prev_month_lop_pay: extraPrevMonthLopPay,
-            extra_prev_month_deductible_hours_pay: extraPrevMonthDeductibleHoursPay,
-            normalOtSalary: normalOtSalary,
-            specialOtSalary: specialOtSalary,
-            totalOtSalary: totalOtSalary,
-            total: finalTotal,
-            wpsPay: wpsPay,
-            balance: balance,
-            wps_cap_enabled: wpsCapEnabled,
-            wps_cap_amount: wpsCapAmount,
-            wps_cap_applied: wpsCapApplied
+            leaveDays: computed.leaveDays,
+            leavePay: computed.leavePay,
+            salaryLeaveAmount: computed.salaryLeaveAmount,
+            netDeduction: computed.netDeduction,
+            deductibleHours: computed.deductibleHours,
+            deductibleHoursPay: computed.deductibleHoursPay,
+            extra_prev_month_lop_pay: 0,
+            extra_prev_month_deductible_hours_pay: 0,
+            normalOtSalary: computed.normalOtSalary,
+            specialOtSalary: computed.specialOtSalary,
+            totalOtSalary: computed.totalOtSalary,
+            total: computed.total,
+            wpsPay: computed.wpsPay,
+            balance: computed.balance,
+            wps_cap_enabled: computed.wps_cap_enabled,
+            wps_cap_amount: computed.wps_cap_amount,
+            wps_cap_applied: computed.wps_cap_applied
         };
 
         // ============================================================
         // COMPUTE DIFF
         // ============================================================
-        const diff = {};
-        for (const key of Object.keys(afterValues)) {
-            const before = beforeValues[key] || 0;
-            const after = afterValues[key] || 0;
+        const diff: any = {};
+        for (const key of (Object.keys(afterValues) as Array<keyof typeof afterValues>)) {
+            const before = (beforeValues as any)[key] || 0;
+            const after = (afterValues as any)[key] || 0;
             if (Math.abs(before - after) > 0.001) {
                 diff[key] = { before, after, change: Math.round((after - before) * 100) / 100 };
             }
@@ -577,7 +481,7 @@ Deno.serve(async (req) => {
                     new_total: afterValues.total
                 })
             });
-        } catch (auditError) {
+        } catch (auditError: any) {
             console.warn('[recalculateSalarySnapshot] Audit log failed:', auditError.message);
             // Don't fail the operation if audit log fails
         }
@@ -594,7 +498,7 @@ Deno.serve(async (req) => {
             message: `Salary recalculated successfully for ${snapshot.name}. ${changedFields.length} field(s) updated.`
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Recalculate salary snapshot error:', error);
         return Response.json({ 
             error: error.message 
