@@ -156,7 +156,7 @@ export default function SalaryAdjustments() {
             company: adj.company,
             employee_id: adj.employee_id,
             category: adj.category,
-            label: adj.label || '',
+            label: adj.label || adj.description || '',
             amount: adj.amount,
             description: adj.description || '',
             start_date: adj.start_date || '',
