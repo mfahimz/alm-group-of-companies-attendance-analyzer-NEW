@@ -105,9 +105,10 @@ function EntryCell({ value, recurringEntries = [], onSave, title, disabled }) {
                                 {recurringEntries.map((re, idx) => (
                                     <div key={`rec-${idx}`} className="flex items-center justify-between text-[11px] py-1 px-2 bg-white/50 rounded border border-indigo-100/50 shadow-sm">
                                         <span className="text-slate-600 font-bold">+{re.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        <span className="text-slate-400 italic truncate ml-2 max-w-[150px]">{re.label || 'Recurring'}</span>
+                                        <span className="text-slate-400 italic truncate ml-2 max-w-[150px]">{re.description || re.label || 'Recurring adjustment'}</span>
                                     </div>
                                 ))}
+                                <p className="text-[9px] text-indigo-400 mt-1.5 px-1 leading-tight">Recurring rules are managed from the Salary Adjustments page. Edit or delete them there.</p>
                             </div>
                         )}
 
