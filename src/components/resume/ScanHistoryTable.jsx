@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { 
@@ -6,7 +6,6 @@ import {
     UserCheck, UserX, Globe, MapPin, Briefcase, Users, Search 
 } from 'lucide-react';
 import ResumeScanResultView from './ResumeScanResult';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const RECOMMENDATION_COLORS = {
@@ -128,6 +127,11 @@ export default function ScanHistoryTable({ refreshKey, isAdmin }) {
             setSelectedIds(new Set());
             setConfirmDelete(null);
             setDeletingId(null);
+            toast.success('Scan results deleted');
+        },
+        onError: (error) => {
+            console.error('Delete scan error:', error);
+            toast.error('Failed to delete scans: ' + error.message);
         }
     });
 

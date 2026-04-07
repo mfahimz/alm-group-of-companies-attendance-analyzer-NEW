@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,18 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EXCEPTION_TYPES, formatExceptionTypeLabel, getFilteredExceptionTypes } from '@/lib/exception-types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-import { Plus, Trash2, Search, Download, Save, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, Download, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
 import EditExceptionDialog from '../exceptions/EditExceptionDialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import TablePagination from '../ui/TablePagination';
-import TimePicker from '../ui/TimePicker';
-import { formatInUAE } from '@/components/ui/timezone';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 import ChecklistSection from './ChecklistSection';
 import { formatMergedWorksheet } from './ChecklistSection';
@@ -267,6 +263,10 @@ export default function ExceptionsTab({ project }) {
         mutationFn: ({ id, data }) => base44.entities.Exception.update(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            toast.success('Exception updated');
+        },
+        onError: (error) => {
+            toast.error('Failed to update exception: ' + (error.message || 'Unknown error'));
         }
     });
 
@@ -275,6 +275,9 @@ export default function ExceptionsTab({ project }) {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             toast.success('Exception updated');
+        },
+        onError: (error) => {
+            toast.error('Failed to update: ' + (error.message || 'Unknown error'));
         }
     });
 
@@ -428,21 +431,27 @@ export default function ExceptionsTab({ project }) {
         setUploadProgress({ current: 0, total: importPreview.exceptions.length, status: 'Importing exceptions...' });
         setShowImportPreview(false);
         
-        const batchSize = 20;
-        for (let i = 0; i < importPreview.exceptions.length; i += batchSize) {
-            const batch = importPreview.exceptions.slice(i, i + batchSize);
-            await base44.entities.Exception.bulkCreate(batch);
-            setUploadProgress({ 
-                current: Math.min(i + batchSize, importPreview.exceptions.length), 
-                total: importPreview.exceptions.length,
-                status: `Importing ${Math.min(i + batchSize, importPreview.exceptions.length)}/${importPreview.exceptions.length}...`
-            });
-        }
+        try {
+            const batchSize = 20;
+            for (let i = 0; i < importPreview.exceptions.length; i += batchSize) {
+                const batch = importPreview.exceptions.slice(i, i + batchSize);
+                await base44.entities.Exception.bulkCreate(batch);
+                setUploadProgress({ 
+                    current: Math.min(i + batchSize, importPreview.exceptions.length), 
+                    total: importPreview.exceptions.length,
+                    status: `Importing ${Math.min(i + batchSize, importPreview.exceptions.length)}/${importPreview.exceptions.length}...`
+                });
+            }
 
-        queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
-        toast.success(`Imported ${importPreview.exceptions.length} exceptions successfully`);
-        setUploadProgress(null);
-        setImportPreview(null);
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            toast.success(`Imported ${importPreview.exceptions.length} exceptions successfully`);
+        } catch (error) {
+            console.error('Import error:', error);
+            toast.error('Import failed: ' + (error.message || 'Unknown error'));
+        } finally {
+            setUploadProgress(null);
+            setImportPreview(null);
+        }
     };
 
     const handleBulkDelete = () => {

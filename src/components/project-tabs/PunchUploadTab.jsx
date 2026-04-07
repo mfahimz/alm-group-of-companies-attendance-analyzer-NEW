@@ -580,7 +580,7 @@ export default function PunchUploadTab({ project }) {
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['punches', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
             toast.success('Punches uploaded successfully');
             setParsedData([]);
             setFile(null);
@@ -588,7 +588,7 @@ export default function PunchUploadTab({ project }) {
             setShowPreviewDialog(false);
         },
         onError: (error) => {
-            queryClient.invalidateQueries(['punches', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
             const isRateLimit = error?.status === 429 || /rate.?limit|too many/i.test(error?.message || '');
             const msg = isRateLimit 
                 ? 'Rate limit exceeded after retries. All uploaded records have been rolled back. Please wait a minute and try again.'
@@ -601,7 +601,7 @@ export default function PunchUploadTab({ project }) {
     const updatePunchMutation = useMutation({
         mutationFn: ({ id, data }) => base44.entities.Punch.update(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries(['punches', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
             setEditingPunch(null);
             toast.success('Punch updated');
         },
@@ -615,7 +615,7 @@ export default function PunchUploadTab({ project }) {
             await base44.entities.Punch.delete(id);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['punches', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
             setPunchToDelete(null);
             setDeleteDialogOpen(false);
             setSelectedPunches([]);
@@ -643,7 +643,7 @@ export default function PunchUploadTab({ project }) {
             }
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['punches', project.id]);
+            queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
             setSelectedPunches([]);
             toast.success('Punches deleted successfully');
             setUploadProgress(null);

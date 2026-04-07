@@ -1360,6 +1360,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     
                     // TERMINAL failure for this record (primary update failed)
                     console.error(`[Phase1Update] Permanent failure for record ${record.id}:`, error);
+                    toast.error(`Update failed for record ${record.id}: ` + (error?.message || 'Unknown error'));
                     failCount++;
                     return false;
                 }
@@ -1444,6 +1445,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             } catch (err) {
                 // Background process: Log errors to console only as requested
                 console.warn(`[Phase2Sync] Exception sync failed for record ${record.id} in background:`, err);
+                toast.error(`Background sync failed for record ${record.id}: ` + (err?.message || 'Unknown error'));
             }
         };
 
@@ -1577,6 +1579,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             queryClient.invalidateQueries(['exceptions', project.id]);
         } catch (err) {
             console.error('Failed to sync GIFT_MINUTES exception:', err);
+            toast.error('Failed to sync GIFT_MINUTES exception: ' + (err?.message || 'Unknown error'));
         }
         
         // Audit log

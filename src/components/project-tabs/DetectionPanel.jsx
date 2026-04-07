@@ -33,16 +33,35 @@ export default function DetectionPanel({
 
     const handleDismiss = async (d, type) => {
         const notes = type;
-        if (d.isDismissed) {
-            const ex = exceptions.find(e => e.type === 'DISMISSED_MISMATCH' && String(e.attendance_id) === String(d.attendance_id) && e.date_from === d.date && e.notes === notes);
-            if (ex) { await base44.entities.Exception.delete(ex.id); toast.success("Restored"); }
-        } else {
-            await base44.entities.Exception.create({ type: 'DISMISSED_MISMATCH', attendance_id: d.attendance_id, project_id: project.id, date_from: d.date, date_to: d.date, notes });
-            toast.success("Dismissed");
+        try {
+            if (d.isDismissed) {
+                const ex = exceptions.find(e => e.type === 'DISMISSED_MISMATCH' && String(e.attendance_id) === String(d.attendance_id) && e.date_from === d.date && e.notes === notes);
+                if (ex) {
+                    await base44.entities.Exception.delete(ex.id);
+                    toast.success("Restored");
+                }
+            } else {
+                await base44.entities.Exception.create({
+                    type: 'DISMISSED_MISMATCH',
+                    attendance_id: d.attendance_id,
+                    project_id: project.id,
+                    date_from: d.date,
+                    date_to: d.date,
+                    notes
+                });
+                toast.success("Dismissed");
+            }
+            queryClient.invalidateQueries({ queryKey: [ 'exceptions', project.id ] });
+            const setter = type === 'mismatch' ? setDismissedMismatchKeys : setDismissedNoMatchKeys;
+            setter(prev => {
+                const n = new Set([ ...prev ]);
+                d.isDismissed ? n.delete(d.key) : n.add(d.key);
+                return n;
+            });
+        } catch (error) {
+            console.error('Dismiss error:', error);
+            toast.error('Operation failed: ' + (error?.message || 'Unknown error'));
         }
-        queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
-        const setter = type === 'mismatch' ? setDismissedMismatchKeys : setDismissedNoMatchKeys;
-        setter(prev => { const n = new Set([...prev]); d.isDismissed ? n.delete(d.key) : n.add(d.key); return n; });
     };
 
     const TopOffenders = ({ detections, dismissedKeys, color }) => {
