@@ -1,10 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
- * Backend function to run attendance analysis for a project
- * This contains the complete analysis logic moved from frontend
+ * Backend function to run attendance analysis for a project.
+ * This contains the complete analysis logic moved from frontend.
+ * This is the main function of the app and is the backbone of the app.
  */
 // @ts-ignore: Deno
+// redeploy trigger 2
 Deno.serve(async (req: Request) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -599,7 +601,7 @@ Deno.serve(async (req: Request) => {
                         const dName = dNames[dateObj.getUTCDay()];
                         const applicableShifts = employeeShifts.filter((ps: any) => !ps.date && isShiftEffective(ps, dateObj));
                         for (const ps of applicableShifts) {
-                             if (ps.applicable_days && ps.applicable_days.toLowerCase().includes(dName.toLowerCase())) { s = ps; break; }
+                            if (ps.applicable_days && ps.applicable_days.toLowerCase().includes(dName.toLowerCase())) { s = ps; break; }
                         }
                         if (!s) {
                             if (dateObj.getUTCDay() === 5) {
@@ -942,7 +944,7 @@ Deno.serve(async (req: Request) => {
                     'DISMISSED_MISMATCH': 3,
                     'GIFT_MINUTES': 1,
                 };
-                
+
                 const dateException = matchingExceptions.length > 0
                     ? matchingExceptions.sort((a: any, b: any) => {
                         const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
@@ -1080,14 +1082,14 @@ Deno.serve(async (req: Request) => {
                     abnormal_dates_set.add(dateStr);
                     critical_abnormal_dates_set.add(dateStr);
                 }
-                
+
                 // ================================================================
                 // SKIP_PUNCH: Determine if skip applies and what type
                 // ================================================================
                 const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
                 const isOnLeave = dateException && (
-                    dateException.type === 'SICK_LEAVE' || 
-                    dateException.type === 'ANNUAL_LEAVE' || 
+                    dateException.type === 'SICK_LEAVE' ||
+                    dateException.type === 'ANNUAL_LEAVE' ||
                     dateException.type === 'PUBLIC_HOLIDAY'
                 );
                 const isNonWorkingStatus = isOnLeave || (dateException && dateException.type === 'OFF');
@@ -1095,11 +1097,11 @@ Deno.serve(async (req: Request) => {
                 let hasSkipPunchApplied = false;
                 let skipType = null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | 'FULL_SKIP'
                 let skipPunchForced0PunchPresent = false; // Tracks the "LOP Saver" case
-                
+
                 if (skipPunchException && !isNonWorkingStatus && skipPunchException.punch_to_skip) {
                     skipType = skipPunchException.punch_to_skip; // 'AM_PUNCH_IN', 'PM_PUNCH_OUT', or 'FULL_SKIP'
                     hasSkipPunchApplied = true;
-                    
+
                     // LOP SAVER: 0 punches + FULL_SKIP → force Present (Skip Punch)
                     // This handles company-wide half-days where people didn't come in at all
                     if (filteredPunches.length === 0 && skipType === 'FULL_SKIP') {
@@ -1132,7 +1134,7 @@ Deno.serve(async (req: Request) => {
                 // 2. Split Shift (4 expected): 0=LOP, 1=Half, 2=Half, 3=Present, 4=Present
                 // Bypasses: SKIP_PUNCH or FULL_SKIP exceptions only.
                 // ================================================================
-                
+
                 const punchCount = filteredPunches.length;
                 const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
                     String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
@@ -1253,7 +1255,7 @@ Deno.serve(async (req: Request) => {
                     if (!shouldSkipTimeCalculation && shift && punchMatches.length > 0) {
                         // Track which shift points had actual punches matched
                         const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
-                        
+
                         for (const match of punchMatches) {
                             if (!match.matchedTo) continue;
 
@@ -1274,12 +1276,12 @@ Deno.serve(async (req: Request) => {
                                 }
                             }
                         }
-                        
+
                         // SKIP_PUNCH: Zero out specific minutes based on skip type
                         if (hasSkipPunchApplied && skipType) {
                             const amStartMissing = !matchedShiftPoints.has('AM_START');
                             const pmEndMissing = !matchedShiftPoints.has('PM_END');
-                            
+
                             if (skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') {
                                 if (amStartMissing) dayLateMinutes = 0;
                             }
@@ -1310,7 +1312,7 @@ Deno.serve(async (req: Request) => {
 
                 // Step 5: Handle MANUAL_OTHER_MINUTES exceptions that are NOT report-generated separately.
                 // This handles manually created other minutes exceptions that were not from report edits.
-                const manualOtherNonReportEx = matchingExceptions.filter(ex => 
+                const manualOtherNonReportEx = matchingExceptions.filter(ex =>
                     ex.type === 'MANUAL_OTHER_MINUTES' && (ex.created_from_report === false || ex.created_from_report === null)
                 );
                 for (const moEx of manualOtherNonReportEx) {
@@ -1410,7 +1412,7 @@ Deno.serve(async (req: Request) => {
 
                 function applyLopAdjacentToBlock(block: string[]) {
                     if (block.length === 0) return;
-                    
+
                     const firstDateStr = block[0];
                     const lastDateStr = block[block.length - 1];
 
@@ -1467,13 +1469,13 @@ Deno.serve(async (req: Request) => {
                                 const originalStatus = (dateStatusMap as Record<string, string>)[dateStr];
                                 fullAbsenceCount++;
                                 lopAdjacentWeeklyOffCount++;
-                                (dateStatusMap as Record<string, string>)[dateStr] = originalStatus === 'WEEKLY_OFF' 
-                                    ? 'LOP_ADJACENT_WEEKLY_OFF' 
+                                (dateStatusMap as Record<string, string>)[dateStr] = originalStatus === 'WEEKLY_OFF'
+                                    ? 'LOP_ADJACENT_WEEKLY_OFF'
                                     : 'LOP_ADJACENT_PUBLIC_HOLIDAY';
-                                
+
                                 console.log(`[runAnalysis] LOP-adjacent deduction: Employee ${attendanceIdStr}, Date ${dateStr} (${originalStatus}) → LOP`);
                             } else {
-                                const skipReason = isProtectedByLeave 
+                                const skipReason = isProtectedByLeave
                                     ? `Protected by Leave (${employeeExceptions.find((ex: any) => dateStr >= ex.date_from && dateStr <= ex.date_to && (ex.type === 'ANNUAL_LEAVE' || ex.type === 'SICK_LEAVE'))?.type})`
                                     : 'SKIP_DOUBLE_DEDUCTION (Exception or Project Setting)';
                                 console.log(`[runAnalysis] LOP-adjacent bypass (${skipReason}): Employee ${attendanceIdStr}, Date ${dateStr}`);
@@ -1612,14 +1614,14 @@ Deno.serve(async (req: Request) => {
 
         if (employeesNeedingLookup.length > 0) {
             console.log(`[runAnalysis] Performing secondary gift minutes lookup for ${employeesNeedingLookup.length} employees (preserving values from prior report runs in project ${project_id})...`);
-            
+
             // Batch lookups to avoid backend rate limits
             const SECONDARY_LOOKUP_BATCH_SIZE = 8;
             const SECONDARY_LOOKUP_BATCH_DELAY = 1500;
-            
+
             for (let i = 0; i < employeesNeedingLookup.length; i += SECONDARY_LOOKUP_BATCH_SIZE) {
                 const batch = employeesNeedingLookup.slice(i, i + SECONDARY_LOOKUP_BATCH_SIZE);
-                
+
                 await Promise.all(batch.map(async (attendance_id) => {
                     const idStr = String(attendance_id);
                     // Search for ANY previous AnalysisResult for this employee + project that has gift minutes saved.
@@ -1639,7 +1641,7 @@ Deno.serve(async (req: Request) => {
                         }
                     }
                 }));
-                
+
                 // Rate-limiting delay between batches of parallel lookups
                 if (i + SECONDARY_LOOKUP_BATCH_SIZE < employeesNeedingLookup.length) {
                     await new Promise(r => setTimeout(r, SECONDARY_LOOKUP_BATCH_DELAY));
