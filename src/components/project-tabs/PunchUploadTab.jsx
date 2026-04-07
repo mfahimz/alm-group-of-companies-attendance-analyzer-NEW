@@ -50,6 +50,135 @@ export default function PunchUploadTab({ project }) {
         queryFn: () => base44.entities.Punch.filter({ project_id: project.id })
     });
 
+    const parseAstraExcel = (workbook, project) => {
+        if (!project || !project.date_from) {
+            throw new Error("Astra Excel: Project dates are missing");
+        }
+        const reportYear = project.date_from.split('-')[0];
+
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+
+        const dayToDateMap = {};
+        let daysRowIndex = -1;
+        const monthMap = {
+            Jan: '01', Feb: '02', Mar: '03', Apr: '04',
+            May: '05', Jun: '06', Jul: '07', Aug: '08',
+            Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+        };
+
+        for (let r = 0; r < rows.length; r++) {
+            if (!rows[r]) continue;
+            if (rows[r][1] && String(rows[r][1]).trim() === 'Days') {
+                daysRowIndex = r;
+                break;
+            }
+        }
+
+        if (daysRowIndex === -1) {
+            throw new Error('Astra Excel: Could not find "Days" header row');
+        }
+
+        const dateRow = rows[daysRowIndex];
+        if (dateRow) {
+            for (let c = 0; c < dateRow.length; c++) {
+                const cellVal = dateRow[c];
+                if (cellVal && typeof cellVal === 'string') {
+                    const dateMatch = cellVal.trim().match(/^(\d{2})-([A-Za-z]{3})$/);
+                    if (dateMatch) {
+                        const monthAbbr = dateMatch[2].charAt(0).toUpperCase() + dateMatch[2].slice(1).toLowerCase();
+                        if (monthMap[monthAbbr]) {
+                            dayToDateMap[c] = `${reportYear}-${monthMap[monthAbbr]}-${dateMatch[1]}`;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (Object.keys(dayToDateMap).length === 0) {
+            throw new Error('Astra Excel: Could not parse any date columns');
+        }
+
+        const punches = [];
+        let employeeBlocksFound = 0;
+
+        const convertToAmPm = (time24, dateStr) => {
+            const cleaned = time24.replace(/\s*\(SE\)\s*$/i, '').trim();
+            const parts = cleaned.split(':');
+            let hh = parseInt(parts[0] || '0', 10);
+            const mm = (parts[1] || '00').padStart(2, '0');
+            
+            const period = hh >= 12 ? 'PM' : 'AM';
+            if (hh > 12) hh -= 12;
+            if (hh === 0) hh = 12;
+
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y} ${hh}:${mm} ${period}`;
+        };
+
+        for (let r = 0; r < rows.length; r++) {
+            const row = rows[r];
+            if (!row) continue;
+            const col1 = row[1];
+
+            if (col1 && typeof col1 === 'string' && col1.trim().startsWith('Employee Code:-')) {
+                employeeBlocksFound++;
+                const empCode = row[6] != null ? String(row[6]).trim() : '';
+
+                let inTimeRow = null;
+                let outTimeRow = null;
+
+                for (let offset = 1; offset <= 12 && (r + offset) < rows.length; offset++) {
+                    const scanRow = rows[r + offset];
+                    if (!scanRow) continue;
+                    const label = scanRow[1];
+                    if (label && typeof label === 'string') {
+                        const trimmed = label.trim();
+                        if (trimmed === 'In Time') inTimeRow = scanRow;
+                        else if (trimmed === 'Out Time') outTimeRow = scanRow;
+                    }
+                    if (inTimeRow && outTimeRow) break;
+                }
+
+                for (const [colIndexStr, punch_date] of Object.entries(dayToDateMap)) {
+                    const colIndex = parseInt(colIndexStr, 10);
+                    const inTimeVal = inTimeRow ? inTimeRow[colIndex] : null;
+                    const outTimeVal = outTimeRow ? outTimeRow[colIndex] : null;
+
+                    const inStr = inTimeVal != null ? String(inTimeVal).trim() : '';
+                    const outStr = outTimeVal != null ? String(outTimeVal).trim() : '';
+
+                    if (inStr && inStr !== '00:00') {
+                        punches.push({
+                            employee_id: empCode,
+                            attendance_id: empCode,
+                            project_id: project.id,
+                            punch_date: punch_date,
+                            timestamp_raw: convertToAmPm(inStr, punch_date)
+                        });
+                    }
+
+                    if (outStr && outStr !== '00:00' && !/\(SE\)\s*$/.test(outStr)) {
+                        punches.push({
+                            employee_id: empCode,
+                            attendance_id: empCode,
+                            project_id: project.id,
+                            punch_date: punch_date,
+                            timestamp_raw: convertToAmPm(outStr, punch_date)
+                        });
+                    }
+                }
+            }
+        }
+
+        if (employeeBlocksFound === 0) {
+            throw new Error('Astra Excel: No employee blocks found in sheet');
+        }
+
+        return punches;
+    };
+
     const handleFileChange = async (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
@@ -59,26 +188,49 @@ export default function PunchUploadTab({ project }) {
             const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
             
             if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-                /* 
-                   Excel Conversion Logic:
-                   If the file is an Excel file, we use SheetJS (XLSX) to read the binary data,
-                   extract the first sheet, and convert it to CSV format. This CSV string is 
-                   then wrapped in a Blob and passed to the existing parseCSV logic.
-                   This ensures that the parsing logic, validation, and column expectations 
-                   remain identical for both file types.
-                */
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     const data = event.target.result;
                     if (data && data instanceof ArrayBuffer) {
                         const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        const csvData = XLSX.utils.sheet_to_csv(worksheet);
                         
-                        // Create a blob from the CSV string to satisfy the existing parser's File/Blob requirement
-                        const blob = new Blob([csvData], { type: 'text/csv' });
-                        parseCSV(blob);
+                        if (project.company === 'Astra Auto Parts') {
+                            try {
+                                const records = parseAstraExcel(workbook, project);
+                                const newWarnings = [];
+                                const pData = records.map((p) => {
+                                    const employeeExists = employees.some(e => String(e.attendance_id) === String(p.attendance_id));
+                                    if (!employeeExists && !newWarnings.includes(`Unknown employee ${p.attendance_id}`)) {
+                                        newWarnings.push(`Unknown employee ${p.attendance_id}`);
+                                    }
+                                    const timestampValidation = validateTimestamp(p.timestamp_raw);
+                                    if (!timestampValidation.valid && !newWarnings.includes(`Record for ${p.attendance_id}: ${timestampValidation.error}`)) {
+                                        newWarnings.push(`Record for ${p.attendance_id}: ${timestampValidation.error}`);
+                                    }
+                                    return {
+                                        attendance_id: p.attendance_id,
+                                        timestamp_raw: p.timestamp_raw,
+                                        punch_date: p.punch_date,
+                                        employeeExists,
+                                        timestampValidation,
+                                        hasInvalidTimestamp: !timestampValidation.valid
+                                    };
+                                });
+                                setParsedData(pData);
+                                setWarnings([...new Set(newWarnings)]);
+                                setShowPreviewDialog(true);
+                            } catch (err) {
+                                toast.error(err.message, { duration: 5000 });
+                            }
+                        } else {
+                            const firstSheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[firstSheetName];
+                            const csvData = XLSX.utils.sheet_to_csv(worksheet);
+                            
+                            // Create a blob from the CSV string to satisfy the existing parser's File/Blob requirement
+                            const blob = new Blob([csvData], { type: 'text/csv' });
+                            parseCSV(blob);
+                        }
                     }
                 };
                 reader.readAsArrayBuffer(selectedFile);
@@ -373,6 +525,7 @@ export default function PunchUploadTab({ project }) {
                     total: totalUploaded
                 });
 
+                let rollbackFailed = false;
                 try {
                     // Fetch all records tagged with this import batch
                     const toRollback = await retryWithBackoff(
@@ -402,6 +555,7 @@ export default function PunchUploadTab({ project }) {
                                         deleted++;
                                     } catch (e) {
                                         console.error('Rollback delete failed for', rec.id, e);
+                                        rollbackFailed = true;
                                     }
                                 }
                             }
@@ -415,6 +569,11 @@ export default function PunchUploadTab({ project }) {
                     }
                 } catch (rollbackErr) {
                     console.error('Rollback query failed:', rollbackErr);
+                    rollbackFailed = true;
+                }
+
+                if (rollbackFailed) {
+                    toast.error(`Upload failed and rollback also failed. Please manually check for orphaned punch records with batch ID: ${importBatchId}. Contact support if needed.`, { duration: 10000 });
                 }
 
                 throw uploadError;

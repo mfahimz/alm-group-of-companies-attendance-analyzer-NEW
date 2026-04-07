@@ -1077,6 +1077,10 @@ export default function RunAnalysisTab({ project }) {
         }
 
         setIsAnalyzing(true);
+        let grandTotal = 0;
+        let totalProcessed = 0;
+        let isError = false;
+        
         setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
 
         try {
@@ -1092,7 +1096,6 @@ export default function RunAnalysisTab({ project }) {
             let offset = 0;
             let isComplete = false;
             let reportRunId = null;
-            let totalProcessed = 0;
 
             while (!isComplete) {
                 const response = await base44.functions.invoke('runAnalysis', {
@@ -1106,16 +1109,22 @@ export default function RunAnalysisTab({ project }) {
                 });
 
                 if (response.data.success) {
+                    if (response.data.total_count > 0 && grandTotal === 0) {
+                        grandTotal = response.data.total_count;
+                    }
+
                     reportRunId = response.data.report_run_id;
                     isComplete = response.data.is_complete;
                     offset += batchSize;
                     totalProcessed += response.data.processed_count;
+                    
+                    const currentTotal = grandTotal || uniqueEmployeeIds.length;
 
                     setProgress({
-                        current: Math.min(offset, uniqueEmployeeIds.length),
-                        total: uniqueEmployeeIds.length,
+                        current: totalProcessed,
+                        total: currentTotal,
                         status: 'Processing...',
-                        subStatus: `Analyzed ${Math.min(offset, uniqueEmployeeIds.length)} of ${uniqueEmployeeIds.length} employees`
+                        subStatus: `Analyzed ${totalProcessed} of ${currentTotal} employees`
                     });
 
                     if (!isComplete) {
@@ -1130,21 +1139,50 @@ export default function RunAnalysisTab({ project }) {
             queryClient.invalidateQueries(['reportRuns', project.id]);
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['projects']);
-            toast.success('Analysis complete');
-            setProgress({
-                current: totalProcessed,
-                total: uniqueEmployeeIds.length,
-                status: 'Complete!',
-                subStatus: 'Report generated successfully'
-            });
+            
+            const finalTotal = grandTotal || uniqueEmployeeIds.length;
+            if (totalProcessed < finalTotal) {
+                if (toast.warning) {
+                    toast.warning(`Analysis complete but ${finalTotal - totalProcessed} employee(s) may have been skipped. Please review attendance records for missing data.`, { duration: 8000 });
+                } else {
+                    toast('Analysis complete with warnings', { description: `${finalTotal - totalProcessed} employee(s) may have been skipped. Please review attendance records for missing data.`, icon: '⚠️', duration: 8000 });
+                }
+                
+                setProgress({
+                    current: totalProcessed,
+                    total: finalTotal,
+                    status: 'Complete with warnings',
+                    subStatus: `Complete with warnings — ${totalProcessed} of ${finalTotal} analyzed`
+                });
+            } else {
+                toast.success('Analysis complete');
+                setProgress({
+                    current: totalProcessed,
+                    total: finalTotal,
+                    status: 'Complete!',
+                    subStatus: 'Report generated successfully'
+                });
+            }
         } catch (error) {
+            isError = true;
             toast.error('Analysis failed: ' + error.message);
             console.error(error);
+            const currentTotal = grandTotal || uniqueEmployeeIds.length;
+            setProgress({
+                current: totalProcessed,
+                total: currentTotal,
+                status: 'Analysis Failed',
+                subStatus: `Analysis stopped at ${totalProcessed} of ${currentTotal} employees — ${error.message}`
+            });
         } finally {
-            setTimeout(() => {
+            if (!isError) {
+                setTimeout(() => {
+                    setIsAnalyzing(false);
+                    setProgress(null);
+                }, 2000);
+            } else {
                 setIsAnalyzing(false);
-                setProgress(null);
-            }, 2000);
+            }
         }
     };
 
