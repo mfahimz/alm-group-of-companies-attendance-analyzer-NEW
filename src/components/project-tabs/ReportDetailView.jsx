@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 // Table components used by DailyBreakdownDialog (extracted)
 import useDetectionAnalysis, { extractTime } from './useDetectionAnalysis';
-import { Download, Search, Save, Filter, Loader2, CheckCircle, Zap } from 'lucide-react';
+import { Download, Search, Save, Filter, Loader2, CheckCircle, Zap, AlertCircle } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import DetectionPanel from './DetectionPanel';
 import { Progress } from "@/components/ui/progress";
@@ -34,6 +34,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [previewHeaders, setPreviewHeaders] = useState([]);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
+    const [isReanalyzing, setIsReanalyzing] = useState(false);
+    const [reanalysisProgress, setReanalysisProgress] = useState(null);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
@@ -874,6 +876,92 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
+    const handleReanalyze = async () => {
+        setIsReanalyzing(true);
+        setReanalysisProgress({ current: 0, total: 0, status: 'Initializing...', subStatus: 'Preparing reanalysis chunked loop...' });
+
+        let grandTotal = 0;
+        let totalProcessed = 0;
+        let offset = 0;
+        const batchSize = 10;
+        let isComplete = false;
+
+        try {
+            while (!isComplete) {
+                const response = await base44.functions.invoke('runAnalysis', {
+                    project_id: project.id,
+                    date_from: project.date_from,
+                    date_to: project.date_to,
+                    report_name: reportRun.report_name || 'Reanalysis',
+                    _existing_report_run_id: reportRun.id,
+                    _chunk_offset: offset,
+                    _chunk_size: batchSize
+                });
+
+                if (response.data.success) {
+                    if (response.data.total_count > 0 && grandTotal === 0) {
+                        grandTotal = response.data.total_count;
+                    }
+
+                    totalProcessed += response.data.processed_count;
+                    offset += batchSize;
+                    isComplete = response.data.is_complete;
+
+                    setReanalysisProgress({
+                        current: totalProcessed,
+                        total: grandTotal || totalProcessed,
+                        status: 'Reanalyzing...',
+                        subStatus: `Reanalyzed ${totalProcessed} of ${grandTotal || '?'} employees`
+                    });
+
+                    if (!isComplete) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                } else {
+                    throw new Error(response.data.error || 'Reanalysis chunk failed');
+                }
+            }
+
+            if (totalProcessed < grandTotal) {
+                toast.warning(`Reanalysis complete but ${grandTotal - totalProcessed} employee(s) may have been skipped. Please review attendance records.`);
+                setReanalysisProgress({
+                    current: totalProcessed,
+                    total: grandTotal,
+                    status: 'Complete with warnings',
+                    subStatus: `Complete with warnings — ${totalProcessed} of ${grandTotal} analyzed`
+                });
+            } else {
+                toast.success('Reanalysis complete. Report updated.');
+                setReanalysisProgress({
+                    current: grandTotal,
+                    total: grandTotal,
+                    status: 'Complete!',
+                    subStatus: 'Reanalysis complete. Refreshing report...'
+                });
+            }
+
+            // After 1500ms delay: invalidate queries to refresh the report
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+            queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
+
+            // After another 500ms (total 2000ms): clear states
+            await new Promise(resolve => setTimeout(resolve, 500));
+            setIsReanalyzing(false);
+            setReanalysisProgress(null);
+
+        } catch (error) {
+            toast.error('Reanalysis failed: ' + error.message);
+            setReanalysisProgress({
+                current: totalProcessed,
+                total: grandTotal || 0,
+                status: 'Failed',
+                subStatus: `Reanalysis stopped at ${totalProcessed} of ${grandTotal || '?'} employees — ${error.message}`
+            });
+            setIsReanalyzing(false);
+        }
+    };
+
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
@@ -1648,6 +1736,31 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </Card>
             )}
 
+            {/* Reanalysis Progress Dialog / Banner */}
+            {reanalysisProgress && (
+                <Card className="bg-indigo-50 border-indigo-200 shadow-sm border-2 animate-in fade-in slide-in-from-top-4">
+                    <CardContent className="py-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                {reanalysisProgress.status === 'Failed' ? (
+                                    <AlertCircle className="w-5 h-5 text-red-600" />
+                                ) : reanalysisProgress.status.includes('Complete') ? (
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                ) : (
+                                    <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                                )}
+                                <span className="font-bold text-indigo-700">{reanalysisProgress.status}</span>
+                            </div>
+                            <div className="text-sm font-bold text-indigo-600">
+                                {reanalysisProgress.current} / {reanalysisProgress.total} employees
+                            </div>
+                        </div>
+                        <Progress value={reanalysisProgress.total > 0 ? (reanalysisProgress.current / reanalysisProgress.total) * 100 : 0} className="w-full bg-indigo-200" />
+                        <p className="text-xs text-indigo-600 mt-2 font-medium">{reanalysisProgress.subStatus}</p>
+                    </CardContent>
+                </Card>
+            )}
+
             <Card className="border-0 shadow-sm">
                 <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -1689,6 +1802,26 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </Button>
                             {project.status !== 'closed' && (
                                 <>
+                                    {!reportRun.is_final && (
+                                        <Button
+                                            onClick={handleReanalyze}
+                                            disabled={isReanalyzing || reportRun.is_final}
+                                            className="bg-indigo-600 hover:bg-indigo-700"
+                                            title="Re-runs analysis with latest exceptions and shifts"
+                                        >
+                                            {isReanalyzing ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Reanalyzing...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Zap className="w-4 h-4 mr-2" />
+                                                    Reanalyze Report
+                                                </>
+                                            )}
+                                        </Button>
+                                    )}
                                     <Button
                                         onClick={() => { loadRawData(); setShowSaveConfirmation(true); }}
                                         disabled={isSaving || (rawDataRequested && !allRawDataLoaded)}
