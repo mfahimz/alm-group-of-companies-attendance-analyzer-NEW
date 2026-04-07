@@ -890,8 +890,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             while (!isComplete) {
                 const response = await base44.functions.invoke('runAnalysis', {
                     project_id: project.id,
-                    date_from: project.date_from,
-                    date_to: project.date_to,
+                    date_from: reportRun.date_from,
+                    date_to: reportRun.date_to,
                     report_name: reportRun.report_name || 'Reanalysis',
                     _existing_report_run_id: reportRun.id,
                     _chunk_offset: offset,
