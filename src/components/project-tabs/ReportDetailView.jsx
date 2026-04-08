@@ -883,33 +883,146 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         setReanalysisProgress({ 
             current: 0, 
             total: 0, 
-            status: 'Preparing...', 
-            subStatus: 'Preparing reanalysis with current report edits...' 
+            status: 'Saving...', 
+            subStatus: 'Saving report edits as exceptions...' 
         });
 
         try {
-            // Collect day_overrides from all results
-            const dayOverridesMap = {};
-            if (results && Array.isArray(results)) {
-                for (const result of results) {
-                    const attId = String(result.attendance_id);
-                    if (!result.day_overrides) continue;
-                    let overrides = {};
-                    try {
-                        overrides = typeof result.day_overrides === 'string'
-                            ? JSON.parse(result.day_overrides)
-                            : result.day_overrides;
-                    } catch (e) {
-                        continue;
+            // PHASE 1: Write exceptions to DB
+            const existingReportExceptions = exceptions.filter(e =>
+                (e.created_from_report && e.report_run_id === reportRun.id) ||
+                (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
+            );
+
+            // Sequential delete with retry and delay
+            for (const ex of existingReportExceptions) {
+                try {
+                    await base44.entities.Exception.delete(ex.id);
+                } catch (err) {
+                    if (err.status === 429 || err.message?.includes('rate limit')) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        await base44.entities.Exception.delete(ex.id);
+                    } else {
+                        throw err;
                     }
-                    if (Object.keys(overrides).length > 0) {
-                        dayOverridesMap[attId] = overrides;
+                }
+                await new Promise(r => setTimeout(r, 150));
+            }
+
+            const exceptionsToCreate = [];
+            for (const result of results) {
+                if (!result.day_overrides) continue;
+                let dayOverrides = {};
+                try {
+                    dayOverrides = JSON.parse(result.day_overrides);
+                } catch (e) {
+                    continue;
+                }
+
+                const datesByType = {};
+                Object.entries(dayOverrides).forEach(([dateStr, override]) => {
+                    const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
+                    if (!datesByType[key]) {
+                        datesByType[key] = {
+                            dates: [],
+                            data: override,
+                            attendance_id: result.attendance_id
+                        };
+                    }
+                    datesByType[key].dates.push(dateStr);
+                });
+
+                for (const group of Object.values(datesByType)) {
+                    const sortedDates = group.dates.sort();
+                    const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
+                    const ranges = [];
+
+                    if (hasTimeMins) {
+                        sortedDates.forEach(d => ranges.push({ start: d, end: d }));
+                    } else {
+                        let currentRange = { start: sortedDates[0], end: sortedDates[0] };
+                        for (let i = 1; i < sortedDates.length; i++) {
+                            const dayDiff = (new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / (1000 * 60 * 60 * 24);
+                            if (dayDiff === 1) { currentRange.end = sortedDates[i]; }
+                            else { ranges.push({ ...currentRange }); currentRange = { start: sortedDates[i], end: sortedDates[i] }; }
+                        }
+                        ranges.push(currentRange);
+                    }
+
+                    for (const range of ranges) {
+                        const needsApproval = true;
+                        const detailsParts = [];
+                        if (group.data.lateMinutes > 0) detailsParts.push(`+${group.data.lateMinutes} late min`);
+                        if (group.data.earlyCheckoutMinutes > 0) detailsParts.push(`+${group.data.earlyCheckoutMinutes} early min`);
+                        if (group.data.otherMinutes > 0) detailsParts.push(`+${group.data.otherMinutes} other min`);
+                        if (group.data.shiftOverride) detailsParts.push('shift override');
+                        if (group.data.details) detailsParts.push(group.data.details);
+
+                        const detailsText = detailsParts.length > 0
+                            ? `Report edit: ${detailsParts.join(' | ')}`
+                            : 'Report edit: Manual adjustment from report';
+
+                        const exceptionData = {
+                            project_id: project.id,
+                            attendance_id: String(group.attendance_id),
+                            date_from: range.start,
+                            date_to: range.end,
+                            type: group.data.type,
+                            details: detailsText,
+                            created_from_report: true,
+                            report_run_id: reportRun.id,
+                            use_in_analysis: true,
+                            approval_status: needsApproval ? 'pending_dept_head' : 'approved'
+                        };
+
+                        if (group.data.lateMinutes && group.data.lateMinutes > 0) exceptionData.late_minutes = group.data.lateMinutes;
+                        if (group.data.earlyCheckoutMinutes && group.data.earlyCheckoutMinutes > 0) exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
+                        if (group.data.otherMinutes && group.data.otherMinutes > 0) exceptionData.other_minutes = group.data.otherMinutes;
+
+                        if (group.data.shiftOverride) {
+                            exceptionData.type = 'SHIFT_OVERRIDE';
+                            exceptionData.new_am_start = group.data.shiftOverride.am_start;
+                            exceptionData.new_am_end = group.data.shiftOverride.am_end;
+                            exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
+                            exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
+                            exceptionData.created_from_report = false;
+                        } else if ((exceptionData.late_minutes || 0) > 0 || (exceptionData.early_checkout_minutes || 0) > 0) {
+                            exceptionData.type = 'MANUAL_LATE';
+                        } else if ((exceptionData.other_minutes || 0) > 0) {
+                            exceptionData.type = 'MANUAL_OTHER_MINUTES';
+                        }
+                        exceptionsToCreate.push(exceptionData);
                     }
                 }
             }
 
-            setReanalysisProgress({ current: 0, total: 0, status: 'Initializing...', subStatus: 'Preparing reanalysis chunked loop...' });
+            // Batch create with retry and delay
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < exceptionsToCreate.length; i += BATCH_SIZE) {
+                const batch = exceptionsToCreate.slice(i, i + BATCH_SIZE);
+                try {
+                    await base44.entities.Exception.bulkCreate(batch);
+                } catch (err) {
+                    if (err.status === 429 || err.message?.includes('rate limit')) {
+                        await new Promise(r => setTimeout(r, 2000));
+                        await base44.entities.Exception.bulkCreate(batch);
+                    } else {
+                        throw err;
+                    }
+                }
+                if (i + BATCH_SIZE < exceptionsToCreate.length) {
+                    await new Promise(r => setTimeout(r, 300));
+                }
+            }
 
+            setReanalysisProgress({ 
+                current: 0, 
+                total: 0, 
+                status: 'Reanalyzing...', 
+                subStatus: 'Exceptions saved. Starting reanalysis...' 
+            });
+
+            // PHASE 2: REANALYSIS
             let grandTotal = 0;
             let totalProcessed = 0;
             let offset = 0;
@@ -924,8 +1037,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     report_name: reportRun.report_name || 'Reanalysis',
                     _existing_report_run_id: reportRun.id,
                     _chunk_offset: offset,
-                    _chunk_size: rebatchSize,
-                    _day_overrides: dayOverridesMap
+                    _chunk_size: rebatchSize
                 });
 
                 if (response.data.success) {
