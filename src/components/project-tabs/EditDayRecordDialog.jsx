@@ -796,8 +796,52 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             }
         }
         
+        // SYNC RECALCULATION: Ensure mutation uses fresh values even if background useEffect hasn't finished
+        let freshLateMinutes = formData.lateMinutes;
+        let freshEarlyMinutes = formData.earlyCheckoutMinutes;
+
+        if (formData.shiftOverride.enabled) {
+            const dayPunches = getDayPunches();
+            if (dayPunches.length > 0) {
+                const overriddenShift = {
+                    am_start: formData.shiftOverride.am_start,
+                    am_end: formData.shiftOverride.am_end,
+                    pm_start: formData.shiftOverride.pm_start,
+                    pm_end: formData.shiftOverride.pm_end
+                };
+
+                if (overriddenShift.am_start && overriddenShift.pm_end) {
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, overriddenShift);
+                    let calcLate = 0;
+                    let calcEarly = 0;
+
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            if (punchTime.getTime() > shiftTime.getTime()) {
+                                calcLate += Math.round((punchTime.getTime() - shiftTime.getTime()) / (1000 * 60));
+                            }
+                        }
+
+                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                            if (punchTime.getTime() < shiftTime.getTime()) {
+                                calcEarly += Math.round((shiftTime.getTime() - punchTime.getTime()) / (1000 * 60));
+                            }
+                        }
+                    }
+                    freshLateMinutes = calcLate;
+                    freshEarlyMinutes = calcEarly;
+                }
+            }
+        }
+
         updateDayMutation.mutate({
             ...formData,
+            lateMinutes: freshLateMinutes,
+            earlyCheckoutMinutes: freshEarlyMinutes,
             originalLateMinutes,
             originalEarlyCheckout,
             originalOtherMinutes
