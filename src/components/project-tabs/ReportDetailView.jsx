@@ -916,7 +916,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             // 3. Delete old exceptions
             const existingReportExceptions = exceptions.filter(e =>
-                e.created_from_report && e.report_run_id === reportRun.id
+                (e.created_from_report && e.report_run_id === reportRun.id) ||
+                (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
             );
             if (existingReportExceptions.length > 0) {
                 for (const ex of existingReportExceptions) {
@@ -985,6 +986,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             exceptionData.new_am_end = group.data.shiftOverride.am_end;
                             exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
                             exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
+                            exceptionData.created_from_report = false;
                         } else if ((exceptionData.late_minutes || 0) > 0 || (exceptionData.early_checkout_minutes || 0) > 0) {
                             exceptionData.type = 'MANUAL_LATE';
                         } else if ((exceptionData.other_minutes || 0) > 0) {
@@ -1129,7 +1131,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             // Delete existing report-generated exceptions for this report to prevent duplicates
             const existingReportExceptions = exceptions.filter(e =>
-                e.created_from_report && e.report_run_id === reportRun.id
+                (e.created_from_report && e.report_run_id === reportRun.id) ||
+                (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
             );
 
             if (existingReportExceptions.length > 0) {
@@ -1249,6 +1252,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             exceptionData.new_am_end = group.data.shiftOverride.am_end;
                             exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
                             exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
+                            exceptionData.created_from_report = false;
                         } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes > 0) {
                             exceptionData.type = 'MANUAL_LATE';
                         } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes === 0) {
