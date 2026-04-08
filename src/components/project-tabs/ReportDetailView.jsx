@@ -5,7 +5,7 @@ import { fetchAllRecords } from '../utils/paginatedFetch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// Table components used by DailyBreakdownDialog (extracted)
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import useDetectionAnalysis, { extractTime } from './useDetectionAnalysis';
 import { Download, Search, Save, Filter, Loader2, CheckCircle, Zap, AlertCircle } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';

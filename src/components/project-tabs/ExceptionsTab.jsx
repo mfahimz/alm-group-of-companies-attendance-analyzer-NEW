@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,16 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EXCEPTION_TYPES, formatExceptionTypeLabel, getFilteredExceptionTypes } from '@/lib/exception-types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
 import { Plus, Trash2, Search, Download, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
+import TablePagination from '../ui/TablePagination';
+import TimePicker from '../ui/TimePicker';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
 import EditExceptionDialog from '../exceptions/EditExceptionDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
-import ChecklistSection from './ChecklistSection';
-import { formatMergedWorksheet } from './ChecklistSection';
+import ChecklistSection, { formatMergedWorksheet } from './ChecklistSection';
 
 // Map user-friendly names to system type codes generated from central source
 const TYPE_MAP = EXCEPTION_TYPES.reduce((acc, type) => {
@@ -134,7 +134,7 @@ export default function ExceptionsTab({ project }) {
     });
 
     // Combine master employees with project overrides for lookups
-    const employees = React.useMemo(() => {
+    const employees = useMemo(() => {
         const combined = [...masterEmployees];
         for (const pe of projectEmployees) {
             // Only add if not already in master list
@@ -165,7 +165,7 @@ export default function ExceptionsTab({ project }) {
     });
 
     // Hierarchical Sorting Logic for Checklist Items: Type Name (A-Z) -> Description/Name
-    const sortedChecklistItems = React.useMemo(() => {
+    const sortedChecklistItems = useMemo(() => {
         if (!checklistItems) return [];
         return [...checklistItems].sort((a, b) => {
             const typeA = (a.task_type || '').toLowerCase();
@@ -905,7 +905,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
     const needsDaySwap = formData.type === 'DAY_SWAP';
     const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
     // Hierarchical Sorting Logic for Exceptions: Type Name (A-Z) -> Employee Name
-    const sortedExceptions = React.useMemo(() => {
+    const sortedExceptions = useMemo(() => {
         return [...filteredExceptions].sort((a, b) => {
             const typeA = (a.is_custom_type ? (a.custom_type_name || 'Custom') : a.type.replace(/_/g, ' ')).toLowerCase();
             const typeB = (b.is_custom_type ? (b.custom_type_name || 'Custom') : b.type.replace(/_/g, ' ')).toLowerCase();
