@@ -516,665 +516,781 @@ Deno.serve(async (req: Request) => {
                 return aIdx - bIdx;
             }).map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
         };
-        const analyzeEmployee = async (attendance_id: any, existingReportOverrides: any = {}) => {
-                const attendanceIdStr = String(attendance_id);
-                const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-                const employeeExceptions = exceptions.filter(e => {
+        const analyzeEmployee = async (attendance_id: any) => {
+            const attendanceIdStr = String(attendance_id);
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
+            const employeeExceptions = exceptions.filter(e => {
+                try {
+                    return (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                        e.use_in_analysis !== false &&
+                        e.is_custom_type !== true;
+                } catch {
+                    return false;
+                }
+            });
+            const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
+            const includeSeconds = true;
+
+            const isShiftEffective = (s: any, targetDate: Date) => {
+                if (!s.effective_from || !s.effective_to) return true;
+                const from = new Date(s.effective_from);
+                const to = new Date(s.effective_to);
+                const targetDay = new Date(targetDate);
+                targetDay.setHours(0, 0, 0, 0);
+                const fromDay = new Date(from);
+                fromDay.setHours(0, 0, 0, 0);
+                const toDay = new Date(to);
+                toDay.setHours(0, 0, 0, 0);
+                return targetDay >= fromDay && targetDay <= toDay;
+            };
+
+            const shiftStartsNearMidnight = (s: any) => {
+                if (!s) return false;
+                const tStart = parseTime(s.am_start);
+                if (!tStart) return false;
+                const minutes = tStart.getHours() * 60 + tStart.getMinutes();
+                return minutes <= MIDNIGHT_BUFFER_MINUTES;
+            };
+
+            const getShiftForDate = (dateStr: string, dateObj: Date) => {
+                const dateSpecificShifts = employeeShifts.filter((s: any) => s.date === dateStr && isShiftEffective(s, dateObj));
+                let s: any = null;
+                if (dateSpecificShifts.length > 0) {
+                    if (dateSpecificShifts.length === 1) {
+                        s = dateSpecificShifts[0];
+                    } else {
+                        const ramadanDateShifts = dateSpecificShifts.filter((ps: any) => ps.applicable_days?.includes('Ramadan'));
+                        if (ramadanDateShifts.length >= 2) {
+                            const dayShift = ramadanDateShifts.find((ps: any) => ps.applicable_days?.includes('Day') || ps.applicable_days?.includes('S1'));
+                            const nightShift = ramadanDateShifts.find((ps: any) => ps.applicable_days?.includes('Night') || ps.applicable_days?.includes('S2'));
+                            if (dayShift && nightShift) {
+                                s = { am_start: dayShift.am_start, am_end: dayShift.pm_end, pm_start: nightShift.am_start, pm_end: nightShift.pm_end, is_single_shift: false, _ramadan: true };
+                            }
+                        }
+                        if (!s) s = dateSpecificShifts.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
+                    }
+                } else {
+                    for (const scheduleId in ramadanShiftsLookup) {
+                        const ramadanData = ramadanShiftsLookup[scheduleId];
+                        if (dateObj >= ramadanData.start && dateObj <= ramadanData.end) {
+                            const daysSinceStart = Math.floor((dateObj.getTime() - ramadanData.start) / (1000 * 60 * 60 * 24));
+                            let saturdays = 0;
+                            for (let i = 0; i < daysSinceStart; i++) {
+                                const checkD = new Date(ramadanData.start); checkD.setDate(checkD.getDate() + i);
+                                if (checkD.getUTCDay() === 6) saturdays++;
+                            }
+                            const weekNum = (saturdays % 2) === 0 ? 1 : 2;
+                            const weekData = weekNum === 1 ? ramadanData.week1 : ramadanData.week2;
+                            const empData = weekData[attendanceIdStr];
+                            if (empData) {
+                                const hasDay = empData.day_start && empData.day_end && empData.day_start !== '—';
+                                const hasNight = empData.night_start && empData.night_end && empData.night_start !== '—';
+                                if (hasDay && hasNight) {
+                                    s = { am_start: empData.day_start, am_end: empData.day_end, pm_start: empData.night_start, pm_end: empData.night_end, is_single_shift: false, _ramadan: true };
+                                } else if (hasDay) {
+                                    s = { am_start: empData.day_start, am_end: '—', pm_start: '—', pm_end: empData.day_end, is_single_shift: true, _ramadan: true };
+                                } else if (hasNight) {
+                                    s = { am_start: empData.night_start, am_end: '—', pm_start: '—', pm_end: empData.night_end, is_single_shift: true, _ramadan: true };
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (!s) {
+                        const dNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const dName = dNames[dateObj.getUTCDay()];
+                        const applicableShifts = employeeShifts.filter((ps: any) => !ps.date && isShiftEffective(ps, dateObj));
+                        for (const ps of applicableShifts) {
+                            if (ps.applicable_days && ps.applicable_days.toLowerCase().includes(dName.toLowerCase())) { s = ps; break; }
+                        }
+                        if (!s) {
+                            if (dateObj.getUTCDay() === 5) {
+                                s = employeeShifts.find((ps: any) => ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
+                                if (!s) s = employeeShifts.find((ps: any) => !ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
+                            } else {
+                                s = employeeShifts.find((ps: any) => !ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
+                            }
+                        }
+                    }
+                }
+                const matchingEx = employeeExceptions.filter((ex: any) => {
+                    const exFrom = new Date(ex.date_from);
+                    const exTo = new Date(ex.date_to);
+                    return dateObj >= exFrom && dateObj <= exTo;
+                });
+                const dateEx = matchingEx.sort((a: any, b: any) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())[0];
+                if (dateEx && dateEx.type === 'SHIFT_OVERRIDE') {
+                    s = {
+                        am_start: dateEx.new_am_start,
+                        am_end: dateEx.new_am_end,
+                        pm_start: dateEx.new_pm_start,
+                        pm_end: dateEx.new_pm_end
+                    };
+                }
+                return s;
+            };
+
+            /**
+             * @Step3: Helper function to determine if double deduction should be skipped for a specific date.
+             * Returns true if either a per-employee SKIP_DOUBLE_DEDUCTION exception exists or
+             * if project-level double deduction skip is enabled (optionally within a date range).
+             */
+            const isDoubleDeductionSkipped = (dayDateStr: string, empEx: any[], proj: any): boolean => {
+                const targetDate = new Date(dayDateStr);
+                targetDate.setHours(0, 0, 0, 0);
+
+                /**
+                 * Condition 1 — Per-employee skip: The employeeExceptions array already loaded 
+                 * for this employee must be scanned for any exception of type SKIP_DOUBLE_DEDUCTION 
+                 * where use_in_analysis is true and the day being evaluated falls within 
+                 * the exception date_from to date_to range.
+                 */
+                const hasEmpSkip = empEx.filter(ex => ex.type === 'SKIP_DOUBLE_DEDUCTION' && ex.use_in_analysis !== false).some(ex => {
                     try {
-                        return (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
-                            e.use_in_analysis !== false &&
-                            e.is_custom_type !== true &&
-                            e.created_from_report !== true; // IGNORE global report-generated exceptions in favor of local overrides
+                        const from = new Date(ex.date_from);
+                        const to = new Date(ex.date_to);
+                        from.setHours(0, 0, 0, 0);
+                        to.setHours(0, 0, 0, 0);
+                        return targetDate >= from && targetDate <= to;
                     } catch {
                         return false;
                     }
                 });
-                const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);
-                const includeSeconds = true;
-
-                const isShiftEffective = (s: any, targetDate: Date) => {
-                    if (!s.effective_from || !s.effective_to) return true;
-                    const from = new Date(s.effective_from);
-                    const to = new Date(s.effective_to);
-                    const targetDay = new Date(targetDate);
-                    targetDay.setHours(0, 0, 0, 0);
-                    const fromDay = new Date(from);
-                    fromDay.setHours(0, 0, 0, 0);
-                    const toDay = new Date(to);
-                    toDay.setHours(0, 0, 0, 0);
-                    return targetDay >= fromDay && targetDay <= toDay;
-                };
-
-                const shiftStartsNearMidnight = (s: any) => {
-                    if (!s) return false;
-                    const tStart = parseTime(s.am_start);
-                    if (!tStart) return false;
-                    const minutes = tStart.getHours() * 60 + tStart.getMinutes();
-                    return minutes <= MIDNIGHT_BUFFER_MINUTES;
-                };
-
-                const getShiftForDate = (dateStr: string, dateObj: Date) => {
-                    const dateSpecificShifts = employeeShifts.filter((s: any) => s.date === dateStr && isShiftEffective(s, dateObj));
-                    let s: any = null;
-                    if (dateSpecificShifts.length > 0) {
-                        if (dateSpecificShifts.length === 1) {
-                            s = dateSpecificShifts[0];
-                        } else {
-                            const ramadanDateShifts = dateSpecificShifts.filter((ps: any) => ps.applicable_days?.includes('Ramadan'));
-                            if (ramadanDateShifts.length >= 2) {
-                                const dayShift = ramadanDateShifts.find((ps: any) => ps.applicable_days?.includes('Day') || ps.applicable_days?.includes('S1'));
-                                const nightShift = ramadanDateShifts.find((ps: any) => ps.applicable_days?.includes('Night') || ps.applicable_days?.includes('S2'));
-                                if (dayShift && nightShift) {
-                                    s = { am_start: dayShift.am_start, am_end: dayShift.pm_end, pm_start: nightShift.am_start, pm_end: nightShift.pm_end, is_single_shift: false, _ramadan: true };
-                                }
-                            }
-                            if (!s) s = dateSpecificShifts.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0];
-                        }
-                    } else {
-                        for (const scheduleId in ramadanShiftsLookup) {
-                            const ramadanData = ramadanShiftsLookup[scheduleId];
-                            if (dateObj >= ramadanData.start && dateObj <= ramadanData.end) {
-                                const daysSinceStart = Math.floor((dateObj.getTime() - ramadanData.start) / (1000 * 60 * 60 * 24));
-                                let saturdays = 0;
-                                for (let i = 0; i < daysSinceStart; i++) {
-                                    const checkD = new Date(ramadanData.start); checkD.setDate(checkD.getDate() + i);
-                                    if (checkD.getUTCDay() === 6) saturdays++;
-                                }
-                                const weekNum = (saturdays % 2) === 0 ? 1 : 2;
-                                const weekData = weekNum === 1 ? ramadanData.week1 : ramadanData.week2;
-                                const empData = weekData[attendanceIdStr];
-                                if (empData) {
-                                    const hasDay = empData.day_start && empData.day_end && empData.day_start !== '—';
-                                    const hasNight = empData.night_start && empData.night_end && empData.night_start !== '—';
-                                    if (hasDay && hasNight) {
-                                        s = { am_start: empData.day_start, am_end: empData.day_end, pm_start: empData.night_start, pm_end: empData.night_end, is_single_shift: false, _ramadan: true };
-                                    } else if (hasDay) {
-                                        s = { am_start: empData.day_start, am_end: '—', pm_start: '—', pm_end: empData.day_end, is_single_shift: true, _ramadan: true };
-                                    } else if (hasNight) {
-                                        s = { am_start: empData.night_start, am_end: '—', pm_start: '—', pm_end: empData.night_end, is_single_shift: true, _ramadan: true };
-                                    }
-                                }
-                                break;
-                            }
-                        }
-                        if (!s) {
-                            const dNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                            const dName = dNames[dateObj.getUTCDay()];
-                            const applicableShifts = employeeShifts.filter((ps: any) => !ps.date && isShiftEffective(ps, dateObj));
-                            for (const ps of applicableShifts) {
-                                if (ps.applicable_days && ps.applicable_days.toLowerCase().includes(dName.toLowerCase())) { s = ps; break; }
-                            }
-                            if (!s) {
-                                if (dateObj.getUTCDay() === 5) {
-                                    s = employeeShifts.find((ps: any) => ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
-                                    if (!s) s = employeeShifts.find((ps: any) => !ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
-                                } else {
-                                    s = employeeShifts.find((ps: any) => !ps.is_friday_shift && !ps.date && isShiftEffective(ps, dateObj));
-                                }
-                            }
-                        }
-                    }
-                    const matchingEx = employeeExceptions.filter((ex: any) => {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return dateObj >= exFrom && dateObj <= exTo;
-                    });
-                    const dateEx = matchingEx.sort((a: any, b: any) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())[0];
-                    if (dateEx && dateEx.type === 'SHIFT_OVERRIDE') {
-                        s = {
-                            am_start: dateEx.new_am_start,
-                            am_end: dateEx.new_am_end,
-                            pm_start: dateEx.new_pm_start,
-                            pm_end: dateEx.new_pm_end
-                        };
-                    }
-                    return s;
-                };
+                if (hasEmpSkip) return true;
 
                 /**
-                 * @Step3: Helper function to determine if double deduction should be skipped for a specific date.
-                 * Returns true if either a per-employee SKIP_DOUBLE_DEDUCTION exception exists or
-                 * if project-level double deduction skip is enabled (optionally within a date range).
+                 * Condition 2 — Project-level global skip: The project object must be checked for 
+                 * skip_double_deduction boolean. If true, also check if skip_double_deduction_date_from 
+                 * and skip_double_deduction_date_to are set. If they are set, only skip days that fall 
+                 * within that date range. If they are not set but skip_double_deduction is true, 
+                 * skip all double deduction for this employee entirely.
                  */
-                const isDoubleDeductionSkipped = (dayDateStr: string, empEx: any[], proj: any): boolean => {
-                    const targetDate = new Date(dayDateStr);
-                    targetDate.setHours(0, 0, 0, 0);
-
-                    /**
-                     * Condition 1 — Per-employee skip: The employeeExceptions array already loaded 
-                     * for this employee must be scanned for any exception of type SKIP_DOUBLE_DEDUCTION 
-                     * where use_in_analysis is true and the day being evaluated falls within 
-                     * the exception date_from to date_to range.
-                     */
-                    const hasEmpSkip = empEx.filter(ex => ex.type === 'SKIP_DOUBLE_DEDUCTION' && ex.use_in_analysis !== false).some(ex => {
+                if (proj.skip_double_deduction === true) {
+                    if (proj.skip_double_deduction_date_from && proj.skip_double_deduction_date_to) {
                         try {
-                            const from = new Date(ex.date_from);
-                            const to = new Date(ex.date_to);
+                            const from = new Date(proj.skip_double_deduction_date_from);
+                            const to = new Date(proj.skip_double_deduction_date_to);
                             from.setHours(0, 0, 0, 0);
                             to.setHours(0, 0, 0, 0);
                             return targetDate >= from && targetDate <= to;
                         } catch {
                             return false;
                         }
-                    });
-                    if (hasEmpSkip) return true;
-
-                    /**
-                     * Condition 2 — Project-level global skip: The project object must be checked for 
-                     * skip_double_deduction boolean. If true, also check if skip_double_deduction_date_from 
-                     * and skip_double_deduction_date_to are set. If they are set, only skip days that fall 
-                     * within that date range. If they are not set but skip_double_deduction is true, 
-                     * skip all double deduction for this employee entirely.
-                     */
-                    if (proj.skip_double_deduction === true) {
-                        if (proj.skip_double_deduction_date_from && proj.skip_double_deduction_date_to) {
-                            try {
-                                const from = new Date(proj.skip_double_deduction_date_from);
-                                const to = new Date(proj.skip_double_deduction_date_to);
-                                from.setHours(0, 0, 0, 0);
-                                to.setHours(0, 0, 0, 0);
-                                return targetDate >= from && targetDate <= to;
-                            } catch {
-                                return false;
-                            }
-                        }
-                        /** If skip_double_deduction is true but no range is set, skip for all days in this project */
-                        return true;
                     }
-
-                    return false;
-                };
-
-                const dayAfterEnd = new Date(date_to);
-                dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
-                const dayAfterEndStr = toDateStr(dayAfterEnd);
-
-                const dayBeforeStart = new Date(date_from);
-                dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
-                const dayBeforeStartStr = toDateStr(dayBeforeStart);
-
-                const employeePunches = punches.filter(p =>
-                    String(p.attendance_id) === attendanceIdStr &&
-                    p.punch_date >= dayBeforeStartStr &&
-                    p.punch_date <= dayAfterEndStr
-                );
-
-                const nextDayPunches = employeePunches.filter(p => p.punch_date === dayAfterEndStr);
-
-                console.log(`[runAnalysis] Employee ${attendanceIdStr}: carried_grace_minutes = ${employee?.carried_grace_minutes || 0}`);
-
-                let workingDays = 0;
-                let presentDays = 0;
-                let fullAbsenceCount = 0;
-                let halfAbsenceCount = 0;
-                let sickLeaveCount = 0;
-                let lateMinutes = 0;
-                let earlyCheckoutMinutes = 0;
-                let otherMinutes = 0;
-                let totalApprovedMinutes = 0;
-                let lopAdjacentWeeklyOffCount = 0; // Weekly off days adjacent to LOP counted as LOP
-                const otherMinutesByDate = {}; // Track other minutes per date (only from NON-exception sources)
-                const otherMinutesFromExceptions: Record<string, number> = {}; // Track other minutes that came from existing exceptions (DO NOT re-create)
-                const abnormal_dates_set = new Set();
-                const critical_abnormal_dates_set = new Set();
-                const auto_resolutions: any[] = [];
-                const lopDatesSet = new Set<string>();
-                // Track per-date status for LOP-adjacent weekly off calculation (done after main loop)
-                const dateStatusMap: Record<string, string> = {}; // dateStr -> 'LOP' | 'SICK_LEAVE' | 'PRESENT' | 'ANNUAL_LEAVE' | 'OTHER'
-
-                const startDate = new Date(date_from);
-                const endDate = new Date(date_to);
-
-                // CRITICAL: Handle assumed present daily for salary-only employees
-                if (employee?.assumed_present_daily === true && employee?.has_attendance_tracking === false) {
-                    // For assumed present employees without attendance tracking,
-                    // they are considered present every working day within the report range
-                    // and should not have attendance deductions.
-                    // This will count all working days as present, ignoring punches/lates/earlies.
-                    let tempWorkingDays = 0;
-                    const dayNameToNumber = {
-                        'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-                        'Thursday': 4, 'Friday': 5, 'Saturday': 6
-                    };
-                    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                        const currentDate = new Date(d);
-                        const dayOfWeek = currentDate.getUTCDay();
-                        let weeklyOffDay = null;
-                        if (project.weekly_off_override && project.weekly_off_override !== 'None') {
-                            weeklyOffDay = dayNameToNumber[project.weekly_off_override];
-                        } else if (employee?.weekly_off) {
-                            weeklyOffDay = dayNameToNumber[employee.weekly_off];
-                        }
-
-                        // Check if this day is also marked as a weekly off. If so, don't count as working day.
-                        if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                            continue;
-                        }
-
-                        // Additionally, ensure no public holidays mark this day off
-                        const dateStr = toDateStr(currentDate);
-                        const matchingExceptions = employeeExceptions.filter(ex => {
-                            try {
-                                const exFrom = new Date(ex.date_from);
-                                const exTo = new Date(ex.date_to);
-                                return currentDate >= exFrom && currentDate <= exTo;
-                            } catch (dateError) {
-                                // CRITICAL FIX: Log invalid exception dates in assumed_present_daily block
-                                console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE (assumed_present_daily check) - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
-                                return false;
-                            }
-                        });
-                        const hasPublicHoliday = matchingExceptions.some(ex =>
-                            ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
-                        );
-
-                        if (hasPublicHoliday) {
-                            continue;
-                        }
-                        tempWorkingDays++;
-                    }
-                    workingDays = tempWorkingDays;
-                    presentDays = tempWorkingDays;
-                    // All other counts (absences, late, early, other minutes) remain 0
-                    // This means assumed_present_daily overrides any other attendance logic
-                    return {
-                        attendance_id,
-                        working_days: Math.max(0, workingDays),
-                        present_days: Math.max(0, presentDays),
-                        full_absence_count: 0,
-                        half_absence_count: 0,
-                        sick_leave_count: 0,
-                        annual_leave_count: 0,
-                        late_minutes: 0,
-                        early_checkout_minutes: 0,
-                        other_minutes: 0,
-                        approved_minutes: 0,
-                        deductible_minutes: 0, // No deductions for assumed present
-                        grace_minutes: 0,
-                        abnormal_dates: '',
-                        notes: 'Assumed Present Daily',
-                        auto_resolutions: '',
-                        _otherMinutesDetails: null
-                    };
+                    /** If skip_double_deduction is true but no range is set, skip for all days in this project */
+                    return true;
                 }
 
-                // Calculate annual leave as CALENDAR DAYS (not working days)
-                // This is done upfront, counting all days including weekends/holidays
-                let annualLeaveCount = 0;
-                const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
-                const annualLeaveDatesProcessed = new Set(); // Track dates already counted
+                return false;
+            };
 
-                for (const alEx of annualLeaveExceptions) {
-                    try {
-                        const exFrom = new Date(alEx.date_from);
-                        const exTo = new Date(alEx.date_to);
+            const dayAfterEnd = new Date(date_to);
+            dayAfterEnd.setDate(dayAfterEnd.getDate() + 1);
+            const dayAfterEndStr = toDateStr(dayAfterEnd);
 
-                        // Clamp to report date range
-                        const rangeStart = exFrom < startDate ? startDate : exFrom;
-                        const rangeEnd = exTo > endDate ? endDate : exTo;
+            const dayBeforeStart = new Date(date_from);
+            dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
+            const dayBeforeStartStr = toDateStr(dayBeforeStart);
 
-                        if (rangeStart <= rangeEnd) {
-                            // Count each calendar day in the range
-                            for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
-                                const dateStr = toDateStr(d);
-                                if (!annualLeaveDatesProcessed.has(dateStr)) {
-                                    annualLeaveDatesProcessed.add(dateStr);
-                                    annualLeaveCount++;
-                                }
-                            }
-                        }
-                    } catch (dateError) {
-                        // CRITICAL FIX: Log invalid exception dates instead of silently failing
-                        console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${alEx.id}, date_from: ${alEx.date_from}, date_to: ${alEx.date_to}, Error: ${dateError.message}`);
-                    }
-                }
+            const employeePunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= dayBeforeStartStr &&
+                p.punch_date <= dayAfterEndStr
+            );
 
+            const nextDayPunches = employeePunches.filter(p => p.punch_date === dayAfterEndStr);
+
+            console.log(`[runAnalysis] Employee ${attendanceIdStr}: carried_grace_minutes = ${employee?.carried_grace_minutes || 0}`);
+
+            let workingDays = 0;
+            let presentDays = 0;
+            let fullAbsenceCount = 0;
+            let halfAbsenceCount = 0;
+            let sickLeaveCount = 0;
+            let lateMinutes = 0;
+            let earlyCheckoutMinutes = 0;
+            let otherMinutes = 0;
+            let totalApprovedMinutes = 0;
+            let lopAdjacentWeeklyOffCount = 0; // Weekly off days adjacent to LOP counted as LOP
+            const otherMinutesByDate = {}; // Track other minutes per date (only from NON-exception sources)
+            const otherMinutesFromExceptions: Record<string, number> = {}; // Track other minutes that came from existing exceptions (DO NOT re-create)
+            const abnormal_dates_set = new Set();
+            const critical_abnormal_dates_set = new Set();
+            const auto_resolutions: any[] = [];
+            const lopDatesSet = new Set<string>();
+            // Track per-date status for LOP-adjacent weekly off calculation (done after main loop)
+            const dateStatusMap: Record<string, string> = {}; // dateStr -> 'LOP' | 'SICK_LEAVE' | 'PRESENT' | 'ANNUAL_LEAVE' | 'OTHER'
+
+            const startDate = new Date(date_from);
+            const endDate = new Date(date_to);
+
+            // CRITICAL: Handle assumed present daily for salary-only employees
+            if (employee?.assumed_present_daily === true && employee?.has_attendance_tracking === false) {
+                // For assumed present employees without attendance tracking,
+                // they are considered present every working day within the report range
+                // and should not have attendance deductions.
+                // This will count all working days as present, ignoring punches/lates/earlies.
+                let tempWorkingDays = 0;
                 const dayNameToNumber = {
                     'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
                     'Thursday': 4, 'Friday': 5, 'Saturday': 6
                 };
-
-                for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
+                for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
                     const currentDate = new Date(d);
-                    const dateStr = toDateStr(currentDate);
-                    // CRITICAL: Use UTC day of week to avoid timezone issues
-                    // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
-                    // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
                     const dayOfWeek = currentDate.getUTCDay();
-                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const currentDayName = dayNames[dayOfWeek];
-
                     let weeklyOffDay = null;
-                    // Determine weekly off day from project override or employee setting
                     if (project.weekly_off_override && project.weekly_off_override !== 'None') {
                         weeklyOffDay = dayNameToNumber[project.weekly_off_override];
                     } else if (employee?.weekly_off) {
                         weeklyOffDay = dayNameToNumber[employee.weekly_off];
                     }
 
-                    // Check if this is employee's weekly off day - BEFORE any other processing
+                    // Check if this day is also marked as a weekly off. If so, don't count as working day.
                     if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
-                        dateStatusMap[dateStr] = 'WEEKLY_OFF';
                         continue;
                     }
 
-                    // Get ALL matching exceptions for this date first (to check DAY_SWAP and PUBLIC_HOLIDAY)
-                    let matchingExceptions = [];
-                    try {
-                        matchingExceptions = employeeExceptions.filter(ex => {
-                            try {
-                                const exFrom = new Date(ex.date_from);
-                                const exTo = new Date(ex.date_to);
-                                return currentDate >= exFrom && currentDate <= exTo && ex.type !== 'GIFT_MINUTES';
-                            } catch (dateError) {
-                                // CRITICAL FIX: Log invalid exception dates instead of silently failing
-                                console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
-                                return false;
-                            }
-                        });
-                    } catch {
-                        matchingExceptions = [];
-                    }
-
-                    // Check for PUBLIC_HOLIDAY - day is NOT a working day (check BEFORE assumed_present_daily)
+                    // Additionally, ensure no public holidays mark this day off
+                    const dateStr = toDateStr(currentDate);
+                    const matchingExceptions = employeeExceptions.filter(ex => {
+                        try {
+                            const exFrom = new Date(ex.date_from);
+                            const exTo = new Date(ex.date_to);
+                            return currentDate >= exFrom && currentDate <= exTo;
+                        } catch (dateError) {
+                            // CRITICAL FIX: Log invalid exception dates in assumed_present_daily block
+                            console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE (assumed_present_daily check) - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
+                            return false;
+                        }
+                    });
                     const hasPublicHoliday = matchingExceptions.some(ex =>
                         ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
                     );
 
                     if (hasPublicHoliday) {
-                        // Check for MANUAL_ABSENT even on public holiday
-                        const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
-                        if (hasManualAbsent) {
-                            fullAbsenceCount++;
-                            dateStatusMap[dateStr] = 'LOP';
-                            lopDatesSet.add(dateStr);
-                        } else {
-                            dateStatusMap[dateStr] = 'PUBLIC_HOLIDAY';
-                        }
-                        continue; // Skip this day - it's a holiday
-                    }
-
-                    // CRITICAL FIX: ASSUMED_PRESENT_DAILY logic
-                    // Employees flagged as "assumed present" are automatically marked present every working day
-                    // This applies AFTER checking weekly off and public holidays
-                    if (employee?.assumed_present_daily === true) {
-                        workingDays++;
-                        presentDays++;
-                        // Skip ALL punch processing, late/early calculations, exceptions for this day
                         continue;
                     }
+                    tempWorkingDays++;
+                }
+                workingDays = tempWorkingDays;
+                presentDays = tempWorkingDays;
+                // All other counts (absences, late, early, other minutes) remain 0
+                // This means assumed_present_daily overrides any other attendance logic
+                return {
+                    attendance_id,
+                    working_days: Math.max(0, workingDays),
+                    present_days: Math.max(0, presentDays),
+                    full_absence_count: 0,
+                    half_absence_count: 0,
+                    sick_leave_count: 0,
+                    annual_leave_count: 0,
+                    late_minutes: 0,
+                    early_checkout_minutes: 0,
+                    other_minutes: 0,
+                    approved_minutes: 0,
+                    deductible_minutes: 0, // No deductions for assumed present
+                    grace_minutes: 0,
+                    abnormal_dates: '',
+                    notes: 'Assumed Present Daily',
+                    auto_resolutions: '',
+                    _otherMinutesDetails: null
+                };
+            }
 
-                    // DAY_SWAP exception: Override weekly off for specific dates
-                    const daySwapException = matchingExceptions.find(ex => ex.type === 'DAY_SWAP');
-                    if (daySwapException) {
-                        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        const currentDayName = dayNames[dayOfWeek];
+            // Calculate annual leave as CALENDAR DAYS (not working days)
+            // This is done upfront, counting all days including weekends/holidays
+            let annualLeaveCount = 0;
+            const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
+            const annualLeaveDatesProcessed = new Set(); // Track dates already counted
 
-                        // If current day matches new_weekly_off, treat it as weekly off
-                        if (daySwapException.new_weekly_off === currentDayName) {
-                            continue; // Skip this day - it's the new weekly off
-                        }
+            for (const alEx of annualLeaveExceptions) {
+                try {
+                    const exFrom = new Date(alEx.date_from);
+                    const exTo = new Date(alEx.date_to);
 
-                        // If current day matches working_day_override, treat it as working day (ignore standard weekly off)
-                        if (daySwapException.working_day_override === currentDayName) {
-                            weeklyOffDay = null; // Override the weekly off - make this day a working day
-                        }
-                    }
+                    // Clamp to report date range
+                    const rangeStart = exFrom < startDate ? startDate : exFrom;
+                    const rangeEnd = exTo > endDate ? endDate : exTo;
 
-                    // Now it's safe to count as a working day
-                    workingDays++;
-
-                    // PRIORITY-BASED EXCEPTION SORTING
-                    const EXCEPTION_PRIORITY: Record<string, number> = {
-                        'MANUAL_ABSENT': 10,
-                        'MANUAL_PRESENT': 10,
-                        'SICK_LEAVE': 10,
-                        'ANNUAL_LEAVE': 10,
-                        'SHIFT_OVERRIDE': 9,
-                        'SKIP_PUNCH': 9,
-                        'ALLOWED_MINUTES': 8,
-                        'MANUAL_LATE': 8,
-                        'MANUAL_EARLY_CHECKOUT': 8,
-                        'MANUAL_OTHER_MINUTES': 7,
-                        'DAY_SWAP': 7,
-                        'WEEKLY_OFF_OVERRIDE': 7,
-                        'HALF_DAY_HOLIDAY': 6,
-                        'CUSTOM': 5,
-                        'DISMISSED_MISMATCH': 3,
-                        'GIFT_MINUTES': 1,
-                    };
-
-                    const dateException = matchingExceptions.length > 0
-                        ? matchingExceptions.sort((a: any, b: any) => {
-                            const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
-                            const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
-                            if (priA !== priB) return priB - priA;
-                            return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
-                        })[0]
-                        : null;
-
-                    // Step 1: Check for report-local overrides (manual edits from the report view)
-                    const reportLocalOverride = existingReportOverrides[dateStr];
-
-                    if (dateException || reportLocalOverride) {
-                        const effectiveStatusType = reportLocalOverride?.type || dateException?.type;
-
-                        if (effectiveStatusType === 'MANUAL_PRESENT') {
-                            presentDays++;
-                            dateStatusMap[dateStr] = 'PRESENT';
-                            continue;
-                        } else if (effectiveStatusType === 'WORK_FROM_HOME') {
-                            presentDays++;
-                            dateStatusMap[dateStr] = 'WORK_FROM_HOME';
-                            continue;
-                        } else if (effectiveStatusType === 'MANUAL_ABSENT') {
-                            fullAbsenceCount++;
-                            dateStatusMap[dateStr] = 'LOP';
-                            lopDatesSet.add(dateStr);
-                            continue;
-                        } else if (effectiveStatusType === 'SICK_LEAVE') {
-                            sickLeaveCount++;
-                            dateStatusMap[dateStr] = 'SICK_LEAVE';
-                            continue;
+                    if (rangeStart <= rangeEnd) {
+                        // Count each calendar day in the range
+                        for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+                            const dateStr = toDateStr(d);
+                            if (!annualLeaveDatesProcessed.has(dateStr)) {
+                                annualLeaveDatesProcessed.add(dateStr);
+                                annualLeaveCount++;
+                            }
                         }
                     }
+                } catch (dateError) {
+                    // CRITICAL FIX: Log invalid exception dates instead of silently failing
+                    console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${alEx.id}, date_from: ${alEx.date_from}, date_to: ${alEx.date_to}, Error: ${dateError.message}`);
+                }
+            }
 
-                    // Check for ANNUAL_LEAVE
-                    const annualLeaveException = employeeExceptions.find(ex => {
+            const dayNameToNumber = {
+                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+            };
+
+            for (let d = new Date(startDate); d <= endDate; d = new Date(d.setDate(d.getDate() + 1))) {
+                const currentDate = new Date(d);
+                const dateStr = toDateStr(currentDate);
+                // CRITICAL: Use UTC day of week to avoid timezone issues
+                // new Date(dateStr) creates a date at UTC midnight, so we must use getUTCDay()
+                // Otherwise, server timezone can shift the day and cause incorrect weekly off detection
+                const dayOfWeek = currentDate.getUTCDay();
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDayName = dayNames[dayOfWeek];
+
+                let weeklyOffDay = null;
+                // Determine weekly off day from project override or employee setting
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (employee?.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[employee.weekly_off];
+                }
+
+                // Check if this is employee's weekly off day - BEFORE any other processing
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    dateStatusMap[dateStr] = 'WEEKLY_OFF';
+                    continue;
+                }
+
+                // Get ALL matching exceptions for this date first (to check DAY_SWAP and PUBLIC_HOLIDAY)
+                let matchingExceptions = [];
+                try {
+                    matchingExceptions = employeeExceptions.filter(ex => {
                         try {
                             const exFrom = new Date(ex.date_from);
                             const exTo = new Date(ex.date_to);
-                            return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
-                        } catch {
+                            return currentDate >= exFrom && currentDate <= exTo && ex.type !== 'GIFT_MINUTES';
+                        } catch (dateError) {
+                            // CRITICAL FIX: Log invalid exception dates instead of silently failing
+                            console.warn(`[runAnalysis] ⚠️ INVALID EXCEPTION DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, Type: ${ex.type}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
                             return false;
                         }
                     });
+                } catch {
+                    matchingExceptions = [];
+                }
 
-                    if (annualLeaveException) {
-                        const dayPunchesForLeave = employeePunches.filter((p: any) => p.punch_date === dateStr);
-                        if (dayPunchesForLeave.length === 0) {
-                            workingDays--;
-                            dateStatusMap[dateStr] = 'ANNUAL_LEAVE';
-                            continue;
-                        }
-                    }
+                // Check for PUBLIC_HOLIDAY - day is NOT a working day (check BEFORE assumed_present_daily)
+                const hasPublicHoliday = matchingExceptions.some(ex =>
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
 
-                    let shift = getShiftForDate(dateStr, currentDate);
-
-                    // Apply SHIFT_OVERRIDE from local overrides OR global exceptions
-                    if ((dateException && dateException.type === 'SHIFT_OVERRIDE') || (reportLocalOverride && reportLocalOverride.shiftOverride)) {
-                        try {
-                            const isFriday = dayOfWeek === 5;
-                            const shouldApplyOverride = reportLocalOverride?.shiftOverride || (dateException?.include_friday || !isFriday);
-
-                            if (shouldApplyOverride) {
-                                shift = {
-                                    am_start: reportLocalOverride?.shiftOverride?.am_start || dateException?.new_am_start,
-                                    am_end: reportLocalOverride?.shiftOverride?.am_end || dateException?.new_am_end,
-                                    pm_start: reportLocalOverride?.shiftOverride?.pm_start || dateException?.new_pm_start,
-                                    pm_end: reportLocalOverride?.shiftOverride?.pm_end || dateException?.new_pm_end
-                                };
-                            }
-                        } catch (e: any) {
-                            console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
-                        }
-                    }
-
-                    const currentShiftStartsEarly = shiftStartsNearMidnight(shift);
-                    const nextDateObj = new Date(currentDate);
-                    nextDateObj.setDate(nextDateObj.getDate() + 1);
-                    const nextDateStr = toDateStr(nextDateObj);
-
-                    let dayPunches = employeePunches.filter(p => {
-                        if (p.punch_date === dateStr) {
-                            return !isWithinMidnightBuffer(p.timestamp_raw) || currentShiftStartsEarly;
-                        }
-                        return false;
-                    });
-
-                    const nextDayShift = getShiftForDate(nextDateStr, nextDateObj);
-                    const nextShiftStartsEarly = shiftStartsNearMidnight(nextDayShift);
-
-                    const nextDayEarlyPunches = employeePunches.filter(p => {
-                        if (p.punch_date === nextDateStr) {
-                            return isWithinMidnightBuffer(p.timestamp_raw) && !nextShiftStartsEarly;
-                        }
-                        return false;
-                    });
-
-                    dayPunches = [...dayPunches, ...nextDayEarlyPunches].sort((a, b) => {
-                        if (a.punch_date !== b.punch_date) return a.punch_date < b.punch_date ? -1 : 1;
-                        const tA = parseTime(a.timestamp_raw)?.getTime() || 0;
-                        const tB = parseTime(b.timestamp_raw)?.getTime() || 0;
-                        return tA - tB;
-                    });
-
-                    let filteredPunches: any[] = filterMultiplePunches(dayPunches, shift, includeSeconds);
-
-                    // Log missing shift AFTER filteredPunches is computed
-                    if (!shift && filteredPunches.length > 0 && !dateException) {
-                        console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
-                        abnormal_dates_set.add(dateStr);
-                        critical_abnormal_dates_set.add(dateStr);
-                    }
-
-                    // SKIP_PUNCH logic
-                    const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-                    const isOnLeave = (dateException && (
-                        dateException.type === 'SICK_LEAVE' ||
-                        dateException.type === 'ANNUAL_LEAVE' ||
-                        dateException.type === 'PUBLIC_HOLIDAY'
-                    )) || (reportLocalOverride && (
-                        reportLocalOverride.type === 'SICK_LEAVE' ||
-                        reportLocalOverride.type === 'ANNUAL_LEAVE'
-                    ));
-                    const isNonWorkingStatus = isOnLeave || (dateException && dateException.type === 'OFF') || (reportLocalOverride && reportLocalOverride.type === 'OFF');
-
-                    let hasSkipPunchApplied = false;
-                    let skipType = null;
-                    let skipPunchForced0PunchPresent = false;
-
-                    if (skipPunchException && !isNonWorkingStatus && skipPunchException.punch_to_skip) {
-                        skipType = skipPunchException.punch_to_skip;
-                        hasSkipPunchApplied = true;
-
-                        if (filteredPunches.length === 0 && skipType === 'FULL_SKIP') {
-                            filteredPunches = [{ _fake_skip_punch: true }];
-                            skipPunchForced0PunchPresent = true;
-                        } else if (filteredPunches.length === 0) {
-                            filteredPunches = [{ _fake_skip_punch: true }];
-                        }
-                    }
-
-                    let punchMatches: any[] = [];
-                    let hasUnmatchedPunch = false;
-                    const hasOnlyFakePunches = filteredPunches.length > 0 && filteredPunches.every((p: any) => p._fake_skip_punch);
-                    if (shift && filteredPunches.length > 0 && !hasOnlyFakePunches) {
-                        punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
-                        hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
-                    }
-
-                    const punchCount = filteredPunches.length;
-                    const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
-                        String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
-                        shift.am_end !== '—' && shift.pm_start !== '—';
-                    const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
-
-                    if (punchCount > 0) {
-                        if (skipPunchForced0PunchPresent) {
-                            presentDays++;
-                            dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                        } else if (!hasSkipPunchApplied) {
-                            if (isSingleShift) {
-                                presentDays++;
-                                if (punchCount === 1) halfAbsenceCount++;
-                                dateStatusMap[dateStr] = 'PRESENT';
-                            } else {
-                                presentDays++;
-                                if (punchCount === 1 || punchCount === 2) halfAbsenceCount++;
-                                dateStatusMap[dateStr] = 'PRESENT';
-                            }
-                        } else {
-                            presentDays++;
-                            dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                        }
+                if (hasPublicHoliday) {
+                    // Check for MANUAL_ABSENT even on public holiday
+                    const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
+                    if (hasManualAbsent) {
+                        fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
                     } else {
-                        if (!dateException || (dateException.type !== 'MANUAL_PRESENT')) {
-                            fullAbsenceCount++;
-                            dateStatusMap[dateStr] = 'LOP';
-                            lopDatesSet.add(dateStr);
-                        } else {
-                            presentDays++;
-                            dateStatusMap[dateStr] = 'PRESENT';
-                        }
+                        dateStatusMap[dateStr] = 'PUBLIC_HOLIDAY';
+                    }
+                    continue; // Skip this day - it's a holiday
+                }
+
+                // CRITICAL FIX: ASSUMED_PRESENT_DAILY logic
+                // Employees flagged as "assumed present" are automatically marked present every working day
+                // This applies AFTER checking weekly off and public holidays
+                if (employee?.assumed_present_daily === true) {
+                    workingDays++;
+                    presentDays++;
+                    // Skip ALL punch processing, late/early calculations, exceptions for this day
+                    continue;
+                }
+
+                // DAY_SWAP exception: Override weekly off for specific dates
+                const daySwapException = matchingExceptions.find(ex => ex.type === 'DAY_SWAP');
+                if (daySwapException) {
+                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    const currentDayName = dayNames[dayOfWeek];
+
+                    // If current day matches new_weekly_off, treat it as weekly off
+                    if (daySwapException.new_weekly_off === currentDayName) {
+                        continue; // Skip this day - it's the new weekly off
                     }
 
-                    let approvedMinutesForDay = 0;
+                    // If current day matches working_day_override, treat it as working day (ignore standard weekly off)
+                    if (daySwapException.working_day_override === currentDayName) {
+                        weeklyOffDay = null; // Override the weekly off - make this day a working day
+                    }
+                }
+
+                // Now it's safe to count as a working day
+                workingDays++;
+
+                // PRIORITY-BASED EXCEPTION SORTING: Higher numbers win.
+                // GIFT_MINUTES is always the lowest priority at 1. Unknown types default to 5, 
+                // which is above GIFT_MINUTES but below most active operational exceptions.
+                const EXCEPTION_PRIORITY: Record<string, number> = {
+                    'MANUAL_ABSENT': 10,
+                    'MANUAL_PRESENT': 10,
+                    'SICK_LEAVE': 10,
+                    'ANNUAL_LEAVE': 10,
+                    'SHIFT_OVERRIDE': 9,
+                    'SKIP_PUNCH': 9,
+                    'ALLOWED_MINUTES': 8,
+                    'MANUAL_LATE': 8,
+                    'MANUAL_EARLY_CHECKOUT': 8,
+                    'MANUAL_OTHER_MINUTES': 7,
+                    'DAY_SWAP': 7,
+                    'WEEKLY_OFF_OVERRIDE': 7,
+                    'HALF_DAY_HOLIDAY': 6,
+                    'CUSTOM': 5,
+                    'DISMISSED_MISMATCH': 3,
+                    'GIFT_MINUTES': 1,
+                };
+
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a: any, b: any) => {
+                        const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
+                        const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
+                        if (priA !== priB) return priB - priA; // Higher number wins
+                        // Within same priority level, newest (by creation date) wins
+                        return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
+                    })[0]
+                    : null;
+
+                // Step 1: Check for report-generated exceptions (created_from_report === true)
+                // Among all report-generated exceptions for this day, select the one with the highest priority.
+                const reportGeneratedException = matchingExceptions
+                    .filter(ex => ex.created_from_report === true)
+                    .sort((a: any, b: any) => {
+                        const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
+                        const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
+                        if (priA !== priB) return priB - priA;
+                        return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
+                    })[0];
+
+                if (dateException) {
+                    if (dateException.type === 'MANUAL_PRESENT') {
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'PRESENT';
+                        continue;  // Skip punch-based counting to prevent double-counting
+                    } else if (dateException.type === 'WORK_FROM_HOME') {
+                        // WORK_FROM_HOME marks present with zero deductible minutes regardless of punches.
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'WORK_FROM_HOME';
+                        continue;
+                    } else if (dateException.type === 'MANUAL_ABSENT') {
+                        fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
+                        continue;
+                    } else if (dateException.type === 'SICK_LEAVE') {
+                        // Sick leave counts as WORKING DAY (no deduction from working_days)
+                        // Day is tracked separately as sick_leave_count
+                        // No LOP deduction, no late/early calculation for this day
+                        sickLeaveCount++;
+                        dateStatusMap[dateStr] = 'SICK_LEAVE';
+                        continue;
+                    }
+                }
+
+                // Check for ANNUAL_LEAVE - already counted as calendar days upfront
+                // Just skip this day if employee is on annual leave and didn't work
+                const annualLeaveException = employeeExceptions.find(ex => {
                     try {
-                        if (rules.approved_minutes_enabled && filteredPunches.length > 0) {
-                            const amEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
-                            if (amEx) approvedMinutesForDay = amEx.allowed_minutes || 0;
-                        }
-                    } catch {
-                        approvedMinutesForDay = 0;
+                        const exFrom = new Date(ex.date_from);
+                        const exTo = new Date(ex.date_to);
+                        return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
+                    } catch (dateError) {
+                        // CRITICAL FIX: Log invalid exception dates
+                        console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE DATE in daily loop - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
+                        return false;
                     }
+                });
 
-                    let dayLateMinutes = 0;
-                    let dayEarlyMinutes = 0;
+                if (annualLeaveException) {
+                    // Check if employee worked on this day despite annual leave
+                    const dayPunchesForLeave = employeePunches.filter((p: any) => p.punch_date === dateStr);
+                    if (dayPunchesForLeave.length === 0) {
+                        // Skip this day for attendance counting - annual leave already counted as calendar days upfront
+                        // Decrement working days since this is a leave day (not a working day to count)
+                        workingDays--;
+                        dateStatusMap[dateStr] = 'ANNUAL_LEAVE';
+                        continue;
+                    }
+                    // If employee worked, continue normal analysis
+                }
+                let shift = getShiftForDate(dateStr, currentDate);
 
-                    if (reportLocalOverride && (reportLocalOverride.lateMinutes > 0 || reportLocalOverride.earlyCheckoutMinutes > 0 || reportLocalOverride.otherMinutes > 0)) {
-                        dayLateMinutes = Math.abs(reportLocalOverride.lateMinutes || 0);
-                        dayEarlyMinutes = Math.abs(reportLocalOverride.earlyCheckoutMinutes || 0);
-                        if (reportLocalOverride.otherMinutes > 0) {
-                            otherMinutes += reportLocalOverride.otherMinutes;
-                            otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + reportLocalOverride.otherMinutes;
+                // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
+
+                if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                    try {
+                        const isFriday = dayOfWeek === 5;
+                        const shouldApplyOverride = dateException.include_friday || !isFriday;
+
+                        if (shouldApplyOverride) {
+                            shift = {
+                                am_start: dateException.new_am_start,
+                                am_end: dateException.new_am_end,
+                                pm_start: dateException.new_pm_start,
+                                pm_end: dateException.new_pm_end
+                            };
+                        }
+                    } catch (e: any) {
+                        let errorMessageStr = e.message;
+                        console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
+                        // Continue with existing shift
+                    }
+                }
+
+                // ================================================================
+                // UNIVERSAL 3:00 AM MIDNIGHT ROLLBACK (CORE LOGIC)
+                // ================================================================
+                const currentShiftStartsEarly = shiftStartsNearMidnight(shift);
+                const nextDateObj = new Date(currentDate);
+                nextDateObj.setDate(nextDateObj.getDate() + 1);
+                const nextDateStr = toDateStr(nextDateObj);
+
+                let dayPunches = employeePunches.filter(p => {
+                    if (p.punch_date === dateStr) {
+                        return !isWithinMidnightBuffer(p.timestamp_raw) || currentShiftStartsEarly;
+                    }
+                    return false;
+                });
+
+                const nextDayShift = getShiftForDate(nextDateStr, nextDateObj);
+                const nextShiftStartsEarly = shiftStartsNearMidnight(nextDayShift);
+
+                const nextDayEarlyPunches = employeePunches.filter(p => {
+                    if (p.punch_date === nextDateStr) {
+                        return isWithinMidnightBuffer(p.timestamp_raw) && !nextShiftStartsEarly;
+                    }
+                    return false;
+                });
+
+                dayPunches = [...dayPunches, ...nextDayEarlyPunches].sort((a, b) => {
+                    if (a.punch_date !== b.punch_date) return a.punch_date < b.punch_date ? -1 : 1;
+                    const tA = parseTime(a.timestamp_raw)?.getTime() || 0;
+                    const tB = parseTime(b.timestamp_raw)?.getTime() || 0;
+                    return tA - tB;
+                });
+
+
+                let filteredPunches: any[] = filterMultiplePunches(dayPunches, shift, includeSeconds);
+
+                // Log missing shift AFTER filteredPunches is computed
+                if (!shift && filteredPunches.length > 0 && !dateException) {
+                    console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
+                }
+
+                // ================================================================
+                // SKIP_PUNCH: Determine if skip applies and what type
+                // ================================================================
+                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                const isOnLeave = dateException && (
+                    dateException.type === 'SICK_LEAVE' ||
+                    dateException.type === 'ANNUAL_LEAVE' ||
+                    dateException.type === 'PUBLIC_HOLIDAY'
+                );
+                const isNonWorkingStatus = isOnLeave || (dateException && dateException.type === 'OFF');
+
+                let hasSkipPunchApplied = false;
+                let skipType = null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | 'FULL_SKIP'
+                let skipPunchForced0PunchPresent = false; // Tracks the "LOP Saver" case
+
+                if (skipPunchException && !isNonWorkingStatus && skipPunchException.punch_to_skip) {
+                    skipType = skipPunchException.punch_to_skip; // 'AM_PUNCH_IN', 'PM_PUNCH_OUT', or 'FULL_SKIP'
+                    hasSkipPunchApplied = true;
+
+                    // LOP SAVER: 0 punches + FULL_SKIP → force Present (Skip Punch)
+                    // This handles company-wide half-days where people didn't come in at all
+                    if (filteredPunches.length === 0 && skipType === 'FULL_SKIP') {
+                        filteredPunches = [{ _fake_skip_punch: true }];
+                        skipPunchForced0PunchPresent = true;
+                        console.log(`[runAnalysis] SKIP_PUNCH LOP SAVER: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + FULL_SKIP → Present (Skip Punch)`);
+                    } else if (filteredPunches.length === 0) {
+                        // AM_PUNCH_IN or PM_PUNCH_OUT with 0 punches: still mark present to avoid LOP
+                        // but this is a less common case — employee should have SOME punches
+                        filteredPunches = [{ _fake_skip_punch: true }];
+                        console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + ${skipType} → adding fake punch`);
+                    }
+                }
+
+                let punchMatches: any[] = [];
+                let hasUnmatchedPunch = false;
+                // Allow punch matching even when skip is applied (we'll zero out specific minutes after)
+                // Only skip matching if we have a fake-only punch list
+                const hasOnlyFakePunches = filteredPunches.length > 0 && filteredPunches.every((p: any) => p._fake_skip_punch);
+                if (shift && filteredPunches.length > 0 && !hasOnlyFakePunches) {
+                    punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
+                    hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+                }
+
+                // ================================================================
+                // PUNCH COMPLETENESS RULE (REPLACED detectPartialDay)
+                // ================================================================
+                // This logic determines Present, Half Day, or Absent status based on punch counts.
+                // 1. Single Shift (2 expected): 0=LOP, 1=Half, 2=Present
+                // 2. Split Shift (4 expected): 0=LOP, 1=Half, 2=Half, 3=Present, 4=Present
+                // Bypasses: SKIP_PUNCH or FULL_SKIP exceptions only.
+                // ================================================================
+
+                const punchCount = filteredPunches.length;
+                const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                    String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
+                    shift.am_end !== '—' && shift.pm_start !== '—' &&
+                    shift.am_end !== '-' && shift.pm_start !== '-' &&
+                    shift.am_end !== 'null' && shift.pm_start !== 'null';
+                const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
+
+                if (punchCount > 0) {
+                    if (skipPunchForced0PunchPresent) {
+                        // LOP SAVER: If presence was forced via SKIP_PUNCH + 0 punches
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
+                    } else if (!hasSkipPunchApplied) {
+                        // NORMAL PUNCH COMPLETENESS LOGIC
+                        if (isSingleShift) {
+                            if (punchCount === 1) {
+                                // CHANGE 2: Single shift, 1 punch = Half Day
+                                presentDays++;
+                                halfAbsenceCount++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Single shift, 1 punch → Half Day`);
+                            } else {
+                                // 2 or more punches = Present
+                                presentDays++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                            }
+                        } else {
+                            // SPLIT SHIFT (4 expected)
+                            if (punchCount === 1 || punchCount === 2) {
+                                // CHANGE 2: Split shift, 1 or 2 punches = Half Day
+                                presentDays++;
+                                halfAbsenceCount++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Split shift, ${punchCount} punch(es) → Half Day`);
+                            } else {
+                                // 3 or 4 punches = Present
+                                presentDays++;
+                                dateStatusMap[dateStr] = 'PRESENT';
+                            }
                         }
                     } else {
-                        const shouldSkipTimeCalculation = (dateException && [
-                            'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
-                        ].includes(dateException.type)) || (reportLocalOverride && [
-                            'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
-                        ].includes(reportLocalOverride.type));
+                        // SKIP_PUNCH is applied, always Present
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
+                    }
+                } else {
+                    // Zero punches
+                    if (!dateException || (dateException.type !== 'MANUAL_PRESENT')) {
+                        fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
+                    } else {
+                        presentDays++;
+                        dateStatusMap[dateStr] = 'PRESENT';
+                    }
+                }
 
-                        if (!shouldSkipTimeCalculation && shift && punchMatches.length > 0) {
-                            const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
-                            for (const match of punchMatches) {
-                                if (!match.matchedTo) continue;
-                                const punchTime = match.punch.time;
-                                const shiftTime = match.shiftTime;
-                                if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                                    if (punchTime > shiftTime) dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
-                                }
-                                if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                                    if (punchTime < shiftTime) dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                // Check for approved minutes (Al Maraghi Motors only).
+                // RULES:
+                // 1. Only applies if employee was PRESENT (has punches) — not on absent/LOP days.
+                // 2. Applied PER-DAY: reduces that specific day's late+early BEFORE accumulating.
+                //    This means the raw late/early stored in AnalysisResult are ALREADY reduced.
+                //    totalApprovedMinutes is the SUM of per-day reductions, tracked for DISPLAY only.
+                // ALLOWED_MINUTES must be applied independently of dateException priority because it can coexist with other exception types on the same day.
+                let approvedMinutesForDay = 0;
+                try {
+                    if (rules.approved_minutes_enabled && filteredPunches.length > 0) {
+                        const amEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
+                        if (amEx) {
+                            approvedMinutesForDay = amEx.allowed_minutes || 0;
+                        }
+                    }
+                } catch {
+                    approvedMinutesForDay = 0;
+                }
+
+                // Step 2: Unified calculation logic for time minutes
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+
+                if (reportGeneratedException) {
+                    // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
+                    if (reportGeneratedException.type === 'MANUAL_PRESENT') {
+                        // Mark present, ensure minutes remain 0
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (reportGeneratedException.type === 'MANUAL_ABSENT') {
+                        // Mark absent LOP, ensure minutes remain 0
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (reportGeneratedException.type === 'SICK_LEAVE') {
+                        // Mark sick leave, ensure minutes remain 0
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else if (reportGeneratedException.type === 'ANNUAL_LEAVE') {
+                        // Handle as annual leave, ensure minutes remain 0
+                        dayLateMinutes = 0;
+                        dayEarlyMinutes = 0;
+                    } else {
+                        // Read late_minutes, early_checkout_minutes, other_minutes directly from the reportGeneratedException record.
+                        // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
+                        dayLateMinutes = Math.abs(reportGeneratedException.late_minutes || 0);
+                        dayEarlyMinutes = Math.abs(reportGeneratedException.early_checkout_minutes || 0);
+                        if (reportGeneratedException.other_minutes > 0) {
+                            otherMinutes += reportGeneratedException.other_minutes;
+                            otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + reportGeneratedException.other_minutes;
+                        }
+                    }
+                    // Skip punch-based calculation for this day as report-generated values are applied directly
+                } else {
+                    // If no reportGeneratedException exists for this day: apply existing logic.
+                    // Check shouldSkipTimeCalculation using specific type list.
+                    const shouldSkipTimeCalculation = dateException && [
+                        'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                    ].includes(dateException.type);
+
+                    if (!shouldSkipTimeCalculation && shift && punchMatches.length > 0) {
+                        // Track which shift points had actual punches matched
+                        const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
+
+                        for (const match of punchMatches) {
+                            if (!match.matchedTo) continue;
+
+                            const punchTime = match.punch.time;
+                            const shiftTime = match.shiftTime;
+
+                            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                                if (punchTime > shiftTime) {
+                                    const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                                    dayLateMinutes += minutes;
                                 }
                             }
-                            if (hasSkipPunchApplied && skipType) {
-                                if ((skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') && !matchedShiftPoints.has('AM_START')) dayLateMinutes = 0;
-                                if ((skipType === 'PM_PUNCH_OUT' || skipType === 'FULL_SKIP') && !matchedShiftPoints.has('PM_END')) dayEarlyMinutes = 0;
+
+                            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                                if (punchTime < shiftTime) {
+                                    const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                                    dayEarlyMinutes += minutes;
+                                }
+                            }
+                        }
+
+                        // SKIP_PUNCH: Zero out specific minutes based on skip type
+                        if (hasSkipPunchApplied && skipType) {
+                            const amStartMissing = !matchedShiftPoints.has('AM_START');
+                            const pmEndMissing = !matchedShiftPoints.has('PM_END');
+
+                            if (skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') {
+                                if (amStartMissing) dayLateMinutes = 0;
+                            }
+                            if (skipType === 'PM_PUNCH_OUT' || skipType === 'FULL_SKIP') {
+                                if (pmEndMissing) dayEarlyMinutes = 0;
                             }
                         }
                     }
+                }
 
                 // FIX: Apply approved minutes PER-DAY before accumulating.
                 // approvedMinutesForDay runs independently of punch calculation if punches are present.
@@ -1453,7 +1569,16 @@ Deno.serve(async (req: Request) => {
                 lop_adjacent_weekly_off_count: Math.max(0, lopAdjacentWeeklyOffCount),
                 lop_adjacent_weekly_off_dates: lopAdjacentWeeklyOffDates,
                 lop_dates: lopDatesStr,
-                day_overrides: JSON.stringify(existingReportOverrides)
+                // CRITICAL: Only include other minutes that did NOT come from existing exceptions.
+                // Other minutes from existing exceptions are already in the DB — do NOT re-create them.
+                // otherMinutesByDate = from NON-exception sources (should be created as new exceptions)
+                // otherMinutesFromExceptions = from existing exceptions (already exist, skip)
+                _otherMinutesDetails: (Object.keys(otherMinutesByDate).length > 0) ? {
+                    attendance_id: attendanceIdStr,
+                    other_minutes: Object.values(otherMinutesByDate).reduce((sum: number, v: any) => sum + v, 0),
+                    employee_name: employee?.name || attendanceIdStr,
+                    breakdown: otherMinutesByDate
+                } : null
             };
         };
 
@@ -1528,22 +1653,7 @@ Deno.serve(async (req: Request) => {
         // Using smaller batches with delays to handle database load issues
         const allResults = [];
         const processedAttendanceIds = new Set();
-
-        const reportLocalOverridesByAttendanceId = new Map(
-            existingResultsForReport
-                .filter(r => r.attendance_id !== null && r.attendance_id !== undefined)
-                .map(r => {
-                    let overrides = {};
-                    if (r.day_overrides) {
-                        try {
-                            overrides = typeof r.day_overrides === 'string' ? JSON.parse(r.day_overrides) : r.day_overrides;
-                        } catch (e) {
-                            console.warn(`[runAnalysis] Failed to parse day_overrides for employee ${r.attendance_id}`);
-                        }
-                    }
-                    return [String(r.attendance_id), overrides];
-                })
-        );
+        const otherMinutesExceptionsToCreate = []; // Track other minutes exceptions to create
         const ANALYSIS_BATCH_SIZE = 100; // CRITICAL FIX: Process 100 employees at once to avoid timeout
         const ANALYSIS_BATCH_DELAY = 0; // No delays for maximum speed
 
@@ -1562,9 +1672,8 @@ Deno.serve(async (req: Request) => {
 
                 processedAttendanceIds.add(idStr);
                 try {
-                    const localOverrides = reportLocalOverridesByAttendanceId.get(idStr) || {};
-                    const result = await analyzeEmployee(attendance_id, localOverrides);
-                    const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(idStr) || 0;
+                    const result = await analyzeEmployee(attendance_id);
+                    const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
 
                     allResults.push({
                         project_id,
@@ -1574,8 +1683,12 @@ Deno.serve(async (req: Request) => {
                         // or the secondary lookup (different report run within the same project).
                         ramadan_gift_minutes: preservedRamadanGiftMinutes,
                         ...result
-                    } as any);
+                    });
 
+                    // Track other minutes for exception creation
+                    if (result._otherMinutesDetails) {
+                        otherMinutesExceptionsToCreate.push(result._otherMinutesDetails);
+                    }
                 } catch (e: any) {
                     console.error(`[runAnalysis] ERROR: Failed to analyze employee ${idStr}:`, e.message);
                 }
@@ -1651,8 +1764,40 @@ Deno.serve(async (req: Request) => {
             }
         }
 
-        // MANUAL_OTHER_MINUTES generation is now handled within AnalysisResult.day_overrides
-        // No global Exception records are created here.
+        // Create MANUAL_OTHER_MINUTES exceptions for employees with other minutes
+        // CRITICAL FIX: Create PER-DATE exceptions, not spanning the entire project range.
+        // Each date with other minutes gets its own exception with the correct minutes for that day.
+        if (otherMinutesExceptionsToCreate.length > 0) {
+            console.log(`[runAnalysis] Creating MANUAL_OTHER_MINUTES exceptions (per-date) for ${otherMinutesExceptionsToCreate.length} employees`);
+
+            for (const detail of otherMinutesExceptionsToCreate) {
+                try {
+                    const breakdown = detail.breakdown || {};
+                    const dates = Object.keys(breakdown);
+
+                    for (const dateStr of dates) {
+                        const minutesForDate = (breakdown as Record<string, number>)[dateStr];
+                        if (!minutesForDate || minutesForDate <= 0) continue;
+
+                        await base44.asServiceRole.entities.Exception.create({
+                            project_id,
+                            attendance_id: detail.attendance_id,
+                            date_from: dateStr,
+                            date_to: dateStr,
+                            type: 'MANUAL_OTHER_MINUTES',
+                            other_minutes: minutesForDate,
+                            details: `Other minutes: ${minutesForDate} min on ${new Date(dateStr).toLocaleDateString()}`,
+                            created_from_report: true,
+                            report_run_id: reportRun.id,
+                            use_in_analysis: true,
+                            approval_status: 'pending_dept_head'
+                        });
+                    }
+                } catch (exError) {
+                    console.warn(`[runAnalysis] Failed to create other minutes exception for ${detail.attendance_id}:`, exError.message);
+                }
+            }
+        }
 
         // Update project status (only if this is NOT a chunk or it's the final chunk)
         const isFinalChunk = _chunk_offset === undefined || (startIdx + allResults.length >= uniqueEmployeeIds.length);
@@ -1671,6 +1816,7 @@ Deno.serve(async (req: Request) => {
             chunk_start: startIdx,
             chunk_end: endIdx,
             is_complete: isFinalChunk,
+            other_minutes_exceptions_created: otherMinutesExceptionsToCreate.length,
             message: `Analysis complete for ${allResults.length} employees (${startIdx}-${endIdx} of ${uniqueEmployeeIds.length})`
         });
 
