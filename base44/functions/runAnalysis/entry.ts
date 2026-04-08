@@ -23,7 +23,8 @@ Deno.serve(async (req: Request) => {
             report_name,
             _existing_report_run_id,
             _chunk_offset,
-            _chunk_size
+            _chunk_size,
+            _day_overrides
         } = await req.json();
 
         if (!project_id || !date_from || !date_to) {
@@ -1019,6 +1020,24 @@ Deno.serve(async (req: Request) => {
                 }
                 let shift = getShiftForDate(dateStr, currentDate);
 
+                // _DAY_OVERRIDES: Apply in-memory SHIFT_OVERRIDE from Reanalyze (not saved to DB)
+                const dayOverrideEntry = (_day_overrides as any)?.[attendanceIdStr]?.[dateStr];
+                if (dayOverrideEntry?.type === 'SHIFT_OVERRIDE' && dayOverrideEntry?.shiftOverride) {
+                    try {
+                        const ov = dayOverrideEntry.shiftOverride;
+                        if (ov.am_start && ov.pm_end) {
+                            shift = {
+                                am_start: ov.am_start,
+                                am_end: ov.am_end || '',
+                                pm_start: ov.pm_start || '',
+                                pm_end: ov.pm_end
+                            };
+                        }
+                    } catch (ovErr: any) {
+                        console.warn(`[runAnalysis] Failed to apply day_overrides SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, ovErr.message);
+                    }
+                }
+
                 // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
 
                 if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
@@ -1216,32 +1235,47 @@ Deno.serve(async (req: Request) => {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
 
-                if (reportGeneratedException) {
+                // _DAY_OVERRIDES: Use in-memory day override as substitute for reportGeneratedException
+                // Only applies to non-SHIFTOVERRIDE types (SHIFTOVERRIDE is handled via shift variable above)
+                // If _day_overrides has an entry for this employee+date, it takes priority over DB exceptions
+                let effectiveReportException: any = reportGeneratedException;
+                if (dayOverrideEntry && dayOverrideEntry.type !== 'SHIFT_OVERRIDE') {
+                    effectiveReportException = {
+                        type: dayOverrideEntry.type,
+                        late_minutes: dayOverrideEntry.lateMinutes || 0,
+                        early_checkout_minutes: dayOverrideEntry.earlyCheckoutMinutes || 0,
+                        other_minutes: dayOverrideEntry.otherMinutes || 0,
+                        created_from_report: true,
+                        created_date: new Date().toISOString()
+                    };
+                }
+
+                if (effectiveReportException) {
                     // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
-                    if (reportGeneratedException.type === 'MANUAL_PRESENT') {
+                    if (effectiveReportException.type === 'MANUAL_PRESENT') {
                         // Mark present, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
-                    } else if (reportGeneratedException.type === 'MANUAL_ABSENT') {
+                    } else if (effectiveReportException.type === 'MANUAL_ABSENT') {
                         // Mark absent LOP, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
-                    } else if (reportGeneratedException.type === 'SICK_LEAVE') {
+                    } else if (effectiveReportException.type === 'SICK_LEAVE') {
                         // Mark sick leave, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
-                    } else if (reportGeneratedException.type === 'ANNUAL_LEAVE') {
+                    } else if (effectiveReportException.type === 'ANNUAL_LEAVE') {
                         // Handle as annual leave, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else {
-                        // Read late_minutes, early_checkout_minutes, other_minutes directly from the reportGeneratedException record.
+                        // Read late_minutes, early_checkout_minutes, other_minutes directly from the effectiveReportException record.
                         // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
-                        dayLateMinutes = Math.abs(reportGeneratedException.late_minutes || 0);
-                        dayEarlyMinutes = Math.abs(reportGeneratedException.early_checkout_minutes || 0);
-                        if (reportGeneratedException.other_minutes > 0) {
-                            otherMinutes += reportGeneratedException.other_minutes;
-                            otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + reportGeneratedException.other_minutes;
+                        dayLateMinutes = Math.abs(effectiveReportException.late_minutes || 0);
+                        dayEarlyMinutes = Math.abs(effectiveReportException.early_checkout_minutes || 0);
+                        if (effectiveReportException.other_minutes > 0) {
+                            otherMinutes += effectiveReportException.other_minutes;
+                            otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + effectiveReportException.other_minutes;
                         }
                     }
                     // Skip punch-based calculation for this day as report-generated values are applied directly
