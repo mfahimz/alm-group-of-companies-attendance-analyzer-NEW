@@ -911,11 +911,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 }
             }
 
-            // 2. Mark report as saved
-            await Promise.all([
-                base44.entities.ReportRun.update(reportRun.id, { is_saved: true }),
-                base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
-            ]);
+            // 2. Update last saved report ID
+            await base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id });
 
             // 3. Delete old exceptions
             const existingReportExceptions = exceptions.filter(e =>
