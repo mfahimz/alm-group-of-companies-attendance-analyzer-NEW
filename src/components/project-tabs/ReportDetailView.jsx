@@ -37,6 +37,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [isReanalyzing, setIsReanalyzing] = useState(false);
     const [reanalysisProgress, setReanalysisProgress] = useState(null);
     const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+    const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
     const [saveProgress, setSaveProgress] = useState(null);
     const [riskFilter, setRiskFilter] = useState('all');
     const [finalizationProgress, setFinalizationProgress] = useState({
@@ -876,17 +877,161 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    const handleReanalyze = async () => {
+    const handleReanalyzeWithSave = async () => {
+        setShowReanalyzeConfirm(false);
         setIsReanalyzing(true);
-        setReanalysisProgress({ current: 0, total: 0, status: 'Initializing...', subStatus: 'Preparing reanalysis chunked loop...' });
-
-        let grandTotal = 0;
-        let totalProcessed = 0;
-        let offset = 0;
-        const batchSize = 10;
-        let isComplete = false;
+        setReanalysisProgress({ 
+            current: 0, 
+            total: 0, 
+            status: 'Saving...', 
+            subStatus: 'Saving report edits before reanalysis...' 
+        });
 
         try {
+            // PHASE 1: SILENT SAVE (Extracted from saveReportMutation)
+            // 1. Validation
+            const newFrom = new Date(reportRun.date_from);
+            const newTo = new Date(reportRun.date_to);
+            const projectFrom = new Date(project.date_from);
+            const projectTo = new Date(project.date_to);
+            const isFullProjectRange = 
+                newFrom.toLocaleDateString() === projectFrom.toLocaleDateString() && 
+                newTo.toLocaleDateString() === projectTo.toLocaleDateString();
+
+            if (!isFullProjectRange) {
+                const overlappingReport = allReportRuns.find(run => {
+                    if (!run.is_saved || run.id === reportRun.id) return false;
+                    const savedFrom = new Date(run.date_from);
+                    const savedTo = new Date(run.date_to);
+                    return (newFrom <= savedTo) && (newTo >= savedFrom);
+                });
+                if (overlappingReport) {
+                    const rangeText = `${new Date(overlappingReport.date_from).toLocaleDateString()} - ${new Date(overlappingReport.date_to).toLocaleDateString()}`;
+                    throw new Error(`Overlap Detected: A saved report already exists for part of this period (${rangeText}).`);
+                }
+            }
+
+            // 2. Mark report as saved
+            await Promise.all([
+                base44.entities.ReportRun.update(reportRun.id, { is_saved: true }),
+                base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
+            ]);
+
+            // 3. Delete old exceptions
+            const existingReportExceptions = exceptions.filter(e =>
+                e.created_from_report && e.report_run_id === reportRun.id
+            );
+            if (existingReportExceptions.length > 0) {
+                for (const ex of existingReportExceptions) {
+                    await base44.entities.Exception.delete(ex.id);
+                }
+            }
+
+            // 4. Create new exceptions from day_overrides
+            const exceptionsToCreate = [];
+            for (const result of results) {
+                if (!result.day_overrides) continue;
+                let dayOverrides = {};
+                try { dayOverrides = JSON.parse(result.day_overrides); } catch (e) { continue; }
+                const datesByType = {};
+                Object.entries(dayOverrides).forEach(([dateStr, override]) => {
+                    const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
+                    if (!datesByType[key]) {
+                        datesByType[key] = { dates: [], data: override, attendance_id: result.attendance_id };
+                    }
+                    datesByType[key].dates.push(dateStr);
+                });
+
+                for (const group of Object.values(datesByType)) {
+                    const sortedDates = group.dates.sort();
+                    const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
+                    const ranges = [];
+                    if (hasTimeMins) {
+                        sortedDates.forEach(d => ranges.push({ start: d, end: d }));
+                    } else {
+                        let currentRange = { start: sortedDates[0], end: sortedDates[0] };
+                        for (let i = 1; i < sortedDates.length; i++) {
+                            const dayDiff = (new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / (1000 * 60 * 60 * 24);
+                            if (dayDiff === 1) { currentRange.end = sortedDates[i]; }
+                            else { ranges.push({ ...currentRange }); currentRange = { start: sortedDates[i], end: sortedDates[i] }; }
+                        }
+                        ranges.push(currentRange);
+                    }
+
+                    for (const range of ranges) {
+                        const detailsParts = [];
+                        if (group.data.lateMinutes > 0) detailsParts.push(`+${group.data.lateMinutes} late min`);
+                        if (group.data.earlyCheckoutMinutes > 0) detailsParts.push(`+${group.data.earlyCheckoutMinutes} early min`);
+                        if (group.data.otherMinutes > 0) detailsParts.push(`+${group.data.otherMinutes} other min`);
+                        if (group.data.shiftOverride) detailsParts.push('shift override');
+                        const detailsText = detailsParts.length > 0 ? `Report edit: ${detailsParts.join(' | ')}` : 'Report edit: Manual adjustment from report';
+                        
+                        const exceptionData = {
+                            project_id: project.id,
+                            attendance_id: String(group.attendance_id),
+                            date_from: range.start,
+                            date_to: range.end,
+                            type: group.data.type,
+                            details: detailsText,
+                            created_from_report: true,
+                            report_run_id: reportRun.id,
+                            use_in_analysis: true,
+                            approval_status: 'pending_dept_head'
+                        };
+                        if (group.data.lateMinutes > 0) exceptionData.late_minutes = group.data.lateMinutes;
+                        if (group.data.earlyCheckoutMinutes > 0) exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
+                        if (group.data.otherMinutes > 0) exceptionData.other_minutes = group.data.otherMinutes;
+
+                        if (group.data.shiftOverride) {
+                            exceptionData.type = 'SHIFT_OVERRIDE';
+                            exceptionData.new_am_start = group.data.shiftOverride.am_start;
+                            exceptionData.new_am_end = group.data.shiftOverride.am_end;
+                            exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
+                            exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
+                        } else if ((exceptionData.late_minutes || 0) > 0 || (exceptionData.early_checkout_minutes || 0) > 0) {
+                            exceptionData.type = 'MANUAL_LATE';
+                        } else if ((exceptionData.other_minutes || 0) > 0) {
+                            exceptionData.type = 'MANUAL_OTHER_MINUTES';
+                        }
+                        exceptionsToCreate.push(exceptionData);
+                    }
+                }
+            }
+
+            if (exceptionsToCreate.length > 0) {
+                const batchSize = 10;
+                const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                const retryWithBackoff = async (fn, maxRetries = 3) => {
+                    for (let i = 0; i < maxRetries; i++) {
+                        try { return await fn(); } catch (error) {
+                            if ((error.status === 429 || error.message?.includes('rate limit')) && i < maxRetries - 1) {
+                                await delay(Math.min(2000 * Math.pow(2, i), 10000));
+                                continue;
+                            }
+                            throw error;
+                        }
+                    }
+                };
+                for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
+                    const batch = exceptionsToCreate.slice(i, i + batchSize);
+                    await retryWithBackoff(() => base44.entities.Exception.bulkCreate(batch));
+                    await delay(1500);
+                }
+            }
+
+            // Sync queries before reanalysis
+            await queryClient.invalidateQueries(['projectExceptions', project.id]);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // PHASE 2: REANALYSIS
+            setReanalysisProgress({ current: 0, total: 0, status: 'Initializing...', subStatus: 'Preparing reanalysis chunked loop...' });
+
+            let grandTotal = 0;
+            let totalProcessed = 0;
+            let offset = 0;
+            const rebatchSize = 10;
+            let isComplete = false;
+
             while (!isComplete) {
                 const response = await base44.functions.invoke('runAnalysis', {
                     project_id: project.id,
@@ -895,71 +1040,49 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     report_name: reportRun.report_name || 'Reanalysis',
                     _existing_report_run_id: reportRun.id,
                     _chunk_offset: offset,
-                    _chunk_size: batchSize
+                    _chunk_size: rebatchSize
                 });
 
                 if (response.data.success) {
-                    if (response.data.total_count > 0 && grandTotal === 0) {
-                        grandTotal = response.data.total_count;
-                    }
-
+                    if (response.data.total_count > 0 && grandTotal === 0) { grandTotal = response.data.total_count; }
                     totalProcessed += response.data.processed_count;
-                    offset += batchSize;
+                    offset += rebatchSize;
                     isComplete = response.data.is_complete;
-
                     setReanalysisProgress({
                         current: totalProcessed,
                         total: grandTotal || totalProcessed,
                         status: 'Reanalyzing...',
                         subStatus: `Reanalyzed ${totalProcessed} of ${grandTotal || '?'} employees`
                     });
-
-                    if (!isComplete) {
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                    }
+                    if (!isComplete) { await new Promise(resolve => setTimeout(resolve, 300)); }
                 } else {
                     throw new Error(response.data.error || 'Reanalysis chunk failed');
                 }
             }
 
             if (totalProcessed < grandTotal) {
-                toast.warning(`Reanalysis complete but ${grandTotal - totalProcessed} employee(s) may have been skipped. Please review attendance records.`);
-                setReanalysisProgress({
-                    current: totalProcessed,
-                    total: grandTotal,
-                    status: 'Complete with warnings',
-                    subStatus: `Complete with warnings — ${totalProcessed} of ${grandTotal} analyzed`
-                });
+                toast.warning(`Reanalysis complete but ${grandTotal - totalProcessed} employee(s) may have been skipped.`);
             } else {
                 toast.success('Reanalysis complete. Report updated.');
-                setReanalysisProgress({
-                    current: grandTotal,
-                    total: grandTotal,
-                    status: 'Complete!',
-                    subStatus: 'Reanalysis complete. Refreshing report...'
-                });
             }
 
-            // After 1500ms delay: invalidate queries to refresh the report
             await new Promise(resolve => setTimeout(resolve, 1500));
             queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
             queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
-
-            // After another 500ms (total 2000ms): clear states
             await new Promise(resolve => setTimeout(resolve, 500));
             setIsReanalyzing(false);
             setReanalysisProgress(null);
 
         } catch (error) {
-            toast.error('Reanalysis failed: ' + error.message);
-            setReanalysisProgress({
-                current: totalProcessed,
-                total: grandTotal || 0,
-                status: 'Failed',
-                subStatus: `Reanalysis stopped at ${totalProcessed} of ${grandTotal || '?'} employees — ${error.message}`
-            });
+            console.error('Reanalysis with save failed:', error);
+            toast.error('Failed to save report edits: ' + error.message);
             setIsReanalyzing(false);
+            setReanalysisProgress(null);
         }
+    };
+
+    const handleReanalyze = async () => {
+        handleReanalyzeWithSave();
     };
 
     const saveReportMutation = useMutation({
@@ -2108,6 +2231,34 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 isUser={isUser}
                 isSupervisor={isSupervisor}
             />
+
+            <Dialog open={showReanalyzeConfirm} onOpenChange={setShowReanalyzeConfirm}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reanalyze Report</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <p className="text-slate-700">
+                            This will first save your current in-report edits as report exceptions, 
+                            then re-run analysis for all employees using the latest exceptions and shifts.
+                        </p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <p className="text-sm text-blue-800 font-medium mb-1">ℹ️ Note:</p>
+                            <p className="text-sm text-blue-700">
+                                Any edits you have made in this report will be preserved and applied 
+                                globally during this process. This ensures reanalysis respects your manual corrections.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-3">
+                        <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={() => setShowReanalyzeConfirm(false)}>Cancel</Button>
+                        <Button onClick={handleReanalyzeWithSave} className="bg-indigo-600 hover:bg-indigo-700">
+                            Reanalyze
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <ExcelPreviewDialog
                 isOpen={isPreviewOpen}
                 onClose={() => setIsPreviewOpen(false)}
