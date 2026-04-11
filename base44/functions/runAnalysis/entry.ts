@@ -1250,7 +1250,7 @@ Deno.serve(async (req: Request) => {
                     };
                 }
 
-                if (effectiveReportException) {
+                if (effectiveReportException && effectiveReportException.type !== 'SHIFT_OVERRIDE') {
                     // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
                     if (effectiveReportException.type === 'MANUAL_PRESENT') {
                         // Mark present, ensure minutes remain 0
