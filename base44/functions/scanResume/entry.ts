@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 // Build a structured criteria text for the AI prompt
 function buildCriteriaText(criteria) {

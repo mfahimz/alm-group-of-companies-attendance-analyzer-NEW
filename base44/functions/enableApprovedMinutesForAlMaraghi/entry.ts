@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
 /**
  * One-time migration: Enable approved_minutes_enabled for Al Maraghi Auto Repairs

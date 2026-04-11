@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 import { parseISO, getDaysInMonth } from 'npm:date-fns@3.6.0';
 
 /**
