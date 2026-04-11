@@ -4,7 +4,7 @@
  * Mandatory 5000 limit on all filter calls to prevent silent data truncation.
  * Al Maraghi Motors business logic preserved exactly.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
  * DATA ACCESS LAYER - EXPLICIT LIMITS ENFORCED

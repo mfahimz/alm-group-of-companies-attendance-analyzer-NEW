@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
  * ONE-TIME SYNC: Migrate existing companies to Company entity with stable IDs

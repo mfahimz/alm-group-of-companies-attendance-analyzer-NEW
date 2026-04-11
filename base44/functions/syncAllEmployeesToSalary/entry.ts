@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
 /**
  * Syncs all active employee data (attendance_id, name, company) to EmployeeSalary records in bulk.
