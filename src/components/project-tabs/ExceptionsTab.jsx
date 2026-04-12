@@ -1604,6 +1604,8 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                         if (response.data.success) {
                                             toast.success(response.data.message);
                                             queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+                                            await new Promise(r => setTimeout(r, 500));
+                                            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
                                         }
                                     } catch (error) {
                                         toast.error('Failed to import: ' + error.message);
