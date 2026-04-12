@@ -68,23 +68,6 @@ Deno.serve(async (req) => {
         const existingTasks = await base44.asServiceRole.entities.ChecklistItem.filter({ project_id: projectId, is_auto_created: true });
         const existingFingerprints = new Set(existingTasks.map(t => t.fingerprint).filter(f => !!f));
 
-        const projectExceptions = await base44.asServiceRole.entities.Exception.filter({ project_id: projectId });
-        const phDates = new Set(projectExceptions.filter(ex => ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF').flatMap(ex => {
-            const dates: string[] = [];
-            const start = parseISO(ex.date_from);
-            const end = ex.date_to ? parseISO(ex.date_to) : start;
-            const cursor = new Date(start);
-            while (cursor <= end) { dates.push(cursor.toISOString().split('T')[0]); cursor.setDate(cursor.getDate() + 1); }
-            return dates;
-        }));
-
-        const uniqueAttendanceIds = [...new Set(relevantLeaves.map(l => l.attendance_id))];
-        const employeeMap: Record<string, any> = {};
-        for (const attId of uniqueAttendanceIds) {
-            const employees = await base44.asServiceRole.entities.Employee.filter({ attendance_id: attId });
-            if (employees.length > 0) employeeMap[attId] = employees[0];
-        }
-
         // Determine "Current Month" as the month with the HIGHEST number of days in the project range
         const projectDates: Record<string, number> = {};
         const cursor = new Date(projectStart);
@@ -104,6 +87,7 @@ Deno.serve(async (req) => {
         }
         
         const [currentYear, currentMonthIdx] = currentMonthKey.split('-').map(Number);
+        const lastDayOfRelevantMonth = new Date(currentYear, currentMonthIdx + 1, 0);
 
         let createdCount = 0;
         let skippedCount = 0;
@@ -114,7 +98,7 @@ Deno.serve(async (req) => {
             
             // Effective range: intersection of Leave and Project
             const effectiveStart = leaveStart > projectStart ? leaveStart : projectStart;
-            const effectiveEnd = leaveEnd < projectEnd ? leaveEnd : projectEnd;
+            const effectiveEnd = leaveEnd < lastDayOfRelevantMonth ? leaveEnd : lastDayOfRelevantMonth;
 
             const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
             const leaveExtendsBeyond = leaveEnd > projectEnd;
@@ -159,29 +143,6 @@ Deno.serve(async (req) => {
                 });
                 createdCount++;
             } else { skippedCount++; }
-
-            const employee = employeeMap[leave.attendance_id];
-            const rejoiningDate = calculateRejoiningDate(leaveEnd, employee, phDates);
-            const rejoiningDateStr = rejoiningDate.toISOString().split('T')[0];
-            const rejoiningFingerprint = `RejoiningDate_${projectId}_${leave.id}_${rejoiningDateStr}_${nameKey}`;
-
-            // --- REJOINING DATE CONDITION: Only if within project range ---
-            const isRejoiningInProject = rejoiningDate >= projectStart && rejoiningDate <= projectEnd;
-
-            if (isRejoiningInProject && !existingFingerprints.has(rejoiningFingerprint)) {
-                await base44.asServiceRole.entities.ChecklistItem.create({
-                    project_id: projectId,
-                    task_type: 'Rejoining Date',
-                    task_description: `${leave.employee_name} | Rejoining: ${rejoiningDateStr}`,
-                    status: 'pending',
-                    is_predefined: false,
-                    is_auto_created: true,
-                    linked_annual_leave_id: String(leave.id),
-                    fingerprint: rejoiningFingerprint,
-                    notes: `Employee: ${leave.employee_name}\nRejoining: ${rejoiningDateStr}\n[Auto-created]`
-                });
-                createdCount++;
-            } else { skippedCount++; }
         }
 
         return Response.json({ success: true, created: createdCount, skipped: skippedCount, currentMonth: `${currentYear}-${currentMonthIdx + 1}` });
@@ -191,30 +152,6 @@ Deno.serve(async (req) => {
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
-
-function calculateRejoiningDate(endDate: Date, emp: any, publicHolidayDates: Set<string>): Date {
-    const dayMap: Record<string, number> = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-    const weeklyOff = dayMap[emp?.weekly_off || 'Sunday'] ?? 0;
-    
-    // Start by moving one day forward from the end date
-    const cand = new Date(endDate);
-    cand.setDate(cand.getDate() + 1);
-
-    let i = 0;
-    while (i < 30) {
-        const dateStr = [
-            cand.getFullYear(),
-            String(cand.getMonth() + 1).padStart(2, '0'),
-            String(cand.getDate()).padStart(2, '0')
-        ].join('-');
-
-        if (cand.getDay() !== weeklyOff && !publicHolidayDates.has(dateStr)) break;
-        
-        cand.setDate(cand.getDate() + 1);
-        i++;
-    }
-    return cand;
-}
 
 function buildTaskNotes(leave: any, days: number, isALM: boolean, isExt: boolean, prevIdx: number, prevYr: number): string {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

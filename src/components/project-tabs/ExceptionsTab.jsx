@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EXCEPTION_TYPES, formatExceptionTypeLabel, getFilteredExceptionTypes } from '@/lib/exception-types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Search, Download, Edit, Eye, Filter, Sparkles, Calendar } from 'lucide-react';
+import { Plus, Trash2, Search, Download, Edit, Eye, Filter, Sparkles, Calendar, Loader2 } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import TablePagination from '../ui/TablePagination';
 import TimePicker from '../ui/TimePicker';
@@ -38,6 +38,7 @@ const TYPE_MAP = EXCEPTION_TYPES.reduce((acc, type) => {
 
 export default function ExceptionsTab({ project }) {
     const [showForm, setShowForm] = useState(false);
+    const [isImportingLeaves, setIsImportingLeaves] = useState(false);
     const [nlpText, setNlpText] = useState('');
     const [nlpParsing, setNlpParsing] = useState(false);
     const [employeeSearch, setEmployeeSearch] = useState('');
@@ -1589,27 +1590,45 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <CardTitle>Exceptions ({filteredExceptions.length})</CardTitle>
                         <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={async () => {
-                                try {
-                                    const response = await base44.functions.invoke('importAnnualLeavesToProject', {
-                                        projectId: project.id
-                                    });
-                                    if (response.data.success) {
-                                        toast.success(response.data.message);
-                                        queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+                        <div className="relative">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isImportingLeaves}
+                                onClick={async () => {
+                                    try {
+                                        setIsImportingLeaves(true);
+                                        const response = await base44.functions.invoke('importAnnualLeavesToProject', {
+                                            projectId: project.id
+                                        });
+                                        if (response.data.success) {
+                                            toast.success(response.data.message);
+                                            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+                                        }
+                                    } catch (error) {
+                                        toast.error('Failed to import: ' + error.message);
+                                    } finally {
+                                        setIsImportingLeaves(false);
                                     }
-                                } catch (error) {
-                                    toast.error('Failed to import: ' + error.message);
-                                }
-                            }}
-                            className="text-green-600 border-green-300 hover:bg-green-50"
-                        >
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Import Annual Leaves
-                        </Button>
+                                }}
+                                className="text-green-600 border-green-300 hover:bg-green-50"
+                            >
+                                {isImportingLeaves ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Importing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Calendar className="w-4 h-4 mr-2" />
+                                        Import Annual Leaves
+                                    </>
+                                )}
+                            </Button>
+                            {isImportingLeaves && (
+                                <div className="absolute -bottom-1.5 left-0 right-0 h-1 bg-green-400 animate-pulse rounded-full" />
+                            )}
+                        </div>
                         <Button
                             variant="outline"
                             size="sm"
