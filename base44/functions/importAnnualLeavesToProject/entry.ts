@@ -205,6 +205,13 @@ async function createAnnualLeaveChecklistTasks(
     const existingFingerprints = new Set(allAutoTasks.map((t: any) => t.fingerprint).filter((f: any) => !!f));
     const existingLeaveIdsOnTasks = new Set(allAutoTasks.map((t: any) => t.linked_annual_leave_id).filter((id: any) => !!id));
 
+    const projectExceptions = await base44.asServiceRole.entities.Exception.filter({
+        project_id: projectId,
+        type: 'ANNUAL_LEAVE'
+    });
+
+    const exceptionUpdates: Array<{ id: string; leaveDays: number }> = [];
+
     for (const leave of relevantLeaves) {
         const leaveStart = parseISO(leave.date_from);
         const leaveEnd = parseISO(leave.date_to);
@@ -227,6 +234,14 @@ async function createAnnualLeaveChecklistTasks(
         }
 
         if (leaveDays === 0) continue; 
+
+        const matchingException = projectExceptions.find((ex: any) =>
+            String(ex.attendance_id) === String(leave.attendance_id)
+        );
+
+        if (matchingException && matchingException.salary_leave_days !== leaveDays) {
+            exceptionUpdates.push({ id: matchingException.id, leaveDays });
+        }
 
         const dateRangeStr = leaveDatesInRange.length > 0 
             ? (leaveDatesInRange.length === 1 ? leaveDatesInRange[0] : `${leaveDatesInRange[0]} to ${leaveDatesInRange[leaveDatesInRange.length - 1]}`)
@@ -251,6 +266,35 @@ async function createAnnualLeaveChecklistTasks(
         }
 
     }
+
+    for (const update of exceptionUpdates) {
+        let attempt = 0;
+        while (attempt < 3) {
+            try {
+                await base44.asServiceRole.entities.Exception.update(
+                    update.id,
+                    { salary_leave_days: update.leaveDays }
+                );
+                await new Promise(r => setTimeout(r, 150));
+                break;
+            } catch (updateErr: any) {
+                const is429 = updateErr?.status === 429 ||
+                    updateErr?.message?.includes('429') ||
+                    updateErr?.message?.toLowerCase().includes('rate limit');
+                if (is429 && attempt < 2) {
+                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+                    attempt++;
+                } else {
+                    console.warn(
+                        `[createAnnualLeaveChecklistTasks] Failed to update salary_leave_days for exception ${update.id}:`,
+                        updateErr.message
+                    );
+                    break;
+                }
+            }
+        }
+    }
+
     return created;
 }
 
