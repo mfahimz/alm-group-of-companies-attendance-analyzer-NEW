@@ -19,7 +19,7 @@ import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
  * Handles the display of total and the popover for multiple entries.
  * All entries (manual + seeded recurring) are shown in one unified editable list.
  */
-function EntryCell({ value, onSave, title, disabled }) {
+function EntryCell({ value, onSave, title, disabled, isAdminOrCEO }) {
     const allEntries = Array.isArray(value) ? value : (value ? [{ amount: parseFloat(value), desc: '' }] : []);
     const grandTotal = allEntries.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
     
@@ -118,11 +118,13 @@ function EntryCell({ value, onSave, title, disabled }) {
                                     </Button>
                                 </div>
                                 <div>
-                                    <Label className="text-[10px] text-slate-500 uppercase mb-1 block">Description</Label>
+                                    <Label className="text-[10px] text-slate-500 uppercase mb-1 block">
+                                        Description {!isAdminOrCEO && <span className="text-red-500">*</span>}
+                                    </Label>
                                     <Input 
                                         value={entry.desc || ''} 
                                         onChange={(e) => handleEntryChange(idx, 'desc', e.target.value)}
-                                        className="h-8 text-xs bg-white"
+                                        className={`h-8 text-xs bg-white ${!isAdminOrCEO && parseFloat(entry.amount) > 0 && (!entry.desc || !entry.desc.trim()) ? 'border-red-300' : ''}`}
                                         placeholder="Adjustment reason..."
                                     />
                                 </div>
@@ -184,6 +186,9 @@ export default function OvertimeTab({ project }) {
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me()
     });
+
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
 
     // Fetch companies to scope special behavior by stable company_id
     const { data: companies = [], isLoading: loadingCompanies } = useQuery({
@@ -539,6 +544,21 @@ export default function OvertimeTab({ project }) {
         if (Object.keys(editableAdjustments).length === 0) {
             toast.info('No adjustment changes to save');
             return;
+        }
+
+        if (!isAdminOrCEO) {
+            const hasEmptyDesc = Object.values(editableAdjustments).some(empData =>
+                Object.entries(empData).some(([fieldKey, fieldValue]) => {
+                    if (!Array.isArray(fieldValue)) return false;
+                    return fieldValue.some(entry =>
+                        parseFloat(entry.amount) > 0 && (!entry.desc || !entry.desc.trim())
+                    );
+                })
+            );
+            if (hasEmptyDesc) {
+                toast.error('Please add a description for all adjustment entries before saving.');
+                return;
+            }
         }
 
         setIsSavingAdjustments(true);
@@ -903,6 +923,7 @@ export default function OvertimeTab({ project }) {
                                                 value={getValue(row, 'normalOtHours')}
                                                 onSave={(entries) => handleChange(row.attendance_id, 'normalOtHours', entries)}
                                                 disabled={false}
+                                                isAdminOrCEO={isAdminOrCEO}
                                             />
                                         </TableCell>
                                         <TableCell className="bg-cyan-50 p-1">
@@ -911,6 +932,7 @@ export default function OvertimeTab({ project }) {
                                                 value={getValue(row, 'specialOtHours')}
                                                 onSave={(entries) => handleChange(row.attendance_id, 'specialOtHours', entries)}
                                                 disabled={false}
+                                                isAdminOrCEO={isAdminOrCEO}
                                             />
                                         </TableCell>
                                     </TableRow>
@@ -1017,6 +1039,7 @@ export default function OvertimeTab({ project }) {
                                                     value={getAdjustmentValue(row, 'bonus')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'bonus', entries)}
                                                     disabled={!canEditAdjustments}
+                                                    isAdminOrCEO={isAdminOrCEO}
                                                 />
                                             </TableCell>
                                             <TableCell className="bg-green-50 p-1">
@@ -1025,6 +1048,7 @@ export default function OvertimeTab({ project }) {
                                                     value={getAdjustmentValue(row, 'incentive')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'incentive', entries)}
                                                     disabled={!canEditAdjustments}
+                                                    isAdminOrCEO={isAdminOrCEO}
                                                 />
                                             </TableCell>
                                             {isAlMaraghiMotors && (
@@ -1034,6 +1058,7 @@ export default function OvertimeTab({ project }) {
                                                         value={getAdjustmentValue(row, 'open_leave_salary')}
                                                         onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'open_leave_salary', entries)}
                                                         disabled={!canEditAdjustments}
+                                                        isAdminOrCEO={isAdminOrCEO}
                                                     />
                                                 </TableCell>
                                             )}
@@ -1044,6 +1069,7 @@ export default function OvertimeTab({ project }) {
                                                         value={getAdjustmentValue(row, 'variable_salary')}
                                                         onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'variable_salary', entries)}
                                                         disabled={!canEditAdjustments}
+                                                        isAdminOrCEO={isAdminOrCEO}
                                                     />
                                                 </TableCell>
                                             )}
@@ -1053,6 +1079,7 @@ export default function OvertimeTab({ project }) {
                                                     value={getAdjustmentValue(row, 'otherDeduction')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'otherDeduction', entries)}
                                                     disabled={!canEditAdjustments}
+                                                    isAdminOrCEO={isAdminOrCEO}
                                                 />
                                             </TableCell>
                                             <TableCell className="bg-red-50 p-1">
@@ -1061,6 +1088,7 @@ export default function OvertimeTab({ project }) {
                                                     value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
                                                     onSave={(entries) => handleAdjustmentChange(row.attendance_id, 'advanceSalaryDeduction', entries)}
                                                     disabled={!canEditAdjustments}
+                                                    isAdminOrCEO={isAdminOrCEO}
                                                 />
                                             </TableCell>
                                         </TableRow>
