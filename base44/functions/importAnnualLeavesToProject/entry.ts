@@ -180,27 +180,6 @@ async function createAnnualLeaveChecklistTasks(
     projectStart: Date,
     projectEnd: Date
 ): Promise<number> {
-    const projectExceptions = await base44.asServiceRole.entities.Exception.filter({ project_id: projectId });
-    const publicHolidayDates = new Set(
-        projectExceptions
-            .filter((ex: any) => ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF')
-            .flatMap((ex: any) => {
-                const dates: string[] = [];
-                const start = parseISO(ex.date_from);
-                const end = ex.date_to ? parseISO(ex.date_to) : start;
-                const cursor = new Date(start);
-                while (cursor <= end) { dates.push(cursor.toISOString().split('T')[0]); cursor.setDate(cursor.getDate() + 1); }
-                return dates;
-            })
-    );
-
-    const uniqueAttendanceIds = [...new Set(relevantLeaves.map((l: any) => l.attendance_id))];
-    const employeeMap: Record<string, any> = {};
-    for (const attId of uniqueAttendanceIds) {
-        const employees = await base44.asServiceRole.entities.Employee.filter({ attendance_id: attId });
-        if (employees.length > 0) employeeMap[attId] = employees[0];
-    }
-
     const projectDates: Record<string, number> = {};
     const cursor = new Date(projectStart);
     while (cursor <= projectEnd) {
@@ -230,7 +209,8 @@ async function createAnnualLeaveChecklistTasks(
         const leaveStart = parseISO(leave.date_from);
         const leaveEnd = parseISO(leave.date_to);
         const effectiveStart = leaveStart > projectStart ? leaveStart : projectStart;
-        const effectiveEnd = leaveEnd < projectEnd ? leaveEnd : projectEnd;
+        const lastDayOfRelevantMonth = new Date(currentYear, currentMonthIdx + 1, 0);
+        const effectiveEnd = leaveEnd < lastDayOfRelevantMonth ? leaveEnd : lastDayOfRelevantMonth;
 
         const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
         const leaveExtendsBeyond = leaveEnd > projectEnd;
@@ -270,43 +250,8 @@ async function createAnnualLeaveChecklistTasks(
             created++;
         }
 
-        const employee = employeeMap[leave.attendance_id];
-        const rejoiningDate = calculateRejoiningDateManual(leaveEnd, employee, publicHolidayDates);
-        const rejoiningDateStr = rejoiningDate.toISOString().split('T')[0];
-        const rejoiningFingerprint = `RejoiningDate_${projectId}_${leave.id}_${rejoiningDateStr}_${nameKey}`;
-        const isRejoiningInProject = rejoiningDate >= projectStart && rejoiningDate <= projectEnd;
-
-        if (isRejoiningInProject && !existingFingerprints.has(rejoiningFingerprint)) {
-            await base44.asServiceRole.entities.ChecklistItem.create({
-                project_id: projectId,
-                task_type: 'Rejoining Date',
-                task_description: `${leave.employee_name} | Rejoining: ${rejoiningDateStr}`,
-                status: 'pending',
-                is_predefined: false,
-                is_auto_created: true,
-                linked_annual_leave_id: String(leave.id),
-                fingerprint: rejoiningFingerprint,
-                notes: `Employee: ${leave.employee_name}\nRejoining: ${rejoiningDateStr}\n[Auto-created]`
-            });
-            created++;
-        }
     }
     return created;
-}
-
-function calculateRejoiningDateManual(endDate: Date, employee: any, publicHolidayDates: Set<string>): Date {
-    const dayMap: Record<string, number> = { 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6 };
-    const weeklyOff = dayMap[employee?.weekly_off || 'Sunday'] ?? 0;
-    const cand = new Date(endDate);
-    cand.setDate(cand.getDate() + 1);
-    let i = 0;
-    while (i < 30) {
-        const dateStr = cand.toISOString().split('T')[0];
-        if (cand.getDay() !== weeklyOff && !publicHolidayDates.has(dateStr)) break;
-        cand.setDate(cand.getDate() + 1);
-        i++;
-    }
-    return cand;
 }
 
 function buildTaskNotes(leave: any, days: number, isALM: boolean, isExt: boolean, curIdx: number, curYr: number): string {
