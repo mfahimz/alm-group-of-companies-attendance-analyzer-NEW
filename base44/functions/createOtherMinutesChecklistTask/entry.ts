@@ -37,12 +37,20 @@ Deno.serve(async (req) => {
             employeeName = employees[0].name;
         }
 
-        // Parse breakdown from exception details
-        const breakdownMatch = exception.details?.match(/Breakdown: (.+)/);
-        const breakdownText = breakdownMatch ? breakdownMatch[1] : '';
+        const allEmployeeOtherMinutesExceptions = await base44.asServiceRole.entities.Exception.filter({
+            project_id: exception.project_id,
+            attendance_id: exception.attendance_id,
+            type: 'MANUAL_OTHER_MINUTES'
+        });
 
-        // Create task description with name and total other minutes
-        const taskDescription = `${employeeName} - Total Other Minutes: ${exception.other_minutes || 0} min`;
+        const sortedExceptions = allEmployeeOtherMinutesExceptions
+            .sort((a, b) => a.date_from.localeCompare(b.date_from));
+        
+        const dateBreakdown = sortedExceptions
+            .map(ex => `${ex.date_from} (${ex.other_minutes || 0} min)`)
+            .join(', ');
+        
+        const taskDescription = `${employeeName} - ${dateBreakdown}`;
 
         // Find department head for the employee (if available)
         let assignedTo = null;
@@ -57,21 +65,36 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Create the checklist item
-        await base44.asServiceRole.entities.ChecklistItem.create({
+        const existingTasks = await base44.asServiceRole.entities.ChecklistItem.filter({
             project_id: exception.project_id,
-            task_type: 'Other Minutes',
-            task_description: taskDescription,
-            status: 'pending',
-            is_predefined: false,
-            linked_exception_id: exceptionId,
-            assigned_to: assignedTo,
-            notes: breakdownText || `No breakdown available. Total: ${exception.other_minutes || 0} minutes`
+            task_type: 'Other Minutes'
         });
+        
+        const existingTask = existingTasks.find(t =>
+            t.task_description && t.task_description.startsWith(employeeName + ' -')
+        );
+
+        if (existingTask) {
+            await base44.asServiceRole.entities.ChecklistItem.update(existingTask.id, {
+                task_description: taskDescription,
+                notes: `Last updated: ${new Date().toISOString()}`
+            });
+        } else {
+            await base44.asServiceRole.entities.ChecklistItem.create({
+                project_id: exception.project_id,
+                task_type: 'Other Minutes',
+                task_description: taskDescription,
+                status: 'pending',
+                is_predefined: false,
+                linked_exception_id: exceptionId,
+                assigned_to: assignedTo,
+                notes: `Last updated: ${new Date().toISOString()}`
+            });
+        }
 
         return Response.json({ 
             success: true, 
-            message: 'Checklist task created successfully',
+            message: 'Checklist task processed successfully',
             task_description: taskDescription
         });
 
