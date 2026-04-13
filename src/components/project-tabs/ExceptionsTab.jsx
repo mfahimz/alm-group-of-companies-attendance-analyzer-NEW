@@ -190,6 +190,7 @@ export default function ExceptionsTab({ project }) {
     const isUser = userRole === 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
+    const canEditAllowedMinutes = ['admin', 'ceo'].includes(userRole);
 
     const createMutation = useMutation({
         mutationFn: async (data) => {
@@ -285,6 +286,10 @@ export default function ExceptionsTab({ project }) {
 
 
     const handleCellChange = (exceptionId, field, value) => {
+        const exception = allExceptions.find(e => e.id === exceptionId);
+        if (exception?.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) {
+            return;
+        }
         setEditedRows(prev => ({
             ...prev,
             [exceptionId]: {
@@ -295,6 +300,11 @@ export default function ExceptionsTab({ project }) {
     };
 
     const handleSaveRow = (exceptionId) => {
+        const exception = allExceptions.find(e => e.id === exceptionId);
+        if (exception?.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) {
+            toast.error("Only Admin and CEO can edit allowed minutes.");
+            return;
+        }
         if (editedRows[exceptionId]) {
             updateMutation.mutate({ id: exceptionId, data: editedRows[exceptionId] }, {
                 onSuccess: () => {
@@ -1961,10 +1971,17 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                     <Button
                                                        size="sm"
                                                        variant="ghost"
-                                                       onClick={() => setEditingException(exception)}
-                                                       title="Edit exception"
+                                                       onClick={() => {
+                                                            if (exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) {
+                                                                toast.error("Only Admin and CEO can edit allowed minutes.");
+                                                                return;
+                                                            }
+                                                            setEditingException(exception);
+                                                       }}
+                                                       title={exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes ? "Only Admin and CEO can edit allowed minutes." : "Edit exception"}
+                                                       disabled={exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes}
                                                     >
-                                                       <Edit className="w-4 h-4 text-blue-600" />
+                                                       <Edit className={`w-4 h-4 ${exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes ? 'text-slate-400' : 'text-blue-600'}`} />
                                                     </Button>
 
                                                     <Button
@@ -2125,10 +2142,17 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                     <Button
                                                         size="sm"
                                                         variant="ghost"
-                                                        onClick={() => setEditingException(exception)}
-                                                        title="Edit exception"
+                                                        onClick={() => {
+                                                            if (exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) {
+                                                                toast.error("Only Admin and CEO can edit allowed minutes.");
+                                                                return;
+                                                            }
+                                                            setEditingException(exception);
+                                                        }}
+                                                        title={exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes ? "Only Admin and CEO can edit allowed minutes." : "Edit exception"}
+                                                        disabled={exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes}
                                                     >
-                                                        <Edit className="w-4 h-4 text-indigo-600" />
+                                                        <Edit className={`w-4 h-4 ${exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes ? 'text-slate-400' : 'text-indigo-600'}`} />
                                                     </Button>
                                                     <Button
                                                         size="sm"
@@ -2157,6 +2181,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 onClose={() => setEditingException(null)}
                 exception={editingException}
                 projectId={project.id}
+                canEditAllowedMinutes={canEditAllowedMinutes}
             />
 
             {/* Bulk Edit Dialog */}
@@ -2168,6 +2193,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 }}
                 selectedExceptions={selectedExceptions}
                 projectId={project.id}
+                canEditAllowedMinutes={canEditAllowedMinutes}
             />
 
             {/* View Exception Dialog */}

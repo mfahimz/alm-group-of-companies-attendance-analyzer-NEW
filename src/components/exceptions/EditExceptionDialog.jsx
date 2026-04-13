@@ -12,7 +12,7 @@ import TimePicker from '../ui/TimePicker';
 import { useQuery } from '@tanstack/react-query';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 
-export default function EditExceptionDialog({ open, onClose, exception, projectId }) {
+export default function EditExceptionDialog({ open, onClose, exception, projectId, canEditAllowedMinutes }) {
     const { data: project } = useQuery({
         queryKey: ['project', projectId],
         queryFn: async () => {
@@ -110,6 +110,11 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        
+        if ((exception?.type === 'ALLOWED_MINUTES' || formData.type === 'ALLOWED_MINUTES') && !canEditAllowedMinutes) {
+            toast.error("Only Admin and CEO can edit allowed minutes.");
+            return;
+        }
         
         // Clean up data based on type
         const cleanedData = {
@@ -408,6 +413,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                             setFormData({ ...formData, allowed_minutes: value || '' });
                                         }}
                                         min="1"
+                                        disabled={(exception?.type === 'ALLOWED_MINUTES' || formData.type === 'ALLOWED_MINUTES') && !canEditAllowedMinutes}
                                     />
                                 </div>
                                 <div>
@@ -415,6 +421,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                     <Select
                                         value={formData.allowed_minutes_type}
                                         onValueChange={(value) => setFormData({ ...formData, allowed_minutes_type: value })}
+                                        disabled={(exception?.type === 'ALLOWED_MINUTES' || formData.type === 'ALLOWED_MINUTES') && !canEditAllowedMinutes}
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
@@ -434,6 +441,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 <Select
                                     value={formData.target_punch || 'none'}
                                     onValueChange={(value) => setFormData({ ...formData, target_punch: value === 'none' ? null : value })}
+                                    disabled={(exception?.type === 'ALLOWED_MINUTES' || formData.type === 'ALLOWED_MINUTES') && !canEditAllowedMinutes}
                                 >
                                     <SelectTrigger className="h-8 text-xs">
                                         <SelectValue placeholder="No specific punch target" />
@@ -630,7 +638,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                         <Button 
                             type="submit" 
                             className="bg-indigo-600 hover:bg-indigo-700"
-                            disabled={updateMutation.isPending}
+                            disabled={updateMutation.isPending || ((exception?.type === 'ALLOWED_MINUTES' || formData.type === 'ALLOWED_MINUTES') && !canEditAllowedMinutes)}
                         >
                             {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
                         </Button>

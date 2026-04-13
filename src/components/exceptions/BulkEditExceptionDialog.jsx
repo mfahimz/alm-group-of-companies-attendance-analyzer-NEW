@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 
-export default function BulkEditExceptionDialog({ open, onClose, selectedExceptions, projectId }) {
+export default function BulkEditExceptionDialog({ open, onClose, selectedExceptions, projectId, canEditAllowedMinutes }) {
     const [updates, setUpdates] = useState({
         type: { enabled: false, value: '' },
         details: { enabled: false, value: '' },
@@ -20,8 +20,13 @@ export default function BulkEditExceptionDialog({ open, onClose, selectedExcepti
 
     const queryClient = useQueryClient();
 
+    const hasAllowedMinutesSelected = selectedExceptions.some(e => e.type === 'ALLOWED_MINUTES');
+
     const bulkUpdateMutation = useMutation({
         mutationFn: async () => {
+            if (hasAllowedMinutesSelected && !canEditAllowedMinutes) {
+                throw new Error("Only Admin and CEO can edit allowed minutes.");
+            }
             const updateData = {};
             if (updates.type.enabled) updateData.type = updates.type.value;
             if (updates.details.enabled) updateData.details = updates.details.value;
@@ -157,8 +162,14 @@ export default function BulkEditExceptionDialog({ open, onClose, selectedExcepti
 
                     <div className="flex gap-3 pt-4">
                         <Button
-                            onClick={() => bulkUpdateMutation.mutate()}
-                            disabled={bulkUpdateMutation.isPending}
+                            onClick={() => {
+                                if (hasAllowedMinutesSelected && !canEditAllowedMinutes) {
+                                    toast.error("Only Admin and CEO can edit allowed minutes.");
+                                    return;
+                                }
+                                bulkUpdateMutation.mutate();
+                            }}
+                            disabled={bulkUpdateMutation.isPending || (hasAllowedMinutesSelected && !canEditAllowedMinutes)}
                             className="bg-indigo-600 hover:bg-indigo-700"
                         >
                             {bulkUpdateMutation.isPending ? 'Updating...' : 'Update All'}
