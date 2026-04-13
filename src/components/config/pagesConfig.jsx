@@ -232,6 +232,27 @@ export const PAGES_CONFIG = {
     },
 
 
+    AttendanceAnalytics: {
+        name: 'AttendanceAnalytics',
+        title: 'Attendance Analytics',
+        icon: BarChart3,
+        category: 'Projects',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
+    },
+    SalaryAnalytics: {
+        name: 'SalaryAnalytics',
+        title: 'Salary Analytics',
+        icon: DollarSign,
+        category: 'Projects',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
+    },
+
     // Hidden Pages (No navigation)
     ProjectDetail: {
         name: 'ProjectDetail',
