@@ -62,7 +62,7 @@ function App() {
             <Route path="/employees" element={<W name="Employees"><Employees /></W>} />
             <Route path="/employeeprofile" element={<W name="EmployeeProfile"><EmployeeProfile /></W>} />
             <Route path="/salaries" element={<W name="Salaries"><Salaries /></W>} />
-            <Route path="/salaryincrements" element={<W name="SalaryIncrements"><SalaryIncrements /></W>} />
+            <Route path="/salarymodifications" element={<W name="SalaryIncrements"><SalaryIncrements /></W>} />
             <Route path="/salaryreportdetail" element={<W name="SalaryReportDetail"><SalaryReportDetail /></W>} />
             <Route path="/reportdetail" element={<W name="ReportDetail"><ReportDetail /></W>} />
             <Route path="/salaryadjustments" element={<W name="SalaryAdjustments"><SalaryAdjustments /></W>} />
