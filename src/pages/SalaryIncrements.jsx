@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Plus, TrendingUp, Calendar, AlertTriangle, History } from 'lucide-react';
+import { Search, Plus, TrendingUp, TrendingDown, Calendar, AlertTriangle, History } from 'lucide-react';
 import AEDIcon from '../components/ui/AEDIcon';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -32,7 +32,8 @@ export default function SalaryIncrements() {
         new_allowances: 0,
         new_allowances_with_bonus: 0,
         increment_reason: '',
-        notes: ''
+        notes: '',
+        change_type: 'increment'
     });
 
     const queryClient = useQueryClient();
@@ -73,6 +74,13 @@ export default function SalaryIncrements() {
             const currentSalary = salaries.find(s => 
                 String(s.employee_id) === String(data.employee_id)
             );
+
+            if (data.change_type === 'increment' && newTotal <= (currentSalary?.total_salary || 0)) {
+                throw new Error('New salary must be higher than current salary for an increment.');
+            }
+            if (data.change_type === 'decrement' && newTotal >= (currentSalary?.total_salary || 0)) {
+                throw new Error('New salary must be lower than current salary for a decrement.');
+            }
             
             // Format effective_month to YYYY-MM-01
             const effectiveMonth = data.effective_month.length === 7 
@@ -86,7 +94,7 @@ export default function SalaryIncrements() {
             );
             
             if (existingIncrement) {
-                throw new Error(`An increment already exists for this employee effective ${effectiveMonth}. Edit or delete the existing one first.`);
+                throw new Error(`A salary change already exists for this employee effective ${effectiveMonth}. Edit or delete the existing one first.`);
             }
             
             return base44.entities.SalaryIncrement.create({
@@ -104,18 +112,23 @@ export default function SalaryIncrements() {
                 new_allowances_with_bonus: Number(data.new_allowances_with_bonus),
                 new_total_salary: newTotal,
                 increment_reason: data.increment_reason || '',
+                increment_type: data.change_type,
                 notes: data.notes || '',
                 active: true
             });
         },
-        onSuccess: () => {
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries(['salaryIncrements']);
-            toast.success('Salary increment recorded successfully');
+            if (variables.change_type === 'decrement') {
+                toast.success('Salary decrement recorded successfully');
+            } else {
+                toast.success('Salary increment recorded successfully');
+            }
             setShowDialog(false);
             resetForm();
         },
         onError: (error) => {
-            toast.error(error.message || 'Failed to create salary increment');
+            toast.error(error.message || 'Failed to create salary change');
         }
     });
 
@@ -177,7 +190,8 @@ export default function SalaryIncrements() {
             new_allowances: 0,
             new_allowances_with_bonus: 0,
             increment_reason: '',
-            notes: ''
+            notes: '',
+            change_type: 'increment'
         });
         setSelectedEmployeeId('');
     };
@@ -288,7 +302,7 @@ export default function SalaryIncrements() {
     if (!canAccess) {
         return (
             <div className="space-y-6">
-                <Breadcrumb items={[{ label: 'Salary Increments' }]} />
+                <Breadcrumb items={[{ label: 'Salary Changes' }]} />
                 <Card className="border-0 shadow-lg">
                     <CardContent className="p-12 text-center">
                         <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
@@ -311,18 +325,18 @@ export default function SalaryIncrements() {
             
             {salaryUnlocked && (
                 <>
-                    <Breadcrumb items={[{ label: 'Salary Increments' }]} />
+                    <Breadcrumb items={[{ label: 'Salary Changes' }]} />
 
                     <div className="flex justify-between items-center">
                         <div>
-                            <h1 className="text-3xl font-bold text-slate-900">Salary Increments</h1>
+                            <h1 className="text-3xl font-bold text-slate-900">Salary Changes</h1>
                             <p className="text-slate-600 mt-1">
-                                Manage permanent salary increments with effective dates (Al Maraghi Motors only)
+                                Manage permanent salary changes with effective dates (Al Maraghi Motors only)
                             </p>
                         </div>
                         <Button onClick={() => setShowDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
                             <Plus className="w-4 h-4 mr-2" />
-                            Add Salary Increment
+                            Record Salary Change
                         </Button>
                     </div>
 
@@ -332,9 +346,9 @@ export default function SalaryIncrements() {
                             <div className="flex items-start gap-3">
                                 <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
                                 <div className="text-sm text-amber-900">
-                                    <p className="font-medium mb-1">How Salary Increments Work:</p>
+                                    <p className="font-medium mb-1">How Salary Changes Work:</p>
                                     <ul className="list-disc ml-4 space-y-1">
-                                        <li>Increments are <strong>permanent changes</strong> effective from a specific month</li>
+                                        <li>Changes are <strong>permanent</strong> effective from a specific month</li>
                                         <li>Salary calculations use the <strong>salary valid for that month</strong></li>
                                         <li>OT and previous-month deductions use <strong>historical salary</strong> (not current)</li>
                                         <li>This does NOT affect attendance data, only salary calculations</li>
@@ -354,7 +368,7 @@ export default function SalaryIncrements() {
                                     </div>
                                     <div>
                                         <p className="text-2xl font-bold text-slate-900">{increments.length}</p>
-                                        <p className="text-sm text-slate-600">Total Increments</p>
+                                        <p className="text-sm text-slate-600">Total Changes</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -367,7 +381,7 @@ export default function SalaryIncrements() {
                                     </div>
                                     <div>
                                         <p className="text-2xl font-bold text-slate-900">{Object.keys(employeeIncrementSummary).length}</p>
-                                        <p className="text-sm text-slate-600">Employees with Increments</p>
+                                        <p className="text-sm text-slate-600">Employees with Changes</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -413,7 +427,7 @@ export default function SalaryIncrements() {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <History className="w-5 h-5" />
-                                Increment History ({filteredIncrements.length})
+                                Salary Change History ({filteredIncrements.length})
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -422,7 +436,7 @@ export default function SalaryIncrements() {
                             ) : filteredIncrements.length === 0 ? (
                                 <div className="text-center py-12 text-slate-500">
                                     <TrendingUp className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                                    <p>No salary increments recorded yet.</p>
+                                    <p>No salary changes recorded yet.</p>
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
@@ -438,6 +452,7 @@ export default function SalaryIncrements() {
                                                 <SortableTableHead sortKey="effective_month" currentSort={sort} onSort={setSort}>
                                                     Effective Month
                                                 </SortableTableHead>
+                                                <TableHead>Type</TableHead>
                                                 <TableHead>Previous Salary</TableHead>
                                                 <TableHead>New Salary</TableHead>
                                                 <TableHead>Change</TableHead>
@@ -450,8 +465,10 @@ export default function SalaryIncrements() {
                                             {filteredIncrements.map((increment) => {
                                                 const change = (increment.new_total_salary || 0) - (increment.previous_total_salary || 0);
                                                 const changePercent = increment.previous_total_salary > 0 
-                                                    ? ((change / increment.previous_total_salary) * 100).toFixed(1)
+                                                    ? ((Math.abs(change) / increment.previous_total_salary) * 100).toFixed(1)
                                                     : 0;
+                                                
+                                                const derivedType = increment.increment_type || (change >= 0 ? 'increment' : 'decrement');
                                                 
                                                 return (
                                                     <TableRow key={increment.id}>
@@ -462,19 +479,28 @@ export default function SalaryIncrements() {
                                                                 {formatMonth(increment.effective_month)}
                                                             </span>
                                                         </TableCell>
+                                                        <TableCell>
+                                                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                                derivedType === 'increment' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                            }`}>
+                                                                {derivedType === 'increment' ? 'Increment ↑' : 'Decrement ↓'}
+                                                            </span>
+                                                        </TableCell>
                                                         <TableCell className="text-slate-600">
                                                             <CurrencyDisplay amount={increment.previous_total_salary} />
                                                         </TableCell>
-                                                        <TableCell className="font-semibold text-green-700">
+                                                        <TableCell className={`font-semibold ${derivedType === 'increment' ? 'text-green-700' : 'text-red-700'}`}>
                                                             <CurrencyDisplay amount={increment.new_total_salary} />
                                                         </TableCell>
                                                         <TableCell>
-                                                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                                            <span className={`px-2 py-1 flex items-center w-max gap-1 rounded text-xs font-medium ${
                                                                 change > 0 ? 'bg-green-100 text-green-800' : 
                                                                 change < 0 ? 'bg-red-100 text-red-800' : 
                                                                 'bg-slate-100 text-slate-600'
                                                             }`}>
-                                                                {change >= 0 ? '+' : ''}<CurrencyDisplay amount={change} /> ({changePercent}%)
+                                                                {change > 0 && <TrendingUp className="w-3 h-3" />}
+                                                                {change < 0 && <TrendingDown className="w-3 h-3" />}
+                                                                {change >= 0 ? '+' : '-'}<CurrencyDisplay amount={Math.abs(change)} /> ({changePercent}%)
                                                             </span>
                                                         </TableCell>
                                                         <TableCell className="text-sm text-slate-600">
@@ -516,12 +542,33 @@ export default function SalaryIncrements() {
                             resetForm();
                         }
                     }}>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-2xl gap-2">
                             <DialogHeader>
-                                <DialogTitle>Add Salary Increment</DialogTitle>
+                                <DialogTitle>
+                                    {formData.change_type === 'increment' ? 'Record Salary Increment' : 'Record Salary Decrement'}
+                                </DialogTitle>
                             </DialogHeader>
                             
                             <div className="grid grid-cols-2 gap-4 py-4">
+                                <div className="col-span-2 flex gap-2 mb-2">
+                                    <Button 
+                                        type="button"
+                                        variant={formData.change_type === 'increment' ? 'default' : 'outline'}
+                                        className={formData.change_type === 'increment' ? 'bg-green-600 hover:bg-green-700 flex-1' : 'flex-1'}
+                                        onClick={() => setFormData({...formData, change_type: 'increment'})}
+                                    >
+                                        Increment ↑
+                                    </Button>
+                                    <Button 
+                                        type="button"
+                                        variant={formData.change_type === 'decrement' ? 'default' : 'outline'}
+                                        className={formData.change_type === 'decrement' ? 'bg-red-600 hover:bg-red-700 flex-1' : 'flex-1'}
+                                        onClick={() => setFormData({...formData, change_type: 'decrement'})}
+                                    >
+                                        Decrement ↓
+                                    </Button>
+                                </div>
+
                                 <div className="col-span-2">
                                     <Label>Employee</Label>
                                     <Select 
@@ -565,6 +612,11 @@ export default function SalaryIncrements() {
                                         value={formData.new_basic_salary}
                                         onChange={(e) => setFormData({...formData, new_basic_salary: parseFloat(e.target.value) || 0})}
                                     />
+                                    {formData.employee_id && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Current: AED {salaries.find(s => String(s.employee_id) === formData.employee_id)?.basic_salary?.toLocaleString() || 0}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
@@ -574,6 +626,11 @@ export default function SalaryIncrements() {
                                         value={formData.new_allowances}
                                         onChange={(e) => setFormData({...formData, new_allowances: parseFloat(e.target.value) || 0})}
                                     />
+                                    {formData.employee_id && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Current: AED {salaries.find(s => String(s.employee_id) === formData.employee_id)?.allowances?.toLocaleString() || 0}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
@@ -583,10 +640,15 @@ export default function SalaryIncrements() {
                                         value={formData.new_allowances_with_bonus}
                                         onChange={(e) => setFormData({...formData, new_allowances_with_bonus: parseFloat(e.target.value) || 0})}
                                     />
+                                    {formData.employee_id && (
+                                        <p className="text-xs text-slate-500 mt-1">
+                                            Current: AED {salaries.find(s => String(s.employee_id) === formData.employee_id)?.allowances_with_bonus?.toLocaleString() || 0}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div>
-                                    <Label>Increment Reason</Label>
+                                    <Label>{formData.change_type === 'increment' ? 'Increment Reason' : 'Decrement Reason'}</Label>
                                     <Select 
                                         value={formData.increment_reason} 
                                         onValueChange={(val) => setFormData({...formData, increment_reason: val})}
@@ -617,7 +679,7 @@ export default function SalaryIncrements() {
 
                                 <div className="col-span-2 bg-slate-50 rounded-lg p-4">
                                     <div className="text-sm text-slate-600">New Total Salary</div>
-                                    <div className="text-2xl font-bold text-green-600 inline-flex items-center gap-1">
+                                    <div className={`text-2xl font-bold inline-flex items-center gap-1 ${formData.change_type === 'decrement' ? 'text-red-600' : 'text-green-600'}`}>
                                         <AEDIcon className="w-6 h-6" />{Number(
                                             formData.new_basic_salary + 
                                             formData.new_allowances +
@@ -639,7 +701,7 @@ export default function SalaryIncrements() {
                                     disabled={!formData.employee_id || !formData.effective_month || formData.new_basic_salary <= 0}
                                     className="bg-indigo-600 hover:bg-indigo-700"
                                 >
-                                    Save Increment
+                                    Save Salary Change
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
