@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
                 project_id: projectId, 
                 is_auto_created: true 
             });
-            const relevant = existingTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes' || t.task_type === 'Double Deduction Days');
+            const relevant = existingTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes' || t.task_type === 'Double Deduction Days' || t.task_type === 'Sick Leave' || t.task_type === 'Rejoining Date');
             
             let deletedCount = 0;
             for (let i = 0; i < relevant.length; i += BATCH_SIZE) {
@@ -94,6 +94,64 @@ Deno.serve(async (req) => {
             }
         }
 
+        const annualLeaveExceptions = await fetchAllRecords(base44.asServiceRole.entities.Exception, {
+            project_id: projectId,
+            type: 'ANNUAL_LEAVE'
+        });
+
+        const annualLeaveLastDateMap: Record<string, string> = {};
+        for (const ex of annualLeaveExceptions) {
+            const attId = String(ex.attendance_id);
+            const exEnd = ex.date_to || ex.date_from;
+            if (!annualLeaveLastDateMap[attId] || exEnd > annualLeaveLastDateMap[attId]) {
+                annualLeaveLastDateMap[attId] = exEnd;
+            }
+        }
+
+        const projectExceptionsForPH = await fetchAllRecords(base44.asServiceRole.entities.Exception, { project_id: projectId });
+        const publicHolidayDates = new Set<string>();
+        for (const ex of projectExceptionsForPH) {
+            if (ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF') {
+                const phFrom = new Date(ex.date_from);
+                const phTo = ex.date_to ? new Date(ex.date_to) : phFrom;
+                const cur = new Date(phFrom);
+                while (cur <= phTo) {
+                    publicHolidayDates.add(cur.toISOString().split('T')[0]);
+                    cur.setDate(cur.getDate() + 1);
+                }
+            }
+        }
+
+        const employeeWeeklyOffMap: Record<string, number> = {};
+        const dayNameToNum: Record<string, number> = {
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+            'Thursday': 4, 'Friday': 5, 'Saturday': 6
+        };
+        for (const emp of employeeRecords) {
+            if (emp.attendance_id != null) {
+                const dayName = emp.weekly_off || 'Friday';
+                employeeWeeklyOffMap[String(emp.attendance_id)] = dayNameToNum[dayName] ?? 5;
+            }
+        }
+
+        const sickLeaveExceptions = await fetchAllRecords(base44.asServiceRole.entities.Exception, {
+            project_id: projectId,
+            type: 'SICK_LEAVE'
+        });
+
+        const sickLeaveMap: Record<string, string[]> = {};
+        for (const ex of sickLeaveExceptions) {
+            const attId = String(ex.attendance_id);
+            if (!sickLeaveMap[attId]) sickLeaveMap[attId] = [];
+            const exFrom = new Date(ex.date_from);
+            const exTo = ex.date_to ? new Date(ex.date_to) : exFrom;
+            const cursor = new Date(exFrom);
+            while (cursor <= exTo) {
+                sickLeaveMap[attId].push(cursor.toISOString().split('T')[0]);
+                cursor.setDate(cursor.getDate() + 1);
+            }
+        }
+
         const otherMinutesExceptions = await fetchAllRecords(base44.asServiceRole.entities.Exception, {
             project_id: projectId,
             type: 'MANUAL_OTHER_MINUTES'
@@ -113,9 +171,25 @@ Deno.serve(async (req) => {
         
         const expectedTasks: Array<{ fingerprint: string, type: string, description: string, notes: string }> = [];
 
+        const calculateRejoiningDate = (lastLeaveDateStr: string, weeklyOffDay: number): string => {
+            const candidate = new Date(lastLeaveDateStr);
+            candidate.setDate(candidate.getDate() + 1);
+            let safety = 0;
+            while (safety < 60) {
+                const dateStr = candidate.toISOString().split('T')[0];
+                const dayOfWeek = candidate.getUTCDay();
+                if (dayOfWeek !== weeklyOffDay && !publicHolidayDates.has(dateStr)) {
+                    return dateStr;
+                }
+                candidate.setDate(candidate.getDate() + 1);
+                safety++;
+            }
+            return candidate.toISOString().split('T')[0];
+        };
+
         for (const res of analysisResults) {
-            const attId = res.attendance_id || '';
-            const name = attendanceNameMap[String(attId)] || attId || 'Unknown';
+            const attId = String(res.attendance_id || '');
+            const name = attendanceNameMap[attId] || attId || 'Unknown';
             const lop = Number(res.full_absence_count) || 0;
             const other = Number(res.other_minutes) || 0;
             const lopAdj = Number(res.lop_adjacent_weekly_off_count) || 0;
@@ -124,50 +198,38 @@ Deno.serve(async (req) => {
             if (lop > 0) {
                 const fp = `LopDays_${projectId}_${attId}_${lop}_${nameKey}`;
 
-                let lopDatesStr = '';
-                let lopDateRange = reportPeriod;
+                let lopIndividualDates = reportPeriod;
                 if (res.lop_dates) {
                     const lopArray = String(res.lop_dates).split(',').map(d => d.trim()).filter(d => d);
                     if (lopArray.length > 0) {
-                        lopDatesStr = lopArray.map(d => `- ${d}`).join('\n') + '\n';
-                        lopDateRange = lopArray.length === 1 ? lopArray[0] : `${lopArray[0]} to ${lopArray[lopArray.length - 1]}`;
-                    }
-                }
-                
-                let doubleDedStr = '';
-                if (res.lop_adjacent_weekly_off_dates) {
-                    const dedArray = String(res.lop_adjacent_weekly_off_dates).split(',').map(d => d.trim()).filter(d => d);
-                    if (dedArray.length > 0) {
-                        doubleDedStr = 'Double Deduction Days:\n' + dedArray.map(d => `- ${d}`).join('\n') + '\n';
+                        lopIndividualDates = lopArray.join(', ');
                     }
                 }
                 
                 expectedTasks.push({
                     fingerprint: fp,
                     type: 'LOP Days',
-                    description: `${name} | LOP Days: ${lop} | ${lopDateRange}`,
-                    notes: `Employee: ${name}\nID: ${attId}\nLOP Days:\n${lopDatesStr}${doubleDedStr}Total LOP Days: ${lop}\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
+                    description: `${name} | ${lopIndividualDates}`,
+                    notes: ''
                 });
             }
 
             if (other > 0) {
                 const fp = `OtherMinutes_${projectId}_${attId}_${other}_${nameKey}`;
                 
-                let otherNotesStr = '';
-                let otherDateRange = reportPeriod;
-                const employeeOtherEx = otherMinutesMap[String(attId)] || [];
-                if (employeeOtherEx.length > 0) {
-                    const sortedEx = [...employeeOtherEx].sort((a, b) => new Date(a.date_from).getTime() - new Date(b.date_from).getTime());
-                    otherNotesStr = sortedEx.map(ex => `- ${ex.date_from}: ${ex.allowed_minutes} min`).join('\n') + '\n';
-                    const dates = sortedEx.map(ex => ex.date_from);
-                    otherDateRange = dates.length === 1 ? dates[0] : `${dates[0]} to ${dates[dates.length - 1]}`;
-                }
+                const employeeOtherEx = otherMinutesMap[attId] || [];
+                const otherMinutesIndividual = employeeOtherEx.length > 0
+                    ? [...employeeOtherEx]
+                        .sort((a, b) => a.date_from.localeCompare(b.date_from))
+                        .map(ex => `${ex.date_from} (${ex.other_minutes || 0} min)`)
+                        .join(', ')
+                    : `${other} min`;
 
                 expectedTasks.push({
                     fingerprint: fp,
                     type: 'Other Minutes',
-                    description: `${name} | Other Minutes: ${other} min | ${otherDateRange}`,
-                    notes: `Employee: ${name}\nID: ${attId}\nOther Minutes Breakdown:\n${otherNotesStr}Total Other Minutes: ${other} min\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
+                    description: `${name} | ${otherMinutesIndividual}`,
+                    notes: ''
                 });
             }
 
@@ -175,28 +237,57 @@ Deno.serve(async (req) => {
             if (lopAdj > 0) {
                 const fp = `DoubleDeduction_${projectId}_${attId}_${lopAdj}_${nameKey}`;
                 
-                let doubleDedNotes = '';
-                let dedDateRange = reportPeriod;
+                let dedIndividualDates = reportPeriod;
                 if (res.lop_adjacent_weekly_off_dates) {
                     const dedArray = String(res.lop_adjacent_weekly_off_dates).split(',').map(d => d.trim()).filter(d => d);
                     if (dedArray.length > 0) {
-                        doubleDedNotes = dedArray.map(d => `- ${d}`).join('\n') + '\n';
-                        dedDateRange = dedArray.length === 1 ? dedArray[0] : `${dedArray[0]} to ${dedArray[dedArray.length - 1]}`;
+                        dedIndividualDates = dedArray.join(', ');
                     }
                 }
 
                 expectedTasks.push({
                     fingerprint: fp,
                     type: 'Double Deduction Days',
-                    description: `${name} | Double Deduction Days: ${lopAdj} | ${dedDateRange}`,
-                    notes: `Employee: ${name}\nID: ${attId}\nDouble Deduction Days:\n${doubleDedNotes}Total Double Deduction Days: ${lopAdj}\nPeriod: ${reportPeriod}\n[Auto-created from Finalized Report]`
+                    description: `${name} | ${dedIndividualDates}`,
+                    notes: ''
+                });
+            }
+
+            const sick = Number(res.sick_leave_count) || 0;
+            if (sick > 0) {
+                const fp = `SickLeave_${projectId}_${attId}_${sick}_${nameKey}`;
+                const sickDates = (sickLeaveMap[attId] || [])
+                    .sort()
+                    .join(', ');
+                const sickDescription = sickDates
+                    ? `${name} | ${sickDates}`
+                    : `${name} | ${sick} sick leave day(s)`;
+                expectedTasks.push({
+                    fingerprint: fp,
+                    type: 'Sick Leave',
+                    description: sickDescription,
+                    notes: ''
+                });
+            }
+
+            const annualLeave = Number(res.annual_leave_count) || 0;
+            if (annualLeave > 0 && annualLeaveLastDateMap[attId]) {
+                const lastLeaveDate = annualLeaveLastDateMap[attId];
+                const weeklyOffDay = employeeWeeklyOffMap[attId] ?? 5;
+                const rejoiningDate = calculateRejoiningDate(lastLeaveDate, weeklyOffDay);
+                const fp = `RejoiningDate_${projectId}_${attId}_${rejoiningDate}_${nameKey}`;
+                expectedTasks.push({
+                    fingerprint: fp,
+                    type: 'Rejoining Date',
+                    description: `${name} | Rejoining: ${rejoiningDate}`,
+                    notes: ''
                 });
             }
         }
 
         const expectedFingerprints = new Set(expectedTasks.map(t => t.fingerprint));
         const existingProjectTasks = await fetchAllRecords(base44.asServiceRole.entities.ChecklistItem, { project_id: projectId, is_auto_created: true });
-        const relevantExisting = existingProjectTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes' || t.task_type === 'Double Deduction Days');
+        const relevantExisting = existingProjectTasks.filter((t: any) => t.task_type === 'LOP Days' || t.task_type === 'Other Minutes' || t.task_type === 'Double Deduction Days' || t.task_type === 'Sick Leave' || t.task_type === 'Rejoining Date');
 
         let deleted = 0;
         const tasksToDelete = relevantExisting.filter((t: any) => !expectedFingerprints.has(t.fingerprint));
