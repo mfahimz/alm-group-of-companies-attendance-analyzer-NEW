@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Check, X, FileText, AlertCircle, Upload, Loader2, Sparkles } from 'lucide-react';
+import { Plus, Check, X, FileText, AlertCircle, Upload, Loader2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { formatInUAE } from '@/components/ui/timezone';
@@ -29,6 +29,7 @@ export default function AnnualLeaveManagement() {
 
     const [unmatchedSearchTerm, setUnmatchedSearchTerm] = useState(''); // Search term for manual employee matching in import
     const [activeUnmatchedIdx, setActiveUnmatchedIdx] = useState(null); // Tracks which row is currently being manually matched
+    const [expandedLeaveId, setExpandedLeaveId] = useState(null);
 
     const [quickEntryText, setQuickEntryText] = useState('');
     const [isParsing, setIsParsing] = useState(false);
@@ -141,6 +142,17 @@ export default function AnnualLeaveManagement() {
         }
     });
 
+    const { data: employeeSalaries = [] } = useQuery({
+        queryKey: ['employeeSalaries', filterCompany],
+        queryFn: async () => {
+            if (filterCompany) {
+                return base44.entities.EmployeeSalary.filter({ company: filterCompany, active: true }, null, 2000);
+            }
+            return [];
+        },
+        enabled: !!filterCompany
+    });
+
     // =========================================================================
     // PROJECT ENTITY LOADING
     // =========================================================================
@@ -195,6 +207,53 @@ export default function AnnualLeaveManagement() {
         const diffTime = Math.abs(end - start);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
         return diffDays;
+    };
+
+    const calculateMonthlyLeaveSalary = (leave, employeeSalaries) => {
+        if (leave.company !== 'Al Maraghi Motors') return null;
+
+        const empSalary = employeeSalaries.find(s => 
+            (s.attendance_id && s.attendance_id === leave.attendance_id) || 
+            (s.hrms_id && s.hrms_id === leave.employee_id)
+        );
+        if (!empSalary) return null;
+
+        const start = new Date(leave.date_from);
+        const end = new Date(leave.date_to);
+        const basicSalary = Number(empSalary.basic_salary || 0);
+        const allowances = Number(empSalary.allowances || 0);
+        const salaryLeaveBase = basicSalary + allowances;
+
+        const breakdown = [];
+        let currentMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+
+        while (currentMonth <= end) {
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            
+            const monthStart = new Date(year, month, 1);
+            const monthEnd = new Date(year, month + 1, 0);
+            const daysInMonth = monthEnd.getDate();
+
+            const overlapStart = new Date(Math.max(start, monthStart));
+            const overlapEnd = new Date(Math.min(end, monthEnd));
+
+            if (overlapStart <= overlapEnd) {
+                const daysOfLeaveInThatMonth = Math.ceil((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1;
+                const monthLeaveAmount = Math.round((salaryLeaveBase / daysInMonth) * daysOfLeaveInThatMonth);
+
+                breakdown.push({
+                    month: formatInUAE(monthStart, 'MMMM yyyy'),
+                    days: daysOfLeaveInThatMonth,
+                    daysInMonth,
+                    amount: monthLeaveAmount
+                });
+            }
+            currentMonth.setMonth(currentMonth.getMonth() + 1);
+        }
+
+        const totalValue = breakdown.reduce((sum, m) => sum + m.amount, 0);
+        return { breakdown, total: totalValue };
     };
 
     function parseCSV(text) {
@@ -819,66 +878,124 @@ export default function AnnualLeaveManagement() {
                         </thead>
                         <tbody>
                             {filteredLeaves.map((leave) => (
-                                <tr key={leave.id} className="border-t hover:bg-[#F1F5F9]">
-                                    <td className="px-4 py-3">
-                                        <div className="font-medium text-[#1F2937]">{leave.employee_name}</div>
-                                        <div className="text-sm text-[#6B7280]">ID: {leave.attendance_id}</div>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm">{leave.company}</td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm">
-                                            {formatInUAE(new Date(leave.date_from), 'MMM dd, yyyy')} - {formatInUAE(new Date(leave.date_to), 'MMM dd, yyyy')}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="text-sm font-medium">{leave.total_days} days</div>
-                                        {leave.salary_leave_days !== leave.total_days && (
-                                            <div className="text-xs text-amber-600">Salary: {leave.salary_leave_days} days</div>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-[#6B7280]">
-                                        {leave.applied_to_projects ? leave.applied_to_projects.split(',').length + ' projects' : 'Not applied'}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <div className="flex gap-2 justify-end">
-                                            {leave.status === 'pending' && (
-                                                <>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => updateStatusMutation.mutate({ id: leave.id, status: 'approved' })}
-                                                        className="text-green-600"
-                                                    >
-                                                        <Check className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => updateStatusMutation.mutate({ id: leave.id, status: 'rejected' })}
-                                                        className="text-red-600"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </Button>
-                                                </>
+                                <Fragment key={leave.id}>
+                                    <tr className="border-t hover:bg-[#F1F5F9]">
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium text-[#1F2937]">{leave.employee_name}</div>
+                                            <div className="text-sm text-[#6B7280]">ID: {leave.attendance_id}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm">{leave.company}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="text-sm">
+                                                {formatInUAE(new Date(leave.date_from), 'MMM dd, yyyy')} - {formatInUAE(new Date(leave.date_to), 'MMM dd, yyyy')}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="text-sm font-medium">{leave.total_days} days</div>
+                                            {leave.salary_leave_days !== leave.total_days && (
+                                                <div className="text-xs text-amber-600">Salary: {leave.salary_leave_days} days</div>
                                             )}
-                                            <Button size="sm" variant="ghost" onClick={() => handleEdit(leave)}>
-                                                Edit
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    if (confirm('Delete this leave?')) {
-                                                        deleteMutation.mutate(leave.id);
-                                                    }
-                                                }}
-                                                className="text-red-600"
-                                            >
-                                                Delete
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-[#6B7280]">
+                                            {leave.applied_to_projects ? leave.applied_to_projects.split(',').length + ' projects' : 'Not applied'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex gap-2 justify-end">
+                                                {leave.company === 'Al Maraghi Motors' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setExpandedLeaveId(expandedLeaveId === leave.id ? null : leave.id)}
+                                                        className="text-indigo-600"
+                                                    >
+                                                        {expandedLeaveId === leave.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                    </Button>
+                                                )}
+                                                {leave.status === 'pending' && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => updateStatusMutation.mutate({ id: leave.id, status: 'approved' })}
+                                                            className="text-green-600"
+                                                        >
+                                                            <Check className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => updateStatusMutation.mutate({ id: leave.id, status: 'rejected' })}
+                                                            className="text-red-600"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                <Button size="sm" variant="ghost" onClick={() => handleEdit(leave)}>
+                                                    Edit
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        if (confirm('Delete this leave?')) {
+                                                            deleteMutation.mutate(leave.id);
+                                                        }
+                                                    }}
+                                                    className="text-red-600"
+                                                >
+                                                    Delete
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {expandedLeaveId === leave.id && (
+                                        <tr className="bg-indigo-50/30">
+                                            <td colSpan={6} className="px-8 py-4">
+                                                {(() => {
+                                                    const result = calculateMonthlyLeaveSalary(leave, employeeSalaries);
+                                                    if (!result) return (
+                                                        <div className="flex items-center gap-2 text-sm text-amber-700 p-3 bg-amber-50 border border-amber-100 rounded-lg">
+                                                            <AlertCircle className="w-4 h-4" />
+                                                            No salary record found for this employee.
+                                                        </div>
+                                                    );
+                                                    
+                                                    return (
+                                                        <div className="bg-white border border-indigo-100 rounded-lg overflow-hidden shadow-sm max-w-2xl">
+                                                            <table className="w-full text-xs">
+                                                                <thead className="bg-indigo-50/50 text-indigo-900 border-b border-indigo-100">
+                                                                    <tr>
+                                                                        <th className="px-4 py-2 text-left font-semibold">Month</th>
+                                                                        <th className="px-4 py-2 text-center font-semibold">Leave Days</th>
+                                                                        <th className="px-4 py-2 text-center font-semibold">Days in Month</th>
+                                                                        <th className="px-4 py-2 text-right font-semibold">Amount (AED)</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-gray-100">
+                                                                    {result.breakdown.map((m, idx) => (
+                                                                        <tr key={idx} className="hover:bg-slate-50">
+                                                                            <td className="px-4 py-2 font-medium">{m.month}</td>
+                                                                            <td className="px-4 py-2 text-center">{m.days}</td>
+                                                                            <td className="px-4 py-2 text-center">{m.daysInMonth}</td>
+                                                                            <td className="px-4 py-2 text-right font-semibold text-slate-700">{m.amount.toLocaleString()}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                                <tfoot className="bg-indigo-50/30 border-t border-indigo-100">
+                                                                    <tr className="font-bold">
+                                                                        <td colSpan={3} className="px-4 py-2 text-right text-slate-600">Total Leave Salary:</td>
+                                                                        <td className="px-4 py-2 text-right text-indigo-700">{result.total.toLocaleString()} AED</td>
+                                                                    </tr>
+                                                                </tfoot>
+                                                            </table>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </Fragment>
                             ))}
                         </tbody>
                     </table>
