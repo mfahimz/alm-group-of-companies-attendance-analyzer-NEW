@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertTriangle, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,29 @@ export default function PreApprovalDialog({
     // FIX 1: showLimitWarning is now rendered INSIDE DialogContent so Radix UI's
     // focus trap does not block interaction with the warning's buttons.
     const [showLimitWarning, setShowLimitWarning] = useState(false);
+    const [employeeSearch, setEmployeeSearch] = useState('');
+
+    useEffect(() => {
+        if (!open) setEmployeeSearch('');
+    }, [open]);
+
+    const filteredEmployeeGroups = employeeGroups
+        ? employeeGroups.map(group => ({
+            ...group,
+            employees: group.employees.filter(emp =>
+                emp.name?.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+                String(emp.attendance_id).includes(employeeSearch)
+            )
+        })).filter(group => group.employees.length > 0)
+        : [];
+
+    const filteredFlatEmployees = employees
+        ? employees.filter(emp =>
+            emp.name?.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+            String(emp.attendance_id).includes(employeeSearch)
+        )
+        : [];
+
     const queryClient = useQueryClient();
 
     // Get current user role using the pre-initialized client
@@ -405,15 +428,27 @@ export default function PreApprovalDialog({
                                 <Label>Employee *</Label>
                                 <Select
                                     value={formData.attendance_id}
-                                    onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                    onValueChange={(value) => {
+                                        setFormData({ ...formData, attendance_id: value });
+                                        setEmployeeSearch('');
+                                    }}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select employee" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {employeeGroups && employeeGroups.length > 0 ? (
+                                        <div className="p-2 border-b border-slate-100 sticky top-0 bg-white z-20">
+                                            <input
+                                                className="w-full h-8 px-3 text-sm border border-slate-200 rounded-md outline-none focus:border-indigo-400"
+                                                placeholder="Search by name or ID..."
+                                                value={employeeSearch}
+                                                onChange={(e) => setEmployeeSearch(e.target.value)}
+                                                onKeyDown={(e) => e.stopPropagation()}
+                                            />
+                                        </div>
+                                        {filteredEmployeeGroups && filteredEmployeeGroups.length > 0 ? (
                                             /* Change: Render employees grouped by department when hierarchical data is available */
-                                            employeeGroups.map((group, gIdx) => (
+                                            filteredEmployeeGroups.map((group, gIdx) => (
                                                 <SelectGroup key={`group-${gIdx}`}>
                                                     <SelectLabel className="bg-[#EEF2FF] text-[#0F1E36] font-bold py-1 px-3 mb-1 sticky top-0 z-10 border-b border-[#E2E6EC]">
                                                         {group.department}
@@ -424,16 +459,16 @@ export default function PreApprovalDialog({
                                                         </SelectItem>
                                                     ))}
                                                     {/* Add separator between departments for visual clarity */}
-                                                    {gIdx < employeeGroups.length - 1 && <SelectSeparator className="my-1" />}
+                                                    {gIdx < filteredEmployeeGroups.length - 1 && <SelectSeparator className="my-1" />}
                                                 </SelectGroup>
                                             ))
-                                        ) : employees.length === 0 ? (
+                                        ) : filteredFlatEmployees.length === 0 ? (
                                             <div className="p-2 text-sm text-slate-500">
                                                 No subordinate employees available
                                             </div>
                                         ) : (
                                             /* Fallback: Render flat list of employees if groups not provided */
-                                            employees.map(emp => (
+                                            filteredFlatEmployees.map(emp => (
                                                 <SelectItem key={emp.id} value={String(emp.attendance_id)}>
                                                     {emp.name} (ID: {emp.attendance_id})
                                                 </SelectItem>
