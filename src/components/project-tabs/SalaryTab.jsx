@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { toast } from 'sonner';
 import PINLock from '../ui/PINLock';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
 
@@ -51,6 +52,7 @@ export default function SalaryTab({ project }) {
     const [newReportName, setNewReportName] = useState('');
     const [newReportDateFrom, setNewReportDateFrom] = useState('');
     const [newReportDateTo, setNewReportDateTo] = useState('');
+    const [showLeavePreview, setShowLeavePreview] = useState(false);
 
     // Preview States
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -159,6 +161,49 @@ export default function SalaryTab({ project }) {
     };
 
     const hasFinalReport = finalReport && finalReport.is_final === true;
+
+    // ============================================
+    // LEAVE SALARY PREVIEW CALCULATIONS
+    // ============================================
+    const annualLeavePreviews = useMemo(() => {
+        if (!showLeavePreview) return [];
+        
+        return exceptions
+            .filter(ex => ex.type === 'ANNUAL_LEAVE')
+            .map(ex => {
+                const empSalary = employeeSalaries.find(s => 
+                    String(s.attendance_id) === String(ex.attendance_id) || 
+                    String(s.hrms_id) === String(ex.attendance_id)
+                );
+                
+                let salaryLeaveDays = ex.salary_leave_days;
+                if (!salaryLeaveDays || salaryLeaveDays <= 0) {
+                    const start = new Date(ex.date_from);
+                    const end = new Date(ex.date_to);
+                    salaryLeaveDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                }
+                
+                const basic = Number(empSalary?.basic_salary) || 0;
+                const allowances = Number(empSalary?.allowances) || 0;
+                const salaryLeaveBase = basic + allowances;
+                const divisor = project.salary_calculation_days || 30;
+                const leaveAmount = Math.round((salaryLeaveBase / divisor) * salaryLeaveDays);
+                const dailyRate = salaryLeaveBase / divisor;
+                
+                return {
+                    id: ex.id,
+                    name: empSalary?.name || ex.details || ex.attendance_id,
+                    attendance_id: ex.attendance_id,
+                    leaveDays: salaryLeaveDays,
+                    dailyRate,
+                    leaveAmount
+                };
+            });
+    }, [exceptions, employeeSalaries, project.salary_calculation_days, showLeavePreview]);
+
+    const totalLeavePreviewAmount = useMemo(() => {
+        return annualLeavePreviews.reduce((sum, item) => sum + item.leaveAmount, 0);
+    }, [annualLeavePreviews]);
 
     // ============================================
     // HANDLERS
@@ -465,15 +510,26 @@ export default function SalaryTab({ project }) {
                             <AEDIcon className="w-6 h-6" />
                             Salary Reports - {project.company}
                         </CardTitle>
-                        <Button 
-                            onClick={handleOpenGenerateDialog}
-                            disabled={!hasFinalReport || loadingSnapshots}
-                            className="bg-indigo-600 hover:bg-indigo-700"
-                            title={loadingSnapshots ? 'Loading salary snapshots...' : !hasFinalReport ? 'No finalized report available' : ''}
-                        >
-                            <Plus className="w-4 h-4 mr-2" />
-                            {loadingSnapshots ? 'Loading...' : 'Generate New Report'}
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline"
+                                onClick={() => setShowLeavePreview(!showLeavePreview)}
+                                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                title="Preview estimated leave salary for active annual leave exceptions"
+                            >
+                                <Calendar className="w-4 h-4 mr-2" />
+                                {showLeavePreview ? 'Hide Leave Preview' : 'Preview Leave Salary'}
+                            </Button>
+                            <Button 
+                                onClick={handleOpenGenerateDialog}
+                                disabled={!hasFinalReport || loadingSnapshots}
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                title={loadingSnapshots ? 'Loading salary snapshots...' : !hasFinalReport ? 'No finalized report available' : ''}
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                {loadingSnapshots ? 'Loading...' : 'Generate New Report'}
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {/* Info Banner */}
@@ -493,6 +549,73 @@ export default function SalaryTab({ project }) {
                             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 text-sm text-green-800">
                                 <strong>✓ Finalized Report:</strong> {finalReport.report_name || 'Report'} ({finalReport.date_from} to {finalReport.date_to})
                                 {finalReport.finalized_by && <span className="ml-2 text-xs">— Finalized by {finalReport.finalized_by}</span>}
+                            </div>
+                        )}
+
+                        {/* Leave Salary Preview Section */}
+                        {showLeavePreview && (
+                            <div className="mb-8 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+                                <div className="bg-gradient-to-r from-indigo-500 to-emerald-500 p-px rounded-xl overflow-hidden shadow-sm">
+                                    <div className="bg-white rounded-[10px] overflow-hidden">
+                                        <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                                <Calendar className="w-4 h-4 text-indigo-600" />
+                                                Leave Salary Preview (Active Exceptions)
+                                            </h3>
+                                            <Badge className="bg-indigo-600 hover:bg-indigo-600">
+                                                Total: {totalLeavePreviewAmount.toLocaleString()} AED
+                                            </Badge>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow className="hover:bg-transparent bg-slate-50/50">
+                                                        <TableHead className="font-bold text-slate-700">Employee Name</TableHead>
+                                                        <TableHead className="font-bold text-slate-700">Att ID</TableHead>
+                                                        <TableHead className="font-bold text-slate-700">Leave Days</TableHead>
+                                                        <TableHead className="text-right font-bold text-slate-700">Daily Rate</TableHead>
+                                                        <TableHead className="text-right font-bold text-slate-700">Leave Salary</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {annualLeavePreviews.length === 0 ? (
+                                                        <TableRow>
+                                                            <TableCell colSpan={5} className="text-center py-8 text-slate-400">
+                                                                No active ANNUAL_LEAVE exceptions found for this project.
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ) : (
+                                                        <>
+                                                            {annualLeavePreviews.map((item) => (
+                                                                <TableRow key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                                                                    <TableCell className="font-medium text-slate-700">{item.name}</TableCell>
+                                                                    <TableCell className="text-slate-500 font-mono text-xs">{item.attendance_id}</TableCell>
+                                                                    <TableCell>{item.leaveDays} days</TableCell>
+                                                                    <TableCell className="text-right text-slate-600">
+                                                                        {item.dailyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    </TableCell>
+                                                                    <TableCell className="text-right font-bold text-indigo-600">
+                                                                        {item.leaveAmount.toLocaleString()} AED
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                            <TableRow className="bg-slate-50/80 font-bold border-t-2">
+                                                                <TableCell colSpan={4} className="text-right text-slate-700">Total Estimated Leave Salary:</TableCell>
+                                                                <TableCell className="text-right text-indigo-700 text-lg">
+                                                                    {totalLeavePreviewAmount.toLocaleString()} AED
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        </>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                        <div className="p-3 bg-indigo-50/50 text-[10px] text-indigo-700 italic border-t border-indigo-100 flex items-center gap-2">
+                                            <div className="w-1 h-1 bg-indigo-400 rounded-full"></div>
+                                            Preview only. Final amounts may differ based on salary snapshot calculations and other deductions.
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
