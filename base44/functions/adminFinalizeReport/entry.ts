@@ -42,28 +42,18 @@ Deno.serve(async (req) => {
             }
         }
 
-        // Mark the selected report as final
-        await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
-            is_final: true,
-            finalized_by: user.email,
-            finalized_date: new Date().toISOString()
-        });
-
-        // Update project's last_saved_report_id to track which report was finalized
-        await base44.asServiceRole.entities.Project.update(project_id, {
-            last_saved_report_id: report_run_id
-        });
+        const project = projects[0];
 
         // Create salary snapshots for Al Maraghi Motors ONLY
         // Uses a batch loop identical to the frontend finalizeReportMutation pattern.
         // This is required for projects with more than 10 employees to avoid
         // timeout errors that occur with a single non-batch invocation.
-        const project = projects[0];
         if (project.company === 'Al Maraghi Motors') {
             let batch_start = 0;
             const batch_size = 10;
             let has_more = true;
             let totalProcessed = 0;
+            let snapshotsSucceeded = true;
 
             while (has_more) {
                 try {
@@ -98,13 +88,32 @@ Deno.serve(async (req) => {
                 } catch (salaryError) {
                     console.error('[adminFinalizeReport] Salary snapshot batch failed:', salaryError.message);
                     console.error('[adminFinalizeReport] Salary snapshot batch error stack:', salaryError.stack);
-                    // Break the loop on error — don't block finalization
+                    snapshotsSucceeded = false;
                     break;
                 }
             }
 
+            if (!snapshotsSucceeded) {
+                return Response.json({
+                    error: 'Failed to create salary snapshots. Report was NOT finalized. Please try again.',
+                    report_run_id
+                }, { status: 500 });
+            }
+
             console.log(`[adminFinalizeReport] Salary snapshots completed for Al Maraghi Motors. Total employees processed: ${totalProcessed}`);
         }
+
+        // Mark the selected report as final
+        await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
+            is_final: true,
+            finalized_by: user.email,
+            finalized_date: new Date().toISOString()
+        });
+
+        // Update project's last_saved_report_id to track which report was finalized
+        await base44.asServiceRole.entities.Project.update(project_id, {
+            last_saved_report_id: report_run_id
+        });
 
         // Log audit (with error handling to not block finalization)
         try {
