@@ -243,14 +243,6 @@ export default function PreApprovalDialog({
                 allowed_minutes: availableMinutes
             });
 
-            // Second exception: MANUAL_OTHER_MINUTES — records the excess minutes
-            // which are deductible from the employee's attendance as "other minutes"
-            await base44.entities.Exception.create({
-                ...sharedFields,
-                type: 'MANUAL_OTHER_MINUTES',
-                allowed_minutes: excessMinutes
-            });
-
             // Update the half-yearly record to reflect that the full balance was consumed.
             // We add the full availableMinutes as used, bringing remaining to zero.
             if (availableMinutes > 0) {
@@ -390,11 +382,12 @@ export default function PreApprovalDialog({
                             <span className="text-amber-800 font-semibold text-base">Minutes Exceed Available Balance</span>
                         </div>
 
-                        {/* Warning body — intentionally no numbers shown to dept head */}
+                        {/* Warning body */}
                         <div className="bg-amber-50 border border-amber-200 rounded-lg px-5 py-5">
                             <p className="text-amber-900 text-sm leading-relaxed">
-                                some of the minutes you are approving exceed the available balance and will be
-                                considered as other minutes which are deductible from this employee's attendance.
+                                The entered minutes ({parseInt(formData.allowed_minutes)} min) exceeds the available balance ({halfYearlyMinutes?.remaining_minutes || 0} min).
+                                Only the available balance ({halfYearlyMinutes?.remaining_minutes || 0} min) will be applied.
+                                The excess ({parseInt(formData.allowed_minutes) - (halfYearlyMinutes?.remaining_minutes || 0)} min) will be ignored.
                             </p>
                         </div>
 
