@@ -218,8 +218,9 @@ export default function AnnualLeaveManagement() {
         );
         if (!empSalary) return null;
 
-        const start = new Date(leave.date_from);
-        const end = new Date(leave.date_to);
+        const parseDate = (s) => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+        const start = parseDate(leave.date_from);
+        const end = parseDate(leave.date_to);
         const basicSalary = Number(empSalary.basic_salary || 0);
         const allowances = Number(empSalary.allowances || 0);
         const salaryLeaveBase = basicSalary + allowances;
@@ -239,7 +240,7 @@ export default function AnnualLeaveManagement() {
             const overlapEnd = new Date(Math.min(end, monthEnd));
 
             if (overlapStart <= overlapEnd) {
-                const daysOfLeaveInThatMonth = Math.ceil((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1;
+                const daysOfLeaveInThatMonth = Math.round((overlapEnd - overlapStart) / (1000 * 60 * 60 * 24)) + 1;
                 const monthLeaveAmount = Math.round((salaryLeaveBase / daysInMonth) * daysOfLeaveInThatMonth);
 
                 breakdown.push({

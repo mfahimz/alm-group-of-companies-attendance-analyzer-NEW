@@ -178,8 +178,9 @@ export default function SalaryTab({ project }) {
                 
                 let salaryLeaveDays = ex.salary_leave_days;
                 if (!salaryLeaveDays || salaryLeaveDays <= 0) {
-                    const start = new Date(ex.date_from);
-                    const end = new Date(ex.date_to);
+                    const parseDate = (s) => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+                    const start = parseDate(ex.date_from);
+                    const end = parseDate(ex.date_to);
                     salaryLeaveDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
                 }
                 
