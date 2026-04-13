@@ -99,7 +99,7 @@ export const PAGES_CONFIG = {
     },
     SalaryIncrements: {
         name: 'SalaryIncrements',
-        title: 'Salary Increments',
+        title: 'Salary Modifications',
         icon: DollarSign,
         category: 'HRManagement',
         showInNav: true,
