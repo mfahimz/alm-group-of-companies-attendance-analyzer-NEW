@@ -63,10 +63,10 @@ export default function PreApprovalDialog({
     // Change 1: Calculate allowed date range based on approval type
     // AGMs approving for themselves get the full project period; others get +/- 5 days.
     const todayUAE = nowInUAE();
-    const minAllowedDate = isAGMSelfApproval && currentProject?.date_from
+    const minAllowedDate = currentProject?.date_from
         ? currentProject.date_from
         : formatDateForInput(subDays(todayUAE, 5));
-    const maxAllowedDate = isAGMSelfApproval && currentProject?.date_to
+    const maxAllowedDate = currentProject?.date_to
         ? currentProject.date_to
         : formatDateForInput(addDays(todayUAE, 5));
 
