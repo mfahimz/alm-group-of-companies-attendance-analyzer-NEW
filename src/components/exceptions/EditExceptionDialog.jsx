@@ -452,27 +452,51 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                         </div>
                     )}
 
-                    {needsSalaryLeaveDays && (
-                        <div className="border-t pt-4">
-                            <Label>Salary Leave Days (for salary calculation only) *</Label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                placeholder={project?.company === 'Al Maraghi Auto Repairs' ? "e.g. 9.00" : "e.g. 9"}
-                                value={formData.salary_leave_days}
-                                onChange={(e) => setFormData({ ...formData, salary_leave_days: e.target.value })}
-                                min="0"
-                            />
-                            <p className="text-xs text-green-600 mt-1">
-                                💡 Calculated: {calculateDaysBetween()} days between selected dates. Edit if partial days needed.
-                            </p>
-                            {project?.company === 'Al Maraghi Auto Repairs' && (
-                                <p className="text-xs text-amber-600 mt-1">
-                                    ⚠️ This value is used ONLY for salary calculation, not for attendance reports.
+                    {needsSalaryLeaveDays && (() => {
+                        const originalCalendarDays = calculateDaysBetween();
+                        const currentVal = parseFloat(formData.salary_leave_days || 0);
+                        const lopDays = originalCalendarDays - currentVal;
+                        
+                        return (
+                            <div className="border-t pt-4">
+                                <Label>Salary Leave Days (for salary calculation only) *</Label>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder={project?.company === 'Al Maraghi Auto Repairs' ? "e.g. 9.00" : "e.g. 9"}
+                                    value={formData.salary_leave_days}
+                                    onChange={(e) => {
+                                        const valStr = e.target.value;
+                                        if (valStr && parseFloat(valStr) > originalCalendarDays) {
+                                            setFormData({ ...formData, salary_leave_days: originalCalendarDays.toString() });
+                                        } else {
+                                            setFormData({ ...formData, salary_leave_days: valStr });
+                                        }
+                                    }}
+                                    min="0"
+                                    max={originalCalendarDays}
+                                />
+                                {currentVal > originalCalendarDays && (
+                                    <p className="text-xs text-red-500 mt-1">
+                                        Cannot exceed original leave duration of {originalCalendarDays} days.
+                                    </p>
+                                )}
+                                <p className="text-xs text-green-600 mt-1">
+                                    💡 Calculated: {originalCalendarDays} days between selected dates. Edit if partial days needed.
                                 </p>
-                            )}
-                        </div>
-                    )}
+                                {lopDays > 0 && formData.type === 'ANNUAL_LEAVE' && (
+                                    <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 p-2 rounded mt-2">
+                                        ⚠️ {lopDays.toFixed(1)} day(s) will become LOP (Loss of Pay)
+                                    </div>
+                                )}
+                                {project?.company === 'Al Maraghi Auto Repairs' && (
+                                    <p className="text-xs text-amber-600 mt-1">
+                                        ⚠️ This value is used ONLY for salary calculation, not for attendance reports.
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {needsSkipPunch && (
                         <div className="border-t pt-4">

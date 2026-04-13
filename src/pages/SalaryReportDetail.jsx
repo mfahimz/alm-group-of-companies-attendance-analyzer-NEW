@@ -252,7 +252,7 @@ export default function SalaryReportDetail() {
         const salaryLeaveDays = getValue(row, 'salary_leave_days') ?? row.salary_leave_days ?? row.salaryLeaveDays ?? 0;
         // Salary context rule: Annual Leave must follow exception-configured salary leave days.
         const annualLeaveCount = salaryLeaveDays;
-        const fullAbsenceCount = getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0;
+        const fullAbsenceCount = (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0);
         const leaveDays = annualLeaveCount + fullAbsenceCount;
         const deductibleHours = getValue(row, 'deductibleHours') ?? row.deductibleHours ?? 0;
         
@@ -353,7 +353,7 @@ export default function SalaryReportDetail() {
             // Salary context rule: keep annual_leave_count and leaveDays aligned to salary_leave_days + LOP.
             const currentAnnualLeaveDays = currentSalaryLeaveDays;
             updated.annual_leave_count = currentAnnualLeaveDays;
-            const currentLeaveDays = currentAnnualLeaveDays + (updated.full_absence_count || 0);
+            const currentLeaveDays = currentAnnualLeaveDays + (updated.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0);
             updated.leaveDays = currentLeaveDays;
             const currentDeductibleHours = updated.deductibleHours || 0;
             const basicSalary = updated.basic_salary || 0;
@@ -855,7 +855,7 @@ export default function SalaryReportDetail() {
                                                 <td className={`${cellBase} text-red-600 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
                                                         <Input type="number" step="0.01" value={getValue(row, 'full_absence_count')} onChange={(e) => handleChange(row.hrms_id, 'full_absence_count', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : row.full_absence_count || 0}
+                                                    ) : ((row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))}
                                                 </td>
                                                 <td className={`${cellBase} text-blue-600 border-r border-slate-200`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
@@ -908,8 +908,8 @@ export default function SalaryReportDetail() {
                                                 {/* Deductions */}
                                                 <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0))).toFixed(2)} readOnly className="h-6 text-xs w-12 px-1 bg-slate-100" />
-                                                    ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0))).toFixed(2)}
+                                                        <Input type="number" step="0.01" value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)} readOnly className="h-6 text-xs w-12 px-1 bg-slate-100" />
+                                                    ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}
                                                 </td>
                                                 <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
                                                     {adminEditMode && isAdmin ? (

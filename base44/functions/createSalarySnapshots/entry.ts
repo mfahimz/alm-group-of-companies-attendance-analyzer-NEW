@@ -1328,7 +1328,8 @@ Deno.serve(async (req) => {
                     approvedMinutes: analysisResult.approved_minutes || 0,
                     deductibleMinutes: analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0,
                     ramadanGiftMinutes: Math.max(0, analysisResult.ramadan_gift_minutes || 0),
-                    graceMinutes: analysisResult.grace_minutes ?? 15
+                    graceMinutes: analysisResult.grace_minutes ?? 15,
+                    lopAdjacentWeeklyOffCount: analysisResult.lop_adjacent_weekly_off_count || 0
                 };
                 attendanceSource = 'ANALYZED';
                 analyzedCount++;
@@ -1349,7 +1350,8 @@ Deno.serve(async (req) => {
                     approvedMinutes: 0,
                     deductibleMinutes: 0,
                     ramadanGiftMinutes: 0,
-                    graceMinutes: 0
+                    graceMinutes: 0,
+                    lopAdjacentWeeklyOffCount: 0
                 };
                 attendanceSource = 'NO_ATTENDANCE_DATA';
                 noAttendanceCount++;
@@ -1401,7 +1403,7 @@ Deno.serve(async (req) => {
                 attendance: {
                     workingDays: calculated.workingDays,
                     presentDays: calculated.presentDays,
-                    fullAbsenceCount: calculated.fullAbsenceCount,
+                    fullAbsenceCount: (calculated.fullAbsenceCount || 0) + (calculated.lopAdjacentWeeklyOffCount || 0),
                     halfAbsenceCount: calculated.halfAbsenceCount,
                     sickLeaveCount: calculated.sickLeaveCount,
                     annualLeaveCount: calculated.annualLeaveCount,
@@ -1412,7 +1414,8 @@ Deno.serve(async (req) => {
                     deductibleMinutes: (calculated.deductibleMinutes || 0),
                     ramadanGiftMinutes: (calculated.ramadanGiftMinutes || 0),
                     graceMinutes: (calculated.graceMinutes || 15),
-                    salaryLeaveDays: (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount)
+                    salaryLeaveDays: (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount),
+                    lopLeaveDays: Math.max(0, (calculated.annualLeaveCount || 0) - (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount))
                 },
                 adjustments: {
                     normalOtHours: (otRecord?.normalOtHours || 0),

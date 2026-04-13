@@ -35,6 +35,7 @@ export interface SalaryCalculationInput {
         ramadanGiftMinutes: number;
         graceMinutes: number;
         salaryLeaveDays: number;
+        lopLeaveDays: number;
     };
     adjustments: {
         normalOtHours: number;
@@ -86,6 +87,7 @@ export interface ComputedSalaryOutput {
     deductible_minutes: number;
     ramadan_gift_minutes: number;
     salary_leave_days: number;
+    lop_leave_days: number;
 
     // Computed monetary fields
     leaveDays: number;
@@ -246,7 +248,7 @@ export function calculateEmployeeSalary(input: SalaryCalculationInput): Computed
     const prevMonthTotalSalary = prevMonthSalary.total_salary || totalSalaryAmount;
 
     // Leave values
-    const leaveDays = (attendance.annualLeaveCount || 0) + (attendance.fullAbsenceCount || 0);
+    const leaveDays = (attendance.annualLeaveCount || 0) + (attendance.fullAbsenceCount || 0) + (attendance.lopLeaveDays || 0);
     const salaryLeaveDays = attendance.salaryLeaveDays || 0;
 
     // Leave Pay Formula
@@ -364,6 +366,7 @@ export function calculateEmployeeSalary(input: SalaryCalculationInput): Computed
         deductible_minutes: finalizedDeductibleMinutes,
         ramadan_gift_minutes: attendance.ramadanGiftMinutes,
         salary_leave_days: salaryLeaveDays,
+        lop_leave_days: attendance.lopLeaveDays || 0,
 
         leaveDays,
         leavePay,
