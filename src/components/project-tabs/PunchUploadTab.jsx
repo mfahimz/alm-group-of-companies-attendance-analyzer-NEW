@@ -572,10 +572,9 @@ export default function PunchUploadTab({ project }) {
                     rollbackFailed = true;
                 }
 
-                if (rollbackFailed) {
-                    toast.error(`Upload failed and rollback also failed. Please manually check for orphaned punch records with batch ID: ${importBatchId}. Contact support if needed.`, { duration: 10000 });
-                }
-
+                // Attach rollback status to the error so onError can report correctly
+                uploadError.rollbackFailed = rollbackFailed;
+                uploadError.importBatchId = importBatchId;
                 throw uploadError;
             }
         },
@@ -589,12 +588,17 @@ export default function PunchUploadTab({ project }) {
         },
         onError: (error) => {
             queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
-            const isRateLimit = error?.status === 429 || /rate.?limit|too many/i.test(error?.message || '');
-            const msg = isRateLimit 
-                ? 'Rate limit exceeded after retries. All uploaded records have been rolled back. Please wait a minute and try again.'
-                : 'Upload failed: ' + (error.message || 'Unknown error') + '. All uploaded records have been rolled back.';
-            toast.error(msg, { duration: 8000 });
             setUploadProgress(null);
+            
+            if (error.rollbackFailed) {
+                toast.error(`Upload failed and rollback also failed. Please manually check for orphaned punch records with batch ID: ${error.importBatchId}. Contact support if needed.`, { duration: 10000 });
+            } else {
+                const isRateLimit = error?.status === 429 || /rate.?limit|too many/i.test(error?.message || '');
+                const msg = isRateLimit 
+                    ? 'Rate limit exceeded after retries. All uploaded records have been rolled back. Please wait a minute and try again.'
+                    : 'Upload failed: ' + (error.message || 'Unknown error') + '. All uploaded records have been rolled back.';
+                toast.error(msg, { duration: 8000 });
+            }
         }
     });
 

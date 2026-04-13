@@ -446,6 +446,7 @@ export default function AstraImportTab({ project, employees }) {
         } catch (uploadError) {
             // --- Rollback: delete all records tagged with this batch ID -----------
             console.error('Upload failed, starting rollback:', uploadError);
+            let rollbackFailed = false;
 
             try {
                 const toRollback = await retryOnRateLimit(
@@ -469,6 +470,7 @@ export default function AstraImportTab({ project, employees }) {
                                 await base44.entities.Punch.delete(rec.id);
                             } catch (e) {
                                 console.error('Rollback delete failed for', rec.id, e);
+                                rollbackFailed = true;
                             }
                         }
                     }
@@ -478,14 +480,20 @@ export default function AstraImportTab({ project, employees }) {
                 }
             } catch (rollbackErr) {
                 console.error('Rollback query failed:', rollbackErr);
+                rollbackFailed = true;
             }
 
             setIsUploading(false);
             setUploadProgress({ current: 0, total: 0 });
-            toast.error(
-                'Upload failed. All uploaded records have been rolled back.',
-                { duration: 8000 }
-            );
+
+            if (rollbackFailed) {
+                toast.error(`Upload failed and rollback also failed. Please manually check for orphaned punch records with batch ID: ${importBatchId}. Contact support if needed.`, { duration: 10000 });
+            } else {
+                toast.error(
+                    'Upload failed. All uploaded records have been rolled back.',
+                    { duration: 8000 }
+                );
+            }
         }
     };
 
