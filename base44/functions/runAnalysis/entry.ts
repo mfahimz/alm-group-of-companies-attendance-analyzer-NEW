@@ -1465,7 +1465,44 @@ Deno.serve(async (req: Request) => {
                     // If adjacent day has no status (undefined/null = outside report range or unprocessed),
                     // do NOT assume it's LOP — that causes false double deductions.
                     const prevIsLOP = prevStatus === 'LOP';
-                    const nextIsLOP = nextStatus === 'LOP';
+                    let nextIsLOP = nextStatus === 'LOP';
+
+                    // END-OF-PROJECT BOUNDARY RESOLUTION
+                    // If project ends on Sunday (WO), and next Monday (outside) is LOP, 
+                    // we must resolve Monday status using available punches/exceptions.
+                    if (!nextIsLOP && nextStatus === undefined && nextDateStr === dayAfterEndStr) {
+                        const nextDateObj = new Date(nextDateStr);
+                        const dayOfWeek = nextDateObj.getUTCDay();
+
+                        let weeklyOffDay = null;
+                        if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                            weeklyOffDay = (dayNameToNumber as Record<string, number>)[project.weekly_off_override];
+                        } else if (employee?.weekly_off) {
+                            weeklyOffDay = (dayNameToNumber as Record<string, number>)[employee.weekly_off];
+                        }
+
+                        if (dayOfWeek !== weeklyOffDay) {
+                            const matchingEx = employeeExceptions.filter((ex: any) => {
+                                try {
+                                    const exFrom = new Date(ex.date_from);
+                                    const exTo = new Date(ex.date_to);
+                                    return nextDateObj >= exFrom && nextDateObj <= exTo;
+                                } catch { return false; }
+                            });
+
+                            const hasPH = matchingEx.some(ex => ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF');
+                            const hasLeave = matchingEx.some(ex => ex.type === 'SICK_LEAVE' || ex.type === 'ANNUAL_LEAVE' || ex.type === 'MANUAL_PRESENT');
+                            const hasManualAbsent = matchingEx.some(ex => ex.type === 'MANUAL_ABSENT');
+
+                            if (!hasPH) {
+                                if (hasManualAbsent) {
+                                    nextIsLOP = true;
+                                } else if (!hasLeave && nextDayPunches.length === 0) {
+                                    nextIsLOP = true;
+                                }
+                            }
+                        }
+                    }
 
                     if (!prevIsLOP && !nextIsLOP) {
                         return; // No adjacent LOP — skip this block entirely
