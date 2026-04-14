@@ -31,13 +31,6 @@ const PREDEFINED_TASKS = [
 ];
 
 const ADD_TASK_PREDEFINED_TYPES = PREDEFINED_TASKS.map(t => t.task_type);
-const AUTO_CREATED_PREDEFINED_TYPES = [
-    'LOP Days',
-    'Other Minutes',
-    'Double Deduction Days',
-    'Sick Leave',
-    'Rejoining Date'
-];
 
 
 const formatMergedWorksheet = (worksheet, data, XLSX) => {
@@ -128,18 +121,8 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
         deleteTaskMutation.mutate(task.id);
     };
 
-    // Build stats and merged ordered list for filter chips
-    const allPredefinedTypes = [...new Set([...ADD_TASK_PREDEFINED_TYPES, ...AUTO_CREATED_PREDEFINED_TYPES])];
-    
-    // Identify custom types from actual data that aren't in predefined list
-    const customTypesFromData = [...new Set(
-        checklistItems
-            .map(t => (t.task_type || 'Uncategorized').trim())
-            .filter(type => type && !allPredefinedTypes.includes(type))
-    )];
-
-    // Build one merged ordered type list: addTask -> autoCreated -> custom
-    const mergedOrderedTypes = [...allPredefinedTypes, ...customTypesFromData];
+    // Build stats and merged ordered list for filter chips (ONLY predefined Add Task types)
+    const mergedOrderedTypes = [...ADD_TASK_PREDEFINED_TYPES];
 
     const taskTypeStats = {};
     mergedOrderedTypes.forEach(type => {
@@ -148,11 +131,11 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
 
     checklistItems.forEach(task => {
         const type = (task.task_type || 'Uncategorized').trim();
-        // Fallback for types that might not have been caught (though logic above should handle all)
-        if (!taskTypeStats[type]) taskTypeStats[type] = { total: 0, completed: 0 };
-        
-        taskTypeStats[type].total++;
-        if (task.status === 'completed') taskTypeStats[type].completed++;
+        // Only count if it's one of the predefined types shown as chips
+        if (taskTypeStats[type]) {
+            taskTypeStats[type].total++;
+            if (task.status === 'completed') taskTypeStats[type].completed++;
+        }
     });
 
     // Use merged order for filter chips
@@ -249,7 +232,7 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
                                             isSelected ? 'bg-indigo-100 text-indigo-800' :
                                             isComplete ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
                                         }`}>
-                                            {stats.completed}/{stats.total}
+                                            {stats.total}
                                         </span>
                                     </button>
                                 );
