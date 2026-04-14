@@ -30,6 +30,16 @@ const PREDEFINED_TASKS = [
     { task_type: 'Exit', task_description: 'Process certificates and related documentation' }
 ];
 
+const ADD_TASK_PREDEFINED_TYPES = PREDEFINED_TASKS.map(t => t.task_type);
+const AUTO_CREATED_PREDEFINED_TYPES = [
+    'LOP Days',
+    'Other Minutes',
+    'Double Deduction Days',
+    'Sick Leave',
+    'Rejoining Date'
+];
+
+
 const formatMergedWorksheet = (worksheet, data, XLSX) => {
     if (!worksheet || !worksheet['!ref'] || !data || data.length === 0) return;
     const merges = [];
@@ -118,26 +128,40 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
         deleteTaskMutation.mutate(task.id);
     };
 
-    // Build stats only from actual items
+    // Build stats and merged ordered list for filter chips
+    const allPredefinedTypes = [...new Set([...ADD_TASK_PREDEFINED_TYPES, ...AUTO_CREATED_PREDEFINED_TYPES])];
+    
+    // Identify custom types from actual data that aren't in predefined list
+    const customTypesFromData = [...new Set(
+        checklistItems
+            .map(t => (t.task_type || 'Uncategorized').trim())
+            .filter(type => type && !allPredefinedTypes.includes(type))
+    )];
+
+    // Build one merged ordered type list: addTask -> autoCreated -> custom
+    const mergedOrderedTypes = [...allPredefinedTypes, ...customTypesFromData];
+
     const taskTypeStats = {};
+    mergedOrderedTypes.forEach(type => {
+        taskTypeStats[type] = { total: 0, completed: 0 };
+    });
+
     checklistItems.forEach(task => {
         const type = (task.task_type || 'Uncategorized').trim();
+        // Fallback for types that might not have been caught (though logic above should handle all)
         if (!taskTypeStats[type]) taskTypeStats[type] = { total: 0, completed: 0 };
+        
         taskTypeStats[type].total++;
         if (task.status === 'completed') taskTypeStats[type].completed++;
     });
 
-    // Sort: incomplete first (most items), then completed
-    const sortedTaskTypes = Object.entries(taskTypeStats).sort(([, a], [, b]) => {
-        const aComplete = a.total > 0 && a.completed === a.total;
-        const bComplete = b.total > 0 && b.completed === b.total;
-        if (aComplete !== bComplete) return aComplete ? 1 : -1;
-        return b.total - a.total;
-    });
+    // Use merged order for filter chips
+    const sortedTaskTypes = mergedOrderedTypes.map(type => [type, taskTypeStats[type]]);
 
     const displayedItems = selectedTaskType
         ? checklistItems.filter(t => (t.task_type || 'Uncategorized').trim() === selectedTaskType)
         : checklistItems;
+
 
     const allSelected = displayedItems.length > 0 && selectedIds.size === displayedItems.length;
     const someSelected = selectedIds.size > 0 && selectedIds.size < displayedItems.length;
