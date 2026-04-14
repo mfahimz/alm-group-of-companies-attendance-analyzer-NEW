@@ -57,8 +57,8 @@ const PREDEFINED_TASKS = [
         task_description: 'Update employee bank account details for payroll transfer'
     },
     {
-        task_type: 'Attendance',
-        task_description: 'Verify attendance data and resolve any anomalies'
+        task_type: 'Decrements',
+        task_description: 'Process salary decrements and update employee records'
     },
     {
         task_type: 'Leave Salary Sheets',
@@ -107,9 +107,9 @@ export default function ChecklistTab({ project }) {
                 is_predefined: true,
                 status: 'pending'
             }));
-            
+
             // Create all tasks
-            await Promise.all(tasksToCreate.map(task => 
+            await Promise.all(tasksToCreate.map(task =>
                 base44.entities.ChecklistItem.create(task)
             ));
         },
@@ -259,7 +259,7 @@ export default function ChecklistTab({ project }) {
         return b.total - a.total;
     });
 
-    const filteredChecklistItems = selectedTaskType 
+    const filteredChecklistItems = selectedTaskType
         ? checklistItems.filter(t => (t.task_type || 'Uncategorized').trim() === selectedTaskType)
         : checklistItems;
 
@@ -287,13 +287,12 @@ export default function ChecklistTab({ project }) {
                                         key={taskType}
                                         type="button"
                                         onClick={() => setSelectedTaskType(prev => prev === taskType ? null : taskType)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-150 cursor-pointer select-none ${
-                                            isSelected
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-150 cursor-pointer select-none ${isSelected
                                                 ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-400 bg-indigo-50 text-indigo-700'
                                                 : isComplete
                                                     ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100'
                                                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
-                                        }`}
+                                            }`}
                                     >
                                         {isComplete ? (
                                             <CheckCircle2 className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
@@ -330,7 +329,7 @@ export default function ChecklistTab({ project }) {
                             <span className="text-2xl font-bold text-indigo-600">{progressPercentage}%</span>
                         </div>
                         <div className="w-full bg-slate-200 rounded-full h-3">
-                            <div 
+                            <div
                                 className="bg-indigo-600 h-3 rounded-full transition-all duration-500"
                                 style={{ width: `${progressPercentage}%` }}
                             />
@@ -530,9 +529,9 @@ export default function ChecklistTab({ project }) {
                                 value={newTask.task_type}
                                 onValueChange={(value) => {
                                     if (value === '__custom__') {
-                                        setNewTask({...newTask, task_type: ''});
+                                        setNewTask({ ...newTask, task_type: '' });
                                     } else {
-                                        setNewTask({...newTask, task_type: value});
+                                        setNewTask({ ...newTask, task_type: value });
                                     }
                                 }}
                             >
@@ -552,7 +551,7 @@ export default function ChecklistTab({ project }) {
                                 <Input
                                     className="mt-2"
                                     value={newTask.task_type}
-                                    onChange={(e) => setNewTask({...newTask, task_type: e.target.value})}
+                                    onChange={(e) => setNewTask({ ...newTask, task_type: e.target.value })}
                                     placeholder="Enter custom task type..."
                                     autoFocus
                                 />
@@ -562,7 +561,7 @@ export default function ChecklistTab({ project }) {
                             <Label>Description *</Label>
                             <Textarea
                                 value={newTask.task_description}
-                                onChange={(e) => setNewTask({...newTask, task_description: e.target.value})}
+                                onChange={(e) => setNewTask({ ...newTask, task_description: e.target.value })}
                                 placeholder="Describe the task in detail..."
                                 rows={3}
                             />
@@ -571,7 +570,7 @@ export default function ChecklistTab({ project }) {
                             <Label>Notes (Optional)</Label>
                             <Textarea
                                 value={newTask.notes}
-                                onChange={(e) => setNewTask({...newTask, notes: e.target.value})}
+                                onChange={(e) => setNewTask({ ...newTask, notes: e.target.value })}
                                 placeholder="Additional notes..."
                                 rows={2}
                             />
@@ -604,14 +603,14 @@ export default function ChecklistTab({ project }) {
                                 <Label>Task Type</Label>
                                 <Input
                                     value={editingTask.task_type}
-                                    onChange={(e) => setEditingTask({...editingTask, task_type: e.target.value})}
+                                    onChange={(e) => setEditingTask({ ...editingTask, task_type: e.target.value })}
                                 />
                             </div>
                             <div>
                                 <Label>Description</Label>
                                 <Textarea
                                     value={editingTask.task_description}
-                                    onChange={(e) => setEditingTask({...editingTask, task_description: e.target.value})}
+                                    onChange={(e) => setEditingTask({ ...editingTask, task_description: e.target.value })}
                                     rows={3}
                                 />
                             </div>
@@ -620,14 +619,14 @@ export default function ChecklistTab({ project }) {
                                 <Input
                                     type="date"
                                     value={editingTask.due_date || ''}
-                                    onChange={(e) => setEditingTask({...editingTask, due_date: e.target.value})}
+                                    onChange={(e) => setEditingTask({ ...editingTask, due_date: e.target.value })}
                                 />
                             </div>
                             <div>
                                 <Label>Notes</Label>
                                 <Textarea
                                     value={editingTask.notes || ''}
-                                    onChange={(e) => setEditingTask({...editingTask, notes: e.target.value})}
+                                    onChange={(e) => setEditingTask({ ...editingTask, notes: e.target.value })}
                                     rows={2}
                                 />
                             </div>

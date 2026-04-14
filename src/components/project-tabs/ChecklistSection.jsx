@@ -25,7 +25,7 @@ const PREDEFINED_TASKS = [
     { task_type: 'Deductions', task_description: 'Verify all deductions (late, early, other) are correctly applied' },
     { task_type: 'New Joining', task_description: 'Generate and verify leave salary calculation sheets' },
     { task_type: 'Bank account changes', task_description: 'Update employee bank account details for payroll transfer' },
-    { task_type: 'Attendance', task_description: 'Verify attendance data and resolve any anomalies' },
+    { task_type: 'Decrement', task_description: 'Process salary decrements and update employee records' },
     { task_type: 'Leave Salary Sheets', task_description: 'Generate and verify leave salary calculation sheets' },
     { task_type: 'Exit', task_description: 'Process certificates and related documentation' }
 ];
@@ -219,19 +219,17 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
                                         key={taskType}
                                         type="button"
                                         onClick={() => setSelectedTaskType(prev => prev === taskType ? null : taskType)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-150 cursor-pointer select-none ${
-                                            isSelected
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-150 cursor-pointer select-none ${isSelected
                                                 ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-400 bg-indigo-50 text-indigo-700'
                                                 : isComplete
                                                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
                                                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
-                                        }`}
+                                            }`}
                                     >
                                         <span className="whitespace-nowrap">{taskType}</span>
-                                        <span className={`tabular-nums px-1.5 py-0.5 rounded-full text-[10px] ${
-                                            isSelected ? 'bg-indigo-100 text-indigo-800' :
-                                            isComplete ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
-                                        }`}>
+                                        <span className={`tabular-nums px-1.5 py-0.5 rounded-full text-[10px] ${isSelected ? 'bg-indigo-100 text-indigo-800' :
+                                                isComplete ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'
+                                            }`}>
                                             {stats.total}
                                         </span>
                                     </button>
@@ -322,7 +320,7 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
                         <div>
                             <Label>Task Type *</Label>
                             {!isCustomType ? (
-                                <Select value={newTask.task_type} onValueChange={(value) => { if (value === '__custom__') { setIsCustomType(true); setNewTask({...newTask, task_type: ''}); } else { setIsCustomType(false); setNewTask({...newTask, task_type: value}); } }}>
+                                <Select value={newTask.task_type} onValueChange={(value) => { if (value === '__custom__') { setIsCustomType(true); setNewTask({ ...newTask, task_type: '' }); } else { setIsCustomType(false); setNewTask({ ...newTask, task_type: value }); } }}>
                                     <SelectTrigger><SelectValue placeholder="Select task type..." /></SelectTrigger>
                                     <SelectContent>
                                         {PREDEFINED_TASKS.map(task => (<SelectItem key={task.task_type} value={task.task_type}>{task.task_type}</SelectItem>))}
@@ -331,18 +329,18 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
                                 </Select>
                             ) : (
                                 <div className="space-y-2">
-                                    <Input value={newTask.task_type} onChange={(e) => setNewTask({...newTask, task_type: e.target.value})} placeholder="Enter custom task type..." autoFocus />
-                                    <Button type="button" size="sm" variant="ghost" onClick={() => { setIsCustomType(false); setNewTask({...newTask, task_type: ''}); }} className="text-xs">← Back to predefined types</Button>
+                                    <Input value={newTask.task_type} onChange={(e) => setNewTask({ ...newTask, task_type: e.target.value })} placeholder="Enter custom task type..." autoFocus />
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => { setIsCustomType(false); setNewTask({ ...newTask, task_type: '' }); }} className="text-xs">← Back to predefined types</Button>
                                 </div>
                             )}
                         </div>
                         <div>
                             <Label>Description *</Label>
-                            <Textarea value={newTask.task_description} onChange={(e) => setNewTask({...newTask, task_description: e.target.value})} placeholder="Describe the task..." rows={3} />
+                            <Textarea value={newTask.task_description} onChange={(e) => setNewTask({ ...newTask, task_description: e.target.value })} placeholder="Describe the task..." rows={3} />
                         </div>
                         <div>
                             <Label>Notes (Optional)</Label>
-                            <Textarea value={newTask.notes} onChange={(e) => setNewTask({...newTask, notes: e.target.value})} placeholder="Additional notes..." rows={2} />
+                            <Textarea value={newTask.notes} onChange={(e) => setNewTask({ ...newTask, notes: e.target.value })} placeholder="Additional notes..." rows={2} />
                         </div>
                     </div>
                     <DialogFooter>
@@ -358,9 +356,9 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
                     <DialogHeader><DialogTitle>Edit Task</DialogTitle></DialogHeader>
                     {editingTask && (
                         <div className="space-y-4 py-4">
-                            <div><Label>Task Type</Label><Input value={editingTask.task_type} onChange={(e) => setEditingTask({...editingTask, task_type: e.target.value})} /></div>
-                            <div><Label>Description</Label><Textarea value={editingTask.task_description} onChange={(e) => setEditingTask({...editingTask, task_description: e.target.value})} rows={3} /></div>
-                            <div><Label>Notes</Label><Textarea value={editingTask.notes || ''} onChange={(e) => setEditingTask({...editingTask, notes: e.target.value})} rows={2} /></div>
+                            <div><Label>Task Type</Label><Input value={editingTask.task_type} onChange={(e) => setEditingTask({ ...editingTask, task_type: e.target.value })} /></div>
+                            <div><Label>Description</Label><Textarea value={editingTask.task_description} onChange={(e) => setEditingTask({ ...editingTask, task_description: e.target.value })} rows={3} /></div>
+                            <div><Label>Notes</Label><Textarea value={editingTask.notes || ''} onChange={(e) => setEditingTask({ ...editingTask, notes: e.target.value })} rows={2} /></div>
                         </div>
                     )}
                     <DialogFooter>
