@@ -14,12 +14,12 @@ export default function CalendarAdjustmentsTab() {
         from_payroll_month_label: '',
         to_payroll_month_label: '',
         employee_id: '',
-        carry_late_minutes: 0,
-        carry_early_minutes: 0,
-        carry_ot_minutes: 0,
-        carry_lop_days: 0,
-        carry_annual_leave_days: 0,
-        carry_other_leave_days: 0,
+        carry_late_minutes: '',
+        carry_early_minutes: '',
+        carry_ot_minutes: '',
+        carry_lop_days: '',
+        carry_annual_leave_days: '',
+        carry_other_leave_days: '',
         notes: ''
     });
 
@@ -54,12 +54,12 @@ export default function CalendarAdjustmentsTab() {
                 from_payroll_month_label: '',
                 to_payroll_month_label: '',
                 employee_id: '',
-                carry_late_minutes: 0,
-                carry_early_minutes: 0,
-                carry_ot_minutes: 0,
-                carry_lop_days: 0,
-                carry_annual_leave_days: 0,
-                carry_other_leave_days: 0,
+                carry_late_minutes: '',
+                carry_early_minutes: '',
+                carry_ot_minutes: '',
+                carry_lop_days: '',
+                carry_annual_leave_days: '',
+                carry_other_leave_days: '',
                 notes: ''
             });
         }
@@ -71,7 +71,16 @@ export default function CalendarAdjustmentsTab() {
             toast.error('Please fill required fields');
             return;
         }
-        saveMutation.mutate(formData);
+        const submitData = {
+            ...formData,
+            carry_late_minutes: formData.carry_late_minutes === '' ? 0 : Number(formData.carry_late_minutes),
+            carry_early_minutes: formData.carry_early_minutes === '' ? 0 : Number(formData.carry_early_minutes),
+            carry_ot_minutes: formData.carry_ot_minutes === '' ? 0 : Number(formData.carry_ot_minutes),
+            carry_lop_days: formData.carry_lop_days === '' ? 0 : Number(formData.carry_lop_days),
+            carry_annual_leave_days: formData.carry_annual_leave_days === '' ? 0 : Number(formData.carry_annual_leave_days),
+            carry_other_leave_days: formData.carry_other_leave_days === '' ? 0 : Number(formData.carry_other_leave_days)
+        };
+        saveMutation.mutate(submitData);
     };
 
     return (
@@ -126,7 +135,17 @@ export default function CalendarAdjustmentsTab() {
                             <Input
                                 type="number"
                                 value={formData.carry_late_minutes}
-                                onChange={(e) => setFormData({ ...formData, carry_late_minutes: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, carry_late_minutes: '' });
+                                    } else {
+                                        const value = parseFloat(raw);
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, carry_late_minutes: value });
+                                        }
+                                    }
+                                }}
                             />
                         </div>
                         <div>
@@ -134,7 +153,17 @@ export default function CalendarAdjustmentsTab() {
                             <Input
                                 type="number"
                                 value={formData.carry_early_minutes}
-                                onChange={(e) => setFormData({ ...formData, carry_early_minutes: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, carry_early_minutes: '' });
+                                    } else {
+                                        const value = parseFloat(raw);
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, carry_early_minutes: value });
+                                        }
+                                    }
+                                }}
                             />
                         </div>
                         <div>
@@ -142,7 +171,17 @@ export default function CalendarAdjustmentsTab() {
                             <Input
                                 type="number"
                                 value={formData.carry_ot_minutes}
-                                onChange={(e) => setFormData({ ...formData, carry_ot_minutes: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, carry_ot_minutes: '' });
+                                    } else {
+                                        const value = parseFloat(raw);
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, carry_ot_minutes: value });
+                                        }
+                                    }
+                                }}
                             />
                         </div>
                         <div>
@@ -151,7 +190,17 @@ export default function CalendarAdjustmentsTab() {
                                 type="number"
                                 step="0.5"
                                 value={formData.carry_lop_days}
-                                onChange={(e) => setFormData({ ...formData, carry_lop_days: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, carry_lop_days: '' });
+                                    } else {
+                                        const value = parseFloat(raw);
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, carry_lop_days: value });
+                                        }
+                                    }
+                                }}
                             />
                         </div>
                         <div>
@@ -160,7 +209,17 @@ export default function CalendarAdjustmentsTab() {
                                 type="number"
                                 step="0.5"
                                 value={formData.carry_annual_leave_days}
-                                onChange={(e) => setFormData({ ...formData, carry_annual_leave_days: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, carry_annual_leave_days: '' });
+                                    } else {
+                                        const value = parseFloat(raw);
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, carry_annual_leave_days: value });
+                                        }
+                                    }
+                                }}
                             />
                         </div>
                         <div>
@@ -169,7 +228,17 @@ export default function CalendarAdjustmentsTab() {
                                 type="number"
                                 step="0.5"
                                 value={formData.carry_other_leave_days}
-                                onChange={(e) => setFormData({ ...formData, carry_other_leave_days: parseFloat(e.target.value) || 0 })}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, carry_other_leave_days: '' });
+                                    } else {
+                                        const value = parseFloat(raw);
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, carry_other_leave_days: value });
+                                        }
+                                    }
+                                }}
                             />
                         </div>
                     </div>

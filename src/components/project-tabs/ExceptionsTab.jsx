@@ -406,9 +406,9 @@ export default function ExceptionsTab({ project }) {
                         new_am_end: row.new_am_end || row.am_end || '',
                         new_pm_start: row.new_pm_start || row.pm_start || '',
                         new_pm_end: row.new_pm_end || row.pm_end || '',
-                        early_checkout_minutes: row.early_checkout_minutes ? Math.abs(parseInt(row.early_checkout_minutes)) : null,
-                        other_minutes: row.other_minutes ? Math.abs(parseInt(row.other_minutes)) : null,
-                        allowed_minutes: row.allowed_minutes ? Math.abs(parseInt(row.allowed_minutes)) : null
+                        early_checkout_minutes: (row.early_checkout_minutes !== '' && row.early_checkout_minutes != null) ? Math.abs(parseInt(row.early_checkout_minutes)) : null,
+                        other_minutes: (row.other_minutes !== '' && row.other_minutes != null) ? Math.abs(parseInt(row.other_minutes)) : null,
+                        allowed_minutes: (row.allowed_minutes !== '' && row.allowed_minutes != null) ? Math.abs(parseInt(row.allowed_minutes)) : null
                     });
                 });
 
@@ -687,7 +687,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                 details: parsed.details || nlpText,
                 include_friday: false,
                 other_minutes: '',
-                allowed_minutes: parsed.allowed_minutes || '',
+                allowed_minutes: parsed.allowed_minutes ?? '',
                 allowed_minutes_type: parsed.allowed_minutes_type || 'both',
                 punch_to_skip: 'AM_PUNCH_IN',
                 half_day_target: 'AM',
@@ -751,16 +751,22 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         }
 
         // Added other_minutes to cleanedData
-        if (submitData.other_minutes && !isNaN(parseInt(submitData.other_minutes))) {
-            cleanedData.other_minutes = Math.abs(parseInt(submitData.other_minutes));
+        if (submitData.other_minutes !== '' && submitData.other_minutes != null) {
+            const val = parseInt(submitData.other_minutes);
+            if (!isNaN(val)) {
+                cleanedData.other_minutes = Math.abs(val);
+            }
         } else {
             cleanedData.other_minutes = null;
         }
 
         // Add allowed_minutes and allowed_minutes_type
-        if (submitData.type === 'ALLOWED_MINUTES' && submitData.allowed_minutes) {
-            cleanedData.allowed_minutes = Math.abs(parseInt(submitData.allowed_minutes));
-            cleanedData.allowed_minutes_type = submitData.allowed_minutes_type || 'both';
+        if (submitData.type === 'ALLOWED_MINUTES' && (submitData.allowed_minutes !== '' && submitData.allowed_minutes != null)) {
+            const val = parseInt(submitData.allowed_minutes);
+            if (!isNaN(val)) {
+                cleanedData.allowed_minutes = Math.abs(val);
+                cleanedData.allowed_minutes_type = submitData.allowed_minutes_type || 'both';
+            }
         }
 
         // Add skip punch configuration
@@ -775,7 +781,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
         }
 
         // Add punch-specific target for allowed minutes
-        if (submitData.type === 'ALLOWED_MINUTES' && submitData.allowed_minutes) {
+        if (submitData.type === 'ALLOWED_MINUTES' && (submitData.allowed_minutes !== '' && submitData.allowed_minutes != null)) {
             cleanedData.target_punch = submitData.target_punch || null;
         }
 
@@ -1392,8 +1398,15 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                 placeholder="e.g. 60"
                                                 value={formData.allowed_minutes}
                                                 onChange={(e) => {
-                                                    const value = Math.abs(parseInt(e.target.value) || 0);
-                                                    setFormData({ ...formData, allowed_minutes: value || '' });
+                                                    const raw = e.target.value;
+                                                    if (raw === '') {
+                                                        setFormData({ ...formData, allowed_minutes: '' });
+                                                    } else {
+                                                        const value = Math.abs(parseInt(raw));
+                                                        if (!Number.isNaN(value)) {
+                                                            setFormData({ ...formData, allowed_minutes: value });
+                                                        }
+                                                    }
                                                 }}
                                                 min="1"
                                             />

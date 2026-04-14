@@ -82,8 +82,8 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                 new_am_end: exception.new_am_end || '',
                 new_pm_start: exception.new_pm_start || '',
                 new_pm_end: exception.new_pm_end || '',
-                early_checkout_minutes: exception.early_checkout_minutes || '',
-                allowed_minutes: exception.allowed_minutes || '',
+                early_checkout_minutes: exception.early_checkout_minutes ?? '',
+                allowed_minutes: exception.allowed_minutes ?? '',
                 allowed_minutes_type: exception.allowed_minutes_type || 'both',
                 include_friday: exception.include_friday || false,
                 salary_leave_days: calculatedDays,
@@ -138,16 +138,19 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
             cleanedData.include_friday = formData.include_friday || false;
         }
 
-        if (formData.type === 'ALLOWED_MINUTES' && formData.allowed_minutes) {
-            cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
-            cleanedData.allowed_minutes_type = formData.allowed_minutes_type || 'both';
+        if (formData.type === 'ALLOWED_MINUTES' && (formData.allowed_minutes !== '' && formData.allowed_minutes != null)) {
+            const val = parseInt(formData.allowed_minutes);
+            if (!isNaN(val)) {
+                cleanedData.allowed_minutes = val;
+                cleanedData.allowed_minutes_type = formData.allowed_minutes_type || 'both';
+            }
         }
 
-        // MANUAL_OTHER_MINUTES: save the entered minutes into allowed_minutes.
-        // The analysis engine reads allowed_minutes for this type and adds it
-        // directly to other_minutes for the day — no late/early impact.
-        if (formData.type === 'MANUAL_OTHER_MINUTES' && formData.allowed_minutes) {
-            cleanedData.allowed_minutes = parseInt(formData.allowed_minutes);
+        if (formData.type === 'MANUAL_OTHER_MINUTES' && (formData.allowed_minutes !== '' && formData.allowed_minutes != null)) {
+            const val = parseInt(formData.allowed_minutes);
+            if (!isNaN(val)) {
+                cleanedData.allowed_minutes = val;
+            }
         }
 
         if (formData.type === 'ANNUAL_LEAVE' && formData.salary_leave_days !== '' && formData.salary_leave_days !== null && formData.salary_leave_days !== undefined) {
@@ -367,8 +370,15 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 placeholder="e.g. 30"
                                 value={formData.early_checkout_minutes}
                                 onChange={(e) => {
-                                    const value = Math.abs(parseInt(e.target.value) || 0);
-                                    setFormData({ ...formData, early_checkout_minutes: value || '' });
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, early_checkout_minutes: '' });
+                                    } else {
+                                        const value = Math.abs(parseInt(raw));
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, early_checkout_minutes: value });
+                                        }
+                                    }
                                 }}
                                 min="1"
                             />
@@ -388,8 +398,15 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                 placeholder="e.g. 30"
                                 value={formData.allowed_minutes}
                                 onChange={(e) => {
-                                    const value = Math.abs(parseInt(e.target.value) || 0);
-                                    setFormData({ ...formData, allowed_minutes: value || '' });
+                                    const raw = e.target.value;
+                                    if (raw === '') {
+                                        setFormData({ ...formData, allowed_minutes: '' });
+                                    } else {
+                                        const value = Math.abs(parseInt(raw));
+                                        if (!Number.isNaN(value)) {
+                                            setFormData({ ...formData, allowed_minutes: value });
+                                        }
+                                    }
                                 }}
                                 min="1"
                             />
@@ -409,8 +426,15 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
                                         placeholder="e.g. 60"
                                         value={formData.allowed_minutes}
                                         onChange={(e) => {
-                                            const value = Math.abs(parseInt(e.target.value) || 0);
-                                            setFormData({ ...formData, allowed_minutes: value || '' });
+                                            const raw = e.target.value;
+                                            if (raw === '') {
+                                                setFormData({ ...formData, allowed_minutes: '' });
+                                            } else {
+                                                const value = Math.abs(parseInt(raw));
+                                                if (!Number.isNaN(value)) {
+                                                    setFormData({ ...formData, allowed_minutes: value });
+                                                }
+                                            }
                                         }}
                                         min="1"
                                         disabled={(exception?.type === 'ALLOWED_MINUTES' || formData.type === 'ALLOWED_MINUTES') && !canEditAllowedMinutes}

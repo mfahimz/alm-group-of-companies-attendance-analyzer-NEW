@@ -15,9 +15,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const [formData, setFormData] = useState({
         type: 'MANUAL_PRESENT',
         details: '',
-        lateMinutes: 0,
-        earlyCheckoutMinutes: 0,
-        otherMinutes: 0,
+        lateMinutes: '',
+        earlyCheckoutMinutes: '',
+        otherMinutes: '',
         isAbnormal: false,
         shiftOverride: {
             enabled: false,
@@ -346,9 +346,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 setFormData({
                     type: existingOverride.type || 'MANUAL_PRESENT',
                     details: existingOverride.details || '',
-                    lateMinutes: existingOverride.lateMinutes || 0,
-                    earlyCheckoutMinutes: existingOverride.earlyCheckoutMinutes || 0,
-                    otherMinutes: existingOverride.otherMinutes || 0,
+                    lateMinutes: existingOverride.lateMinutes ?? '',
+                    earlyCheckoutMinutes: existingOverride.earlyCheckoutMinutes ?? '',
+                    otherMinutes: existingOverride.otherMinutes ?? '',
                     isAbnormal: existingOverride.isAbnormal || false,
                     shiftOverride: {
                         enabled: !!existingOverride.shiftOverride,
@@ -376,11 +376,11 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 let earlyCheckoutMinutes = 0;
                 let otherMinutes = 0;
 
-                if (dateException && (dateException.late_minutes > 0 || dateException.early_checkout_minutes > 0 || dateException.other_minutes > 0)) {
+                if (dateException && (dateException.late_minutes != null || dateException.early_checkout_minutes != null || dateException.other_minutes != null)) {
                     // Use exception values directly
-                    lateMinutes = dateException.late_minutes || 0;
-                    earlyCheckoutMinutes = dateException.early_checkout_minutes || 0;
-                    otherMinutes = dateException.other_minutes || 0;
+                    lateMinutes = dateException.late_minutes ?? '';
+                    earlyCheckoutMinutes = dateException.early_checkout_minutes ?? '';
+                    otherMinutes = dateException.other_minutes ?? '';
                 } else {
                     // Parse from display values
                     if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {
@@ -420,9 +420,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 setFormData({
                     type: statusType,
                     details: '',
-                    lateMinutes: lateMinutes,
-                    earlyCheckoutMinutes: earlyCheckoutMinutes,
-                    otherMinutes: otherMinutes,
+                    lateMinutes: lateMinutes ?? '',
+                    earlyCheckoutMinutes: earlyCheckoutMinutes ?? '',
+                    otherMinutes: otherMinutes ?? '',
                     isAbnormal: dayRecord.abnormal || false,
                     shiftOverride: {
                         enabled: false,
@@ -531,13 +531,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             overrides[dateStr] = {
                 type: data.type,
                 details: data.details || '',
-                lateMinutes: Number(data.lateMinutes) || 0,
-                earlyCheckoutMinutes: Number(data.earlyCheckoutMinutes) || 0,
-                otherMinutes: Number(data.otherMinutes) || 0,
+                lateMinutes: (data.lateMinutes === '' || data.lateMinutes == null) ? null : Number(data.lateMinutes),
+                earlyCheckoutMinutes: (data.earlyCheckoutMinutes === '' || data.earlyCheckoutMinutes == null) ? null : Number(data.earlyCheckoutMinutes),
+                otherMinutes: (data.otherMinutes === '' || data.otherMinutes == null) ? null : Number(data.otherMinutes),
                 isAbnormal: Boolean(data.isAbnormal),
-                originalLateMinutes: existingOverride?.originalLateMinutes ?? (Number(data.originalLateMinutes) || 0),
-                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? (Number(data.originalEarlyCheckout) || 0),
-                originalOtherMinutes: existingOverride?.originalOtherMinutes ?? (Number(data.originalOtherMinutes) || 0),
+                originalLateMinutes: existingOverride?.originalLateMinutes ?? ((data.originalLateMinutes === '' || data.originalLateMinutes == null) ? null : Number(data.originalLateMinutes)),
+                originalEarlyCheckout: existingOverride?.originalEarlyCheckout ?? ((data.originalEarlyCheckout === '' || data.originalEarlyCheckout == null) ? null : Number(data.originalEarlyCheckout)),
+                originalOtherMinutes: existingOverride?.originalOtherMinutes ?? ((data.originalOtherMinutes === '' || data.originalOtherMinutes == null) ? null : Number(data.originalOtherMinutes)),
                 shiftOverride: data.shiftOverride?.enabled ? {
                     am_start: data.shiftOverride.am_start || '',
                     am_end: data.shiftOverride.am_end || '',
@@ -631,7 +631,7 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             if (data.earlyCheckoutMinutes !== data.originalEarlyCheckout) {
                 changes.push(`Early Checkout: ${data.originalEarlyCheckout || 0} → ${data.earlyCheckoutMinutes}`);
             }
-            if (data.otherMinutes > 0) {
+            if (data.otherMinutes !== '' && data.otherMinutes != null && Number(data.otherMinutes) > 0) {
                 changes.push(`Other Minutes: ${data.otherMinutes}`);
             }
             if (data.shiftOverride?.enabled) {
@@ -973,7 +973,17 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             type="number"
                             min="0"
                             value={formData.lateMinutes}
-                            onChange={(e) => setFormData({ ...formData, lateMinutes: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === '') {
+                                    setFormData({ ...formData, lateMinutes: '' });
+                                } else {
+                                    const value = Math.max(0, parseInt(raw));
+                                    if (!Number.isNaN(value)) {
+                                        setFormData({ ...formData, lateMinutes: value });
+                                    }
+                                }
+                            }}
                             placeholder="0"
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -989,7 +999,17 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             type="number"
                             min="0"
                             value={formData.earlyCheckoutMinutes}
-                            onChange={(e) => setFormData({ ...formData, earlyCheckoutMinutes: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === '') {
+                                    setFormData({ ...formData, earlyCheckoutMinutes: '' });
+                                } else {
+                                    const value = Math.max(0, parseInt(raw));
+                                    if (!Number.isNaN(value)) {
+                                        setFormData({ ...formData, earlyCheckoutMinutes: value });
+                                    }
+                                }
+                            }}
                             placeholder="0"
                         />
                         <p className="text-xs text-slate-500 mt-1">
@@ -1005,7 +1025,17 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                             type="number"
                             min="0"
                             value={formData.otherMinutes}
-                            onChange={(e) => setFormData({ ...formData, otherMinutes: parseInt(e.target.value) || 0 })}
+                            onChange={(e) => {
+                                const raw = e.target.value;
+                                if (raw === '') {
+                                    setFormData({ ...formData, otherMinutes: '' });
+                                } else {
+                                    const value = Math.max(0, parseInt(raw));
+                                    if (!Number.isNaN(value)) {
+                                        setFormData({ ...formData, otherMinutes: value });
+                                    }
+                                }
+                            }}
                             placeholder="0"
                         />
                         <p className="text-xs text-slate-500 mt-1">
