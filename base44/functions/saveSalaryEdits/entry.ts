@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
 
         // SECURITY: Admin, CEO, or HR Manager can save salary edits
         const userRole = user?.extended_role || user?.role || 'user';
-        if (userRole !== 'admin' && userRole !== 'ceo' && userRole !== 'hr_manager') {
+        if (userRole !== 'admin' && userRole !== 'ceo' && userRole !== 'hr_manager' && userRole !== 'senior_accountant') {
             return Response.json({ error: 'Access denied: Admin, CEO, or HR Manager role required' }, { status: 403 });
         }
 

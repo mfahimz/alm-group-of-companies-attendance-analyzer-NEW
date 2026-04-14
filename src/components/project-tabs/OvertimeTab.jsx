@@ -188,7 +188,8 @@ export default function OvertimeTab({ project }) {
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
+    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo' || userRole === 'hr_manager' || userRole === 'senior_accountant';
+    const isActuallySeniorAccountant = userRole === 'senior_accountant';
 
     // Fetch companies to scope special behavior by stable company_id
     const { data: companies = [], isLoading: loadingCompanies } = useQuery({

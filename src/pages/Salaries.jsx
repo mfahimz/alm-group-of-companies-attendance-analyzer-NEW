@@ -59,7 +59,8 @@ export default function Salaries() {
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
     const isHRManager = userRole === 'hr_manager';
-    const canAccessAllCompanies = isAdmin || isSupervisor || isCEO || isHRManager;
+    const isSeniorAccountant = userRole === 'senior_accountant';
+    const canAccessAllCompanies = isAdmin || isSupervisor || isCEO || isHRManager || isSeniorAccountant;
 
     const { data: salaries = [] } = useQuery({
         queryKey: ['salaries', companyFilter],

@@ -61,8 +61,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isUser = userRole === 'user'; const isAdmin = userRole === 'admin'; const isSupervisor = userRole === 'supervisor';
-    const isCEO = userRole === 'ceo'; const isHRManager = userRole === 'hr_manager'; const canEditGiftMinutes = isAdmin || isCEO || isHRManager;
+    const isUser = userRole === 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const isCEO = userRole === 'ceo';
+    const isHRManager = userRole === 'hr_manager';
+    const isSeniorAccountant = userRole === 'senior_accountant';
+    const canModifyAttendance = (isAdmin || isSupervisor || isCEO || isHRManager) && !isSeniorAccountant;
+    const canEditGiftMinutes = (isAdmin || isCEO || isHRManager) && !isSeniorAccountant;
     const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
 
     // LAZY LOADING: Raw data (punches/shifts/exceptions) only loaded on-demand
@@ -1922,7 +1928,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </Button>
                             {project.status !== 'closed' && (
                                 <>
-                                    {!reportRun.is_final && (
+                                    {!reportRun.is_final && canModifyAttendance && (
                                         <Button
                                             onClick={handleReanalyze}
                                             disabled={isReanalyzing || reportRun.is_final}
@@ -1942,15 +1948,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             )}
                                         </Button>
                                     )}
-                                    <Button
-                                        onClick={() => { loadRawData(); setShowSaveConfirmation(true); }}
-                                        disabled={isSaving || (rawDataRequested && !allRawDataLoaded)}
-                                        className="bg-green-600 hover:bg-green-700"
-                                    >
-                                        <Save className="w-4 h-4 mr-2" />
-                                        {isSaving ? 'Saving...' : 'Save Report'}
-                                    </Button>
-                                    {(isAdmin || isSupervisor || isHRManager || project.company === 'Al Maraghi Auto Repairs') && !reportRun.is_final && (
+                                    {canModifyAttendance && (
+                                        <Button
+                                            onClick={() => { loadRawData(); setShowSaveConfirmation(true); }}
+                                            disabled={isSaving || (rawDataRequested && !allRawDataLoaded)}
+                                            className="bg-green-600 hover:bg-green-700"
+                                        >
+                                            <Save className="w-4 h-4 mr-2" />
+                                            {isSaving ? 'Saving...' : 'Save Report'}
+                                        </Button>
+                                    )}
+                                    {canModifyAttendance && !reportRun.is_final && (
                                         <Button
                                             onClick={() => finalizeReportMutation.mutate()}
                                             disabled={finalizeReportMutation.isPending}
@@ -1970,7 +1978,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             )}
                                         </Button>
                                     )}
-                                    {(isAdmin || isSupervisor || isHRManager) && reportRun.is_final && (
+                                    {canModifyAttendance && reportRun.is_final && (
                                         <Button
                                             onClick={() => unfinalizeReportMutation.mutate()}
                                             disabled={unfinalizeReportMutation.isPending}
@@ -2019,14 +2027,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 <SelectItem value="unverified">Unverified Only</SelectItem>
                             </SelectContent>
                         </Select>
-                        <Button
-                            onClick={verifyAllClean}
-                            variant="outline"
-                            size="sm"
-                        >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Verify All Clean
-                        </Button>
+                        {canModifyAttendance && (
+                            <Button
+                                onClick={verifyAllClean}
+                                variant="outline"
+                                size="sm"
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Verify All Clean
+                            </Button>
+                        )}
                         {isAdmin && (
                             <Button
                                 onClick={() => {

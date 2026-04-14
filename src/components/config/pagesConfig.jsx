@@ -41,7 +41,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager'],
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager', 'senior_accountant'],
         isDefaultLandingPage: true,
         smartRoute: true  // Routes to Dashboard or DepartmentHeadDashboard based on role
     },
@@ -53,7 +53,7 @@ export const PAGES_CONFIG = {
         showInNav: false,  // Hidden - accessible via Home button
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'hr_manager', 'senior_accountant']
     },
     // Leadership Dashboards (Hidden - accessed via Home smart routing)
     DepartmentHeadDashboard: {
@@ -75,7 +75,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager', 'senior_accountant']
     },
     Employees: {
         name: 'Employees',
@@ -85,7 +85,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager', 'senior_accountant']
     },
     Salaries: {
         name: 'Salaries',
@@ -95,7 +95,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager', 'senior_accountant']
     },
     SalaryIncrements: {
         name: 'SalaryIncrements',
@@ -105,7 +105,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager', 'senior_accountant']
     },
     HalfYearlyMinutesManagement: {
         name: 'HalfYearlyMinutesManagement',
@@ -145,7 +145,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'ceo', 'hr_manager', 'senior_accountant']
     },
     CompanyManagement: {
         name: 'CompanyManagement',
@@ -250,7 +250,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager', 'senior_accountant']
     },
 
     // Hidden Pages (No navigation)
@@ -262,7 +262,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager', 'senior_accountant']
     },
     ReportDetail: {
         name: 'ReportDetail',
@@ -272,7 +272,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager', 'senior_accountant']
     },
     EmployeeProfile: {
         name: 'EmployeeProfile',
@@ -282,7 +282,7 @@ export const PAGES_CONFIG = {
         showInNav: false,
         requiresAuth: true,
         availableToAll: true,
-        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager']
+        defaultRoles: ['admin', 'supervisor', 'user', 'ceo', 'department_head', 'assistant_gm', 'hr_manager', 'senior_accountant']
     },
     Maintenance: {
         name: 'Maintenance',

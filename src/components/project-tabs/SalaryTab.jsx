@@ -139,7 +139,7 @@ export default function SalaryTab({ project }) {
     // DERIVED VALUES
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo' || userRole === 'hr_manager';
+    const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo' || userRole === 'hr_manager' || userRole === 'senior_accountant';
     // Allow access to Salary tab for Al Maraghi Motors projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryTab = isAdminOrCEO || isAlMaraghi;

@@ -52,9 +52,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
     const isHRManager = userRole === 'hr_manager';
+    const isSeniorAccountant = userRole === 'senior_accountant';
     const isUser = userRole === 'user';
-    const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager;
-    const canDeleteReports = isAdmin || isSupervisor || isUser || isCEO || isHRManager;
+    const canModifyAttendance = (isAdmin || isSupervisor || isCEO || isHRManager) && !isSeniorAccountant;
+    const canDeleteReports = (isAdmin || isSupervisor || isUser || isCEO || isHRManager) && !isSeniorAccountant;
 
     console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
 
@@ -556,7 +557,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     return (
         <div className="space-y-6">
             {/* Run Analysis Section - Always at top */}
-            {!isDepartmentHead && (
+            {!isDepartmentHead && !isSeniorAccountant && (
                 <Card className="border-0 shadow-md bg-white ring-1 ring-slate-950/5">
                     <CardHeader>
                         <CardTitle>Run Attendance Analysis</CardTitle>
@@ -958,7 +959,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                 <TableCell className="font-medium">
                                                     <div className="flex items-center gap-2">
                                                         {run.report_name || 'Unnamed Report'}
-                                                        {!isDepartmentHead && (
+                                                        {!isDepartmentHead && canModifyAttendance && (
                                                             <Button 
                                                                 variant="ghost" 
                                                                 size="sm" 

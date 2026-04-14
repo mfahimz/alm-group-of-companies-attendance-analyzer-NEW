@@ -109,12 +109,14 @@ export default function SalaryReportDetail() {
     // DERIVED VALUES
     // ============================================
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdmin = userRole === 'admin';
+    const isAdmin = userRole === 'admin' || userRole === 'senior_accountant';
+    const isActuallyAdmin = userRole === 'admin';
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
-    const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager'].includes(userRole);
+    const isSeniorAccountant = userRole === 'senior_accountant';
+    const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager', 'senior_accountant'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
-    const canAccessSalaryReport = isAdminOrCEO || isAlMaraghi;
+    const canAccessSalaryReport = isAdminOrCEO || isSeniorAccountant || isAlMaraghi;
     const calculateWpsSplit = (totalAmount, isCapEnabled, capAmount) => {
         if (totalAmount <= 0) {
             return { wpsPay: 0, balance: 0, wpsCapApplied: false };
@@ -136,6 +138,7 @@ export default function SalaryReportDetail() {
     // Can recalculate: Al Maraghi only, report finalized, project not closed, user has permission
     const canRecalculate = isAlMaraghi && 
                            isAdminOrSupervisorOrHR && 
+                           !isSeniorAccountant &&
                            project?.status !== 'closed' &&
                            liveSalarySnapshots.length > 0; // Snapshots exist = report is finalized
 
@@ -596,7 +599,7 @@ export default function SalaryReportDetail() {
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
                     <FileSpreadsheet className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-600">Access restricted to Admin and CEO only</p>
+                    <p className="text-slate-600">Access restricted to authorized payroll personnel only</p>
                 </CardContent>
             </Card>
         );
