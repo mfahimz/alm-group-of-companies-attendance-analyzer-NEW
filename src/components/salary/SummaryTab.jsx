@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Save, Calculator, Landmark, ReceiptText, Wallet } from 'lucide-react';
+import { Save, Calculator, Landmark, ReceiptText, Wallet, Loader2 } from 'lucide-react';
 
 /**
  * SummaryTab.jsx
@@ -395,7 +395,7 @@ export default function SummaryTab({ salaryData = [], report = {}, project = {},
                             onClick={handleSave}
                         >
                             {isSaving ? (
-                                < लैंडमार्क className="w-5 h-5 mr-3 animate-spin" />
+                                <Loader2 className="w-5 h-5 mr-3 animate-spin" />
                             ) : (
                                 <Save className="w-5 h-5 mr-3" />
                             )}
