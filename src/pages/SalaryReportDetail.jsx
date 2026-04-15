@@ -25,6 +25,10 @@ import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OnHoldTab from '../components/salary/OnHoldTab';
+import SummaryTab from '../components/salary/SummaryTab';
+import BranchPayrollTab from '../components/salary/BranchPayrollTab';
+import BodyShopPayrollTab from '../components/salary/BodyShopPayrollTab';
+import CashSalaryTab from '../components/salary/CashSalaryTab';
 
 
 export default function SalaryReportDetail() {
@@ -46,6 +50,19 @@ export default function SalaryReportDetail() {
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [adminEditMode, setAdminEditMode] = useState(false);
     const [activeTab, setActiveTab] = useState('salary');
+
+    // Saves finance team manual entries for the summary reconciliation section
+    // Persists to SalaryReport.summary_manual_fields via Base44 entity update
+    const handleSaveManualFields = async (fields) => {
+        try {
+            await base44.entities.SalaryReport.update(report.id, {
+                summary_manual_fields: JSON.stringify(fields)
+            });
+            toast.success("Summary fields saved");
+        } catch (err) {
+            toast.error("Failed to save summary fields");
+        }
+    };
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -736,6 +753,10 @@ export default function SalaryReportDetail() {
                                     <TabsTrigger value="onhold" className="px-6 flex gap-2">
                                         On Hold
                                     </TabsTrigger>
+                                    <TabsTrigger value="summary" className="px-6">Summary</TabsTrigger>
+                                    <TabsTrigger value="branch" className="px-6">Branch</TabsTrigger>
+                                    <TabsTrigger value="bodyshop" className="px-6">Body Shop</TabsTrigger>
+                                    <TabsTrigger value="cashsalary" className="px-6">Cash Salary</TabsTrigger>
                                 </TabsList>
                             </div>
 
@@ -988,6 +1009,31 @@ export default function SalaryReportDetail() {
 
                             <TabsContent value="onhold" className="p-6 m-0">
                                 <OnHoldTab report={report} project={project} />
+                            </TabsContent>
+
+                            {/* Summary tab — mirrors Main Sheet from Excel payroll file */}
+                            <TabsContent value="summary" className="p-6 m-0">
+                                <SummaryTab
+                                    salaryData={salaryData}
+                                    report={report}
+                                    project={project}
+                                    onSaveManualFields={handleSaveManualFields}
+                                />
+                            </TabsContent>
+
+                            {/* Branch tab — all employees except Bodyshop department */}
+                            <TabsContent value="branch" className="p-6 m-0">
+                                <BranchPayrollTab salaryData={salaryData} />
+                            </TabsContent>
+
+                            {/* Body Shop tab — Bodyshop department employees only */}
+                            <TabsContent value="bodyshop" className="p-6 m-0">
+                                <BodyShopPayrollTab salaryData={salaryData} />
+                            </TabsContent>
+
+                            {/* Cash Salary tab — employees with balance > 0 after WPS cap */}
+                            <TabsContent value="cashsalary" className="p-6 m-0">
+                                <CashSalaryTab salaryData={salaryData} />
                             </TabsContent>
                         </Tabs>
                     </CardContent>
