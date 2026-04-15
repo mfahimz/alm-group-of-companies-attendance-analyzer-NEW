@@ -156,35 +156,6 @@ export default function SalaryReportDetail() {
         }
     }, [report?.snapshot_data]);
 
-    // Load existing manual leave salary holds for this report on mount
-    // Filters by company and status only (report_run_id does not exist on PayrollHold entity)
-    // Then scopes to employees in this report client-side using hrms_ids from salaryData
-    useEffect(() => {
-      if (!report?.company || salaryData.length === 0) return;
-      const loadHolds = async () => {
-        try {
-          const holds = await base44.entities.PayrollHold.filter({
-            company: report.company,
-            status: 'ON_HOLD'
-          });
-          // Build set of hrms_ids present in this report for client-side scoping
-          const reportHrmsIds = new Set(salaryData.map(r => String(r.hrms_id)));
-          // Build lookup map: hrms_id -> hold record id
-          // Only include holds that belong to employees in this report
-          const holdMap = {};
-          (holds || []).forEach(h => {
-            if (reportHrmsIds.has(String(h.hrms_id))) {
-              holdMap[h.hrms_id] = h.id;
-            }
-          });
-          setActiveHolds(holdMap);
-        } catch (err) {
-          console.error('Failed to load manual holds:', err);
-        }
-      };
-      loadHolds();
-    }, [report?.company, salaryData.length]);
-
     // ============================================
     // DERIVED VALUES
     // ============================================
@@ -266,6 +237,31 @@ export default function SalaryReportDetail() {
             return [];
         }
     }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
+
+    // Load existing manual leave salary holds for this report on mount
+    // Filters by company and status only, scopes to employees in this report client-side
+    useEffect(() => {
+      if (!report?.company || salaryData.length === 0) return;
+      const loadHolds = async () => {
+        try {
+          const holds = await base44.entities.PayrollHold.filter({
+            company: report.company,
+            status: 'ON_HOLD'
+          });
+          const reportHrmsIds = new Set(salaryData.map(r => String(r.hrms_id)));
+          const holdMap = {};
+          (holds || []).forEach(h => {
+            if (reportHrmsIds.has(String(h.hrms_id))) {
+              holdMap[h.hrms_id] = h.id;
+            }
+          });
+          setActiveHolds(holdMap);
+        } catch (err) {
+          console.error('Failed to load manual holds:', err);
+        }
+      };
+      loadHolds();
+    }, [report?.company, salaryData.length]);
 
     // ============================================
     // HANDLERS (must be defined before useMemos that use them)
