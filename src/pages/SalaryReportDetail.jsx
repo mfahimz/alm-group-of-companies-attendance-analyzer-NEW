@@ -157,21 +157,25 @@ export default function SalaryReportDetail() {
     }, [report?.snapshot_data]);
 
     // Load existing manual leave salary holds for this report on mount
-    // so the Hold/Release buttons reflect the current saved state
+    // Filters by company and status only (report_run_id does not exist on PayrollHold entity)
+    // Then scopes to employees in this report client-side using hrms_ids from salaryData
     useEffect(() => {
-      if (!report?.report_run_id) return;
+      if (!report?.company || salaryData.length === 0) return;
       const loadHolds = async () => {
         try {
           const holds = await base44.entities.PayrollHold.filter({
-            report_run_id: report.report_run_id,
-            hold_type: 'MANUAL',
-            reason_code: 'MANUAL_LEAVE_SALARY_HOLD',
+            company: report.company,
             status: 'ON_HOLD'
           });
-          // Build a lookup map of hrms_id -> hold record id
+          // Build set of hrms_ids present in this report for client-side scoping
+          const reportHrmsIds = new Set(salaryData.map(r => String(r.hrms_id)));
+          // Build lookup map: hrms_id -> hold record id
+          // Only include holds that belong to employees in this report
           const holdMap = {};
           (holds || []).forEach(h => {
-            holdMap[h.hrms_id] = h.id;
+            if (reportHrmsIds.has(String(h.hrms_id))) {
+              holdMap[h.hrms_id] = h.id;
+            }
           });
           setActiveHolds(holdMap);
         } catch (err) {
@@ -179,7 +183,7 @@ export default function SalaryReportDetail() {
         }
       };
       loadHolds();
-    }, [report?.report_run_id]);
+    }, [report?.company, salaryData.length]);
 
     // ============================================
     // DERIVED VALUES
