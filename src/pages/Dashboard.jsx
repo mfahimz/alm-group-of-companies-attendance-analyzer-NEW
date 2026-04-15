@@ -6,6 +6,7 @@ import { FolderKanban, Users, AlertCircle, CheckCircle } from 'lucide-react';
 import { SkeletonStat } from '../components/ui/SkeletonLoader';
 import AdminDashboard from '../components/dashboard/AdminDashboard';
 import SupervisorDashboard from '../components/dashboard/SupervisorDashboard';
+import AccountantDashboard from '../components/dashboard/AccountantDashboard';
 import UserDashboard from '../components/dashboard/UserDashboard';
 import { useCompanyFilter } from '../components/context/CompanyContext';
 import { useNavigate } from 'react-router-dom';
@@ -75,6 +76,7 @@ export default function Dashboard() {
     const isSupervisor = userRole === 'supervisor';
     const isCEO = userRole === 'ceo';
     const isHRManager = userRole === 'hr_manager';
+    const isSeniorAccountant = userRole === 'senior_accountant';
     const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager;
 
     const stats = [
@@ -138,6 +140,20 @@ export default function Dashboard() {
     }
 
     // Role-based dashboard rendering
+    if (isSeniorAccountant) {
+        return (
+            <div className="space-y-6 animate-in fade-in duration-500">
+                <div className="animate-in slide-in-from-top-4 duration-700">
+                    <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
+                        Welcome back, {currentUser?.display_name || currentUser?.full_name || 'Accountant'}
+                    </h1>
+                    <p className="text-slate-600 mt-2 text-lg">Payroll management and salary overview</p>
+                </div>
+                <AccountantDashboard projects={projects} employees={employees} currentUser={currentUser} />
+            </div>
+        );
+    }
+
     if (isAdmin || isCEO) {
         return (
             <div className="space-y-6 animate-in fade-in duration-500">
