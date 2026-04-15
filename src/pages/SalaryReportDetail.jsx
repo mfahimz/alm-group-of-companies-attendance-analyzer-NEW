@@ -263,64 +263,8 @@ export default function SalaryReportDetail() {
         }
     }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
 
-    // Filter and sort data
-    const filteredData = useMemo(() => {
-        let filtered = salaryData;
-
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(item =>
-                item.name?.toLowerCase().includes(query) ||
-                item.attendance_id?.toString().includes(query) ||
-                (item.department && item.department.toLowerCase().includes(query))
-            );
-        }
-
-        return [...filtered].sort((a, b) => {
-            const key = sortColumn.key;
-            const aVal = a[key];
-            const bVal = b[key];
-            let compareResult = 0;
-
-            if (typeof aVal === 'string') {
-                compareResult = (aVal || '').localeCompare(bVal || '');
-            } else if (typeof aVal === 'number') {
-                compareResult = (aVal || 0) - (bVal || 0);
-            }
-
-            return sortColumn.direction === 'asc' ? compareResult : -compareResult;
-        });
-    }, [salaryData, searchQuery, sortColumn]);
-
-    // Compute summary stats from salaryData for the header stats bar
-    const headerStats = useMemo(() => {
-        let totalWps = 0, totalNet = 0, totalCash = 0, verifiedCount = 0, onHoldCount = 0;
-        salaryData.forEach(row => {
-            const { total, wpsPay, balance } = calculateTotals(row);
-            const isHeld = !!activeHolds[row.hrms_id];
-            
-            // Logic for display stats matching the table's display logic
-            const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
-            const displayWps = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
-            
-            totalWps += displayWps;
-            totalNet += displayTotal;
-            totalCash += (row.balance || balance || 0);
-            if (verifiedEmployees.includes(String(row.attendance_id))) verifiedCount++;
-            if (activeHolds[row.hrms_id]) onHoldCount++;
-        });
-        return {
-            totalWps,
-            totalNet,
-            totalCash,
-            verifiedCount,
-            totalEmployees: salaryData.length,
-            onHoldCount
-        };
-    }, [salaryData, activeHolds, verifiedEmployees, calculateTotals]);
-
     // ============================================
-    // HANDLERS
+    // HANDLERS (must be defined before useMemos that use them)
     // ============================================
     const handleChange = (hrmsId, field, value) => {
         setEditableData(prev => ({
@@ -423,6 +367,61 @@ export default function SalaryReportDetail() {
 
         return { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions, effectiveOtOrIncentive };
     };
+
+    // Filter and sort data
+    const filteredData = useMemo(() => {
+        let filtered = salaryData;
+
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(item =>
+                item.name?.toLowerCase().includes(query) ||
+                item.attendance_id?.toString().includes(query) ||
+                (item.department && item.department.toLowerCase().includes(query))
+            );
+        }
+
+        return [...filtered].sort((a, b) => {
+            const key = sortColumn.key;
+            const aVal = a[key];
+            const bVal = b[key];
+            let compareResult = 0;
+
+            if (typeof aVal === 'string') {
+                compareResult = (aVal || '').localeCompare(bVal || '');
+            } else if (typeof aVal === 'number') {
+                compareResult = (aVal || 0) - (bVal || 0);
+            }
+
+            return sortColumn.direction === 'asc' ? compareResult : -compareResult;
+        });
+    }, [salaryData, searchQuery, sortColumn]);
+
+    // Compute summary stats from salaryData for the header stats bar
+    const headerStats = useMemo(() => {
+        let totalWps = 0, totalNet = 0, totalCash = 0, verifiedCount = 0, onHoldCount = 0;
+        salaryData.forEach(row => {
+            const { total, wpsPay, balance } = calculateTotals(row);
+            const isHeld = !!activeHolds[row.hrms_id];
+            
+            const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
+            const displayWps = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
+            
+            totalWps += displayWps;
+            totalNet += displayTotal;
+            totalCash += (row.balance || balance || 0);
+            if (verifiedEmployees.includes(String(row.attendance_id))) verifiedCount++;
+            if (activeHolds[row.hrms_id]) onHoldCount++;
+        });
+        return {
+            totalWps,
+            totalNet,
+            totalCash,
+            verifiedCount,
+            totalEmployees: salaryData.length,
+            onHoldCount
+        };
+    }, [salaryData, activeHolds, verifiedEmployees, calculateTotals]);
 
     const handleSave = async () => {
         // Check if there are any changes (edits OR verification changes)
