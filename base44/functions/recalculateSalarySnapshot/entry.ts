@@ -63,6 +63,9 @@ Deno.serve(async (req: Request) => {
             mode = 'APPLY'     // Optional: 'PREVIEW' or 'APPLY'
         } = await req.json() as any;
 
+        const holdCreates = [] as any[];
+        const holdUpdates = [] as any[];
+
         // Validate required fields
         if (!report_run_id) {
             return Response.json({ error: 'report_run_id is required' }, { status: 400 });
@@ -163,6 +166,29 @@ Deno.serve(async (req: Request) => {
                 error: `EmployeeSalary record not found for employee ${snapshot.name} (attendance_id: ${attendance_id}). Cannot recalculate salary.` 
             }, { status: 400 });
         }
+
+        // ============================================================
+        // FETCH EMPLOYEE RECORD (for joining_date)
+        // ============================================================
+        const employees = await retryWithBackoff(() => base44.asServiceRole.entities.Employee.filter({
+            hrms_id: String(snapshot.hrms_id)
+        }, null, 1)) as any[];
+        const employee = employees.length > 0 ? employees[0] : null;
+
+        // ============================================================
+        // FETCH EXCEPTIONS (for spanning annual leave)
+        // ============================================================
+        const allExceptions = await retryWithBackoff(() => base44.asServiceRole.entities.Exception.filter({
+            project_id: project_id,
+            attendance_id: String(attendance_id)
+        }, null, 5000)) as any[];
+
+        // ============================================================
+        // FETCH PAYROLL HOLDS
+        // ============================================================
+        const allHolds = await retryWithBackoff(() => base44.asServiceRole.entities.PayrollHold.filter({
+            hrms_id: String(snapshot.hrms_id)
+        }, null, 5000)) as any[];
 
         // ============================================================
         // AL MARAGHI MOTORS: SALARY INCREMENT RESOLUTION FOR OT
@@ -346,16 +372,92 @@ Deno.serve(async (req: Request) => {
                 graceMinutes: attendanceValues.grace_minutes,
                 salaryLeaveDays: attendanceValues.salary_leave_days
             },
-            adjustments: {
-                normalOtHours: adjustmentValues.normalOtHours,
-                specialOtHours: adjustmentValues.specialOtHours,
-                bonus: adjustmentValues.bonus,
-                incentive: adjustmentValues.incentive,
-                open_leave_salary: adjustmentValues.open_leave_salary,
-                variable_salary: adjustmentValues.variable_salary,
-                otherDeduction: adjustmentValues.otherDeduction,
-                advanceSalaryDeduction: adjustmentValues.advanceSalaryDeduction
-            },
+            adjustments: (() => {
+                let releasedHoldAmount = 0;
+                const activeHolds = allHolds.filter(h => h.status === 'ON_HOLD');
+
+                // 1. RELEASE LOGIC (AUTO only)
+                // Rule: Release only if current payroll period starts after hold origin end
+                // AND employee has attendance presence in the current period (rejoin/return check)
+                const isEmployeePresent = (attendanceValues.present_days || 0) > 0;
+                if (isEmployeePresent && activeHolds.length > 0) {
+                    for (const hold of activeHolds) {
+                        const isHoldFromPreviousPeriod = hold.origin_period_end < project.date_from;
+                        const hasPositiveAmount = (hold.amount || 0) > 0;
+
+                        if (isHoldFromPreviousPeriod && hasPositiveAmount && hold.source === 'AUTO') {
+                            releasedHoldAmount += (hold.amount || 0);
+                            holdUpdates.push({
+                                id: hold.id,
+                                status: 'RELEASED',
+                                release_period_start: project.date_from,
+                                release_period_end: project.date_to,
+                                release_report_id: report_run_id,
+                                updated_date: new Date().toISOString()
+                            });
+                        }
+                    }
+                }
+
+                let openLeaveSalary = adjustmentValues.open_leave_salary;
+
+                // 2. DEFER LOGIC (< 2 Years Service & Spanning Leave)
+                const joiningDateStr = employee?.joining_date;
+                const referenceDate = new Date(project.date_to);
+                const joiningDate = joiningDateStr ? new Date(joiningDateStr) : null;
+                let serviceYears = null;
+                if (joiningDate && !isNaN(joiningDate.getTime())) {
+                    serviceYears = (referenceDate.getTime() - joiningDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+                }
+
+                const annualLeaveSpansFuture = allExceptions.some(ex =>
+                    ex.type === 'ANNUAL_LEAVE' &&
+                    ex.date_to > project.date_to
+                );
+
+                if (joiningDateStr && serviceYears !== null && serviceYears < 2.0 && annualLeaveSpansFuture && openLeaveSalary > 0) {
+                    const holdAmount = openLeaveSalary;
+                    const autoKey = `${snapshot.hrms_id}_LEAVE_DEFERRAL_UNDER_TWO_YEARS_${project.date_from}_${project.date_to}_AUTO`;
+                    const existingAutoHold = activeHolds.find(h => h.auto_key === autoKey);
+
+                    if (!existingAutoHold) {
+                        holdCreates.push({
+                            employee_id: employee.id,
+                            hrms_id: String(snapshot.hrms_id || ''),
+                            employee_name: snapshot.name,
+                            company: project.company,
+                            hold_type: 'LEAVE_DEFERRAL',
+                            reason_code: 'UNDER_TWO_YEARS_REJOIN_PENDING',
+                            amount: holdAmount,
+                            source: 'AUTO',
+                            status: 'ON_HOLD',
+                            origin_period_start: project.date_from,
+                            origin_period_end: project.date_to,
+                            auto_key: autoKey,
+                            created_date: new Date().toISOString()
+                        });
+                    } else if (Number(existingAutoHold.amount) !== Number(holdAmount)) {
+                        // Update existing AUTO hold if amount changed (idempotency)
+                        holdUpdates.push({
+                            id: existingAutoHold.id,
+                            amount: holdAmount,
+                            updated_date: new Date().toISOString()
+                        });
+                    }
+                    openLeaveSalary = 0;
+                }
+
+                return {
+                    normalOtHours: adjustmentValues.normalOtHours,
+                    specialOtHours: adjustmentValues.specialOtHours,
+                    bonus: adjustmentValues.bonus,
+                    incentive: adjustmentValues.incentive,
+                    open_leave_salary: openLeaveSalary + releasedHoldAmount,
+                    variable_salary: adjustmentValues.variable_salary,
+                    otherDeduction: adjustmentValues.otherDeduction,
+                    advanceSalaryDeduction: adjustmentValues.advanceSalaryDeduction
+                };
+            })(),
             settings: {
                 isAlMaraghi,
                 divisor,
@@ -459,6 +561,20 @@ Deno.serve(async (req: Request) => {
         };
 
         await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, updatePayload);
+
+        // ============================================
+        // PERSIST PAYROLL HOLDS (ONLY in APPLY mode)
+        // ============================================
+        if (holdCreates.length > 0) {
+            console.log(`[recalculateSalarySnapshot] 💾 Persisting ${holdCreates.length} new auto holds...`);
+            await base44.asServiceRole.entities.PayrollHold.bulkCreate(holdCreates);
+        }
+        if (holdUpdates.length > 0) {
+            console.log(`[recalculateSalarySnapshot] 💾 Updating ${holdUpdates.length} holds (releases)...`);
+            for (const update of holdUpdates) {
+                await base44.asServiceRole.entities.PayrollHold.update(update.id, update);
+            }
+        }
 
         // ============================================================
         // AUDIT LOG

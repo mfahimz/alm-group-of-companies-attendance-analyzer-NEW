@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
 
         // Fetch core data
         // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
-        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData] = await Promise.all([
+        const [employees, salaries, analysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData, allHolds] = await Promise.all([
             base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
             base44.asServiceRole.entities.AnalysisResult.filter({
@@ -321,7 +321,8 @@ Deno.serve(async (req) => {
             base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000),
             base44.asServiceRole.entities.Punch.filter({ project_id: project_id }, null, 5000),
             base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }, null, 5000),
-            base44.asServiceRole.entities.OvertimeData.filter({ project_id: project_id }, null, 5000)
+            base44.asServiceRole.entities.OvertimeData.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.PayrollHold.filter({ company: project.company }, null, 5000)
         ]);
 
         console.log(`[createSalarySnapshots] ============================================`);
@@ -1195,6 +1196,8 @@ Deno.serve(async (req) => {
 
         let loopIterationCount = 0;
         let skippedCount = 0;
+        const holdCreates = [];
+        const holdUpdates = [];
         for (const emp of employeesToProcess) {
             loopIterationCount++;
             console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
@@ -1417,16 +1420,98 @@ Deno.serve(async (req) => {
                     salaryLeaveDays: (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount),
                     lopLeaveDays: Math.max(0, (calculated.annualLeaveCount || 0) - (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount))
                 },
-                adjustments: {
-                    normalOtHours: (otRecord?.normalOtHours || 0),
-                    specialOtHours: (otRecord?.specialOtHours || 0),
-                    bonus: parseAdjustmentValue(otRecord?.bonus),
-                    incentive: parseAdjustmentValue(otRecord?.incentive),
-                    open_leave_salary: isAlMaraghi ? parseAdjustmentValue(otRecord?.open_leave_salary) : 0,
-                    variable_salary: isAlMaraghi ? parseAdjustmentValue(otRecord?.variable_salary) : 0,
-                    otherDeduction: parseAdjustmentValue(otRecord?.otherDeduction),
-                    advanceSalaryDeduction: parseAdjustmentValue(otRecord?.advanceSalaryDeduction)
-                },
+                adjustments: (() => {
+                    const employeeHolds = allHolds.filter(h =>
+                        String(h.hrms_id) === String(emp.hrms_id) ||
+                        String(h.employee_id) === String(emp.id)
+                    );
+
+                    let releasedHoldAmount = 0;
+                    const activeHolds = employeeHolds.filter(h => h.status === 'ON_HOLD');
+
+                    // 1. RELEASE LOGIC (AUTO only)
+                    // Rule: Release only if current payroll period starts after hold origin end
+                    // AND employee has attendance presence in the current period (rejoin/return check)
+                    const isEmployeePresent = (calculated.presentDays || 0) > 0;
+                    if (isEmployeePresent && activeHolds.length > 0) {
+                        for (const hold of activeHolds) {
+                            const isHoldFromPreviousPeriod = hold.origin_period_end < project.date_from;
+                            const hasPositiveAmount = (hold.amount || 0) > 0;
+
+                            if (isHoldFromPreviousPeriod && hasPositiveAmount && hold.source === 'AUTO') {
+                                releasedHoldAmount += (hold.amount || 0);
+                                holdUpdates.push({
+                                    id: hold.id,
+                                    status: 'RELEASED',
+                                    release_period_start: project.date_from,
+                                    release_period_end: project.date_to,
+                                    release_report_id: report_run_id,
+                                    updated_date: new Date().toISOString()
+                                });
+                            }
+                        }
+                    }
+
+                    let openLeaveSalary = isAlMaraghi ? parseAdjustmentValue(otRecord?.open_leave_salary) : 0;
+
+                    // 2. DEFER LOGIC (< 2 Years Service & Spanning Leave)
+                    const joiningDateStr = emp.joining_date;
+                    const referenceDate = new Date(project.date_to);
+                    const joiningDate = joiningDateStr ? new Date(joiningDateStr) : null;
+                    let serviceYears = null;
+                    if (joiningDate && !isNaN(joiningDate.getTime())) {
+                        serviceYears = (referenceDate.getTime() - joiningDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+                    }
+
+                    const annualLeaveSpansFuture = allExceptions.some(ex =>
+                        ex.type === 'ANNUAL_LEAVE' &&
+                        String(ex.attendance_id) === String(emp.attendance_id) &&
+                        ex.date_to > project.date_to
+                    );
+
+                    if (joiningDateStr && serviceYears !== null && serviceYears < 2.0 && annualLeaveSpansFuture && openLeaveSalary > 0) {
+                        const holdAmount = openLeaveSalary;
+                        const autoKey = `${emp.hrms_id}_LEAVE_DEFERRAL_UNDER_TWO_YEARS_${project.date_from}_${project.date_to}_AUTO`;
+                        const existingAutoHold = activeHolds.find(h => h.auto_key === autoKey);
+
+                        if (!existingAutoHold) {
+                            holdCreates.push({
+                                employee_id: emp.id,
+                                hrms_id: String(emp.hrms_id || ''),
+                                employee_name: emp.name,
+                                company: project.company,
+                                hold_type: 'LEAVE_DEFERRAL',
+                                reason_code: 'UNDER_TWO_YEARS_REJOIN_PENDING',
+                                amount: holdAmount,
+                                source: 'AUTO',
+                                status: 'ON_HOLD',
+                                origin_period_start: project.date_from,
+                                origin_period_end: project.date_to,
+                                auto_key: autoKey,
+                                created_date: new Date().toISOString()
+                            });
+                        } else if (Number(existingAutoHold.amount) !== Number(holdAmount)) {
+                            // Update existing AUTO hold if amount changed (idempotency)
+                            holdUpdates.push({
+                                id: existingAutoHold.id,
+                                amount: holdAmount,
+                                updated_date: new Date().toISOString()
+                            });
+                        }
+                        openLeaveSalary = 0;
+                    }
+
+                    return {
+                        normalOtHours: (otRecord?.normalOtHours || 0),
+                        specialOtHours: (otRecord?.specialOtHours || 0),
+                        bonus: parseAdjustmentValue(otRecord?.bonus),
+                        incentive: parseAdjustmentValue(otRecord?.incentive),
+                        open_leave_salary: openLeaveSalary + releasedHoldAmount,
+                        variable_salary: isAlMaraghi ? parseAdjustmentValue(otRecord?.variable_salary) : 0,
+                        otherDeduction: parseAdjustmentValue(otRecord?.otherDeduction),
+                        advanceSalaryDeduction: parseAdjustmentValue(otRecord?.advanceSalaryDeduction)
+                    };
+                })(),
                 settings: {
                     isAlMaraghi,
                     divisor,
@@ -1520,6 +1605,20 @@ Deno.serve(async (req) => {
         console.log(`[createSalarySnapshots]    Total iterations completed: ${loopIterationCount}`);
         console.log(`[createSalarySnapshots]    Snapshots in array: ${snapshots.length}`);
         console.log(`[createSalarySnapshots] ============================================`);
+
+        // ============================================
+        // PERSIST PAYROLL HOLDS
+        // ============================================
+        if (holdCreates.length > 0) {
+            console.log(`[createSalarySnapshots] 💾 Persisting ${holdCreates.length} new auto holds...`);
+            await base44.asServiceRole.entities.PayrollHold.bulkCreate(holdCreates);
+        }
+        if (holdUpdates.length > 0) {
+            console.log(`[createSalarySnapshots] 💾 Updating ${holdUpdates.length} holds (releases)...`);
+            for (const update of holdUpdates) {
+                await base44.asServiceRole.entities.PayrollHold.update(update.id, update);
+            }
+        }
 
         // BATCH MODE: Process in chunks for progress tracking
         if (batch_mode) {
