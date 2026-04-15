@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +50,9 @@ export default function SalaryReportDetail() {
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [adminEditMode, setAdminEditMode] = useState(false);
     const [activeTab, setActiveTab] = useState('salary');
+    // Tracks which employee hrms_ids currently have an active ON_HOLD PayrollHold
+    // record for this report. Keyed by hrms_id, value is the PayrollHold record id.
+    const [activeHolds, setActiveHolds] = useState({});
 
     // Saves finance team manual entries for the summary reconciliation section
     // Persists to SalaryReport.summary_manual_fields via Base44 entity update
@@ -110,7 +113,6 @@ export default function SalaryReportDetail() {
         refetchOnMount: false
     });
 
-    // Load verified employees from report snapshot_data
     React.useEffect(() => {
         if (report?.snapshot_data) {
             try {
@@ -125,6 +127,31 @@ export default function SalaryReportDetail() {
         }
     }, [report?.snapshot_data]);
 
+    // Load existing manual leave salary holds for this report on mount
+    // so the Hold/Release buttons reflect the current saved state
+    useEffect(() => {
+      if (!report?.report_run_id) return;
+      const loadHolds = async () => {
+        try {
+          const holds = await base44.entities.PayrollHold.filter({
+            report_run_id: report.report_run_id,
+            hold_type: 'MANUAL',
+            reason_code: 'MANUAL_LEAVE_SALARY_HOLD',
+            status: 'ON_HOLD'
+          });
+          // Build a lookup map of hrms_id -> hold record id
+          const holdMap = {};
+          (holds || []).forEach(h => {
+            holdMap[h.hrms_id] = h.id;
+          });
+          setActiveHolds(holdMap);
+        } catch (err) {
+          console.error('Failed to load manual holds:', err);
+        }
+      };
+      loadHolds();
+    }, [report?.report_run_id]);
+
     // ============================================
     // DERIVED VALUES
     // ============================================
@@ -134,6 +161,8 @@ export default function SalaryReportDetail() {
     const isAdminOrCEO = userRole === 'admin' || userRole === 'ceo';
     const isSeniorAccountant = userRole === 'senior_accountant';
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager', 'senior_accountant'].includes(userRole);
+    // Users allowed to place or release manual leave salary holds
+    const canManageHolds = ['admin', 'hr_manager', 'senior_accountant'].includes(userRole);
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryReport = isAdminOrCEO || isSeniorAccountant || isAlMaraghi;
@@ -590,6 +619,64 @@ export default function SalaryReportDetail() {
         }
     };
 
+    // Places or releases a manual leave salary hold for a single employee row.
+    // Hold amount is the employee's salaryLeaveAmount for this report period.
+    // Uses a deterministic auto_key for idempotency to prevent duplicate holds.
+    const handleToggleHold = async (row) => {
+      if (!canManageHolds) return;
+      const autoKey = `${row.hrms_id}_MANUAL_LEAVE_HOLD_${report.report_run_id}`;
+      const existingHoldId = activeHolds[row.hrms_id];
+
+      if (existingHoldId) {
+        // Release: update status to RELEASED
+        try {
+          await base44.entities.PayrollHold.update(existingHoldId, {
+            status: 'RELEASED',
+            updated_by: currentUser?.id,
+            updated_date: new Date().toISOString()
+          });
+          setActiveHolds(prev => {
+            const next = { ...prev };
+            delete next[row.hrms_id];
+            return next;
+          });
+          toast.success(`Hold released for ${row.name}`);
+        } catch (err) {
+          console.error('Failed to release hold:', err);
+          toast.error('Failed to release hold');
+        }
+      } else {
+        // Place hold: create a new MANUAL PayrollHold record
+        try {
+          const newHold = await base44.entities.PayrollHold.create({
+            employee_id: row.attendance_id,
+            hrms_id: row.hrms_id,
+            employee_name: row.name,
+            company: report.company,
+            hold_type: 'MANUAL',
+            reason_code: 'MANUAL_LEAVE_SALARY_HOLD',
+            amount: row.salaryLeaveAmount || 0,
+            status: 'ON_HOLD',
+            report_run_id: report.report_run_id,
+            defer_period_start: report.date_from,
+            defer_period_end: report.date_to,
+            notes: 'Manual hold placed from Salary Report Detail',
+            auto_key: autoKey,
+            created_by: currentUser?.id,
+            created_date: new Date().toISOString()
+          });
+          setActiveHolds(prev => ({
+            ...prev,
+            [row.hrms_id]: newHold.id
+          }));
+          toast.success(`Leave salary held for ${row.name}`);
+        } catch (err) {
+          console.error('Failed to place hold:', err);
+          toast.error('Failed to place hold');
+        }
+      }
+    };
+
     const handleExportToExcel = () => {
         import('xlsx').then(XLSX => {
             const exportData = filteredData.map(row => {
@@ -838,7 +925,7 @@ export default function SalaryReportDetail() {
                                         <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                                         <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
                                         <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
-                                        <th colSpan={4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
+                                        <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                                         <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                                     </tr>
                                     {/* Column Header Row */}
@@ -882,18 +969,36 @@ export default function SalaryReportDetail() {
                                         <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">WPS</SortableTableHead>
                                         <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Balance</SortableTableHead>
                                         <TableHead className="whitespace-nowrap bg-indigo-50 px-2 text-center border-r border-slate-300">Cap</TableHead>
+                                        {/* Hold/Release column header */}
+                                        <th className="px-3 py-2 text-center text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-indigo-50">
+                                            Leave Hold
+                                        </th>
                                         <TableHead className="whitespace-nowrap bg-slate-100 px-1 text-center sticky right-0 z-20 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">👁</TableHead>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredData.length === 0 ? (
                                     <tr>
-                                    <td colSpan={34} className="text-center py-12">
+                                    <td colSpan={35} className="text-center py-12">
                                                 <p className="text-slate-500">No employees match your search</p>
                                             </td>
                                         </tr>
                                     ) : filteredData.map((row, idx) => {
                                         const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
+                                        
+                                        // Determine if this employee is eligible for a manual leave salary hold
+                                        // Condition: at least 2 LOP days OR at least 2 annual leave days, and has leave salary
+                                        const isHoldEligible = ((row.full_absence_count || 0) >= 2 || (row.annual_leave_count || 0) >= 2)
+                                            && (row.salaryLeaveAmount || 0) > 0;
+
+                                        // Check if a hold is currently active for this employee in this report
+                                        const isHeld = !!activeHolds[row.hrms_id];
+
+                                        // If held, subtract salaryLeaveAmount from displayed total and wpsPay
+                                        // This is display-only — does not modify the underlying snapshot_data
+                                        const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
+                                        const displayWpsPay = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
+
                                         const stripe = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
                                         const cellBase = `px-2 py-1.5 align-middle text-xs tabular-nums`;
                                         return (
@@ -1014,8 +1119,8 @@ export default function SalaryReportDetail() {
                                                 <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
 
                                                 {/* Final */}
-                                                <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{total.toFixed(2)}</td>
-                                                <td className={`${cellBase} bg-indigo-50 font-bold text-green-700`}>{wpsPay.toFixed(2)}</td>
+                                                <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{displayTotal.toFixed(2)}</td>
+                                                <td className={`${cellBase} bg-indigo-50 font-bold text-green-700`}>{displayWpsPay.toFixed(2)}</td>
                                                 <td className={`${cellBase} bg-indigo-50 font-bold text-amber-700`}>{Math.round(balance)}</td>
                                                 <td className={`${cellBase} bg-indigo-50 text-center`}>
                                                     {wpsCapApplied ? (
@@ -1024,6 +1129,26 @@ export default function SalaryReportDetail() {
                                                         <span className="text-slate-300">—</span>
                                                     )}
                                                 </td>
+
+                                                {/* Manual leave salary hold button — only shown for eligible rows */}
+                                                <td className={`${cellBase} bg-indigo-50 text-center whitespace-nowrap pb-2`}>
+                                                    {isHoldEligible && canManageHolds ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant={isHeld ? "outline" : "destructive"}
+                                                            className={isHeld
+                                                                ? "text-xs px-2 py-1 h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                                                                : "text-xs px-2 py-1 h-7"
+                                                            }
+                                                            onClick={() => handleToggleHold(row)}
+                                                        >
+                                                            {isHeld ? "Release" : "Hold"}
+                                                        </Button>
+                                                    ) : (
+                                                        <span className="text-slate-300 text-xs">—</span>
+                                                    )}
+                                                </td>
+
                                                 <td className={`${cellBase} text-center sticky right-0 z-10 ${stripe} shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
                                                     <Button
                                                         size="sm"
