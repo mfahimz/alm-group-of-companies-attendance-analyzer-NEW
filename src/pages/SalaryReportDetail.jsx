@@ -591,24 +591,60 @@ export default function SalaryReportDetail() {
     };
 
     const handleExportToExcel = () => {
-        toast.error('Excel export requires xlsx package. Please contact administrator.');
-        
-        /* DISABLED - xlsx package not available
-        const exportData = filteredData.map(row => {
-            const { total, wpsPay, balance, wpsCapApplied, netAdditions, netDeductions, effectiveOtOrIncentive } = calculateTotals(row);
-            return {
-                'Attendance ID': row.attendance_id,
-                'Name': row.name,
-                ...
-            };
-        });
+        import('xlsx').then(XLSX => {
+            const exportData = filteredData.map(row => {
+                const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
+                const leaveDays = (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0);
+                const obj = {
+                    'ID': row.attendance_id,
+                    'Name': row.name,
+                    'Department': row.department || '',
+                    'Basic': Math.round(row.basic_salary || 0),
+                    'Allowances': Math.round(row.allowances || 0),
+                    'Allow.+Bonus': Math.round(row.allowances_with_bonus || 0),
+                    'Total Salary': Math.round(row.total_salary || 0),
+                    'Working Days': row.working_days || 0,
+                    'Present': row.present_days || 0,
+                    'LOP': (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0),
+                    'Leave': row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0,
+                    'SL Days': asNumber(row.salary_leave_days || row.salaryLeaveDays),
+                    'SL Amount': asNumber(row.salaryLeaveAmount),
+                    'Bonus': getValue(row, 'bonus'),
+                    'N.OT Hrs': (getValue(row, 'normalOtHours') || 0),
+                    'N.OT Salary': normalOtSalary,
+                    'S.OT Hrs': (getValue(row, 'specialOtHours') || 0),
+                    'S.OT Salary': specialOtSalary,
+                    'Total OT': totalOtSalary,
+                    'Incentive': getValue(row, 'incentive'),
+                    'Net Additions': netAdditions,
+                    'Leave Days (Ded)': leaveDays,
+                    'Leave Pay': asNumber(row.leavePay),
+                    'Leave Deduction': row.netDeduction || 0,
+                    'Ded Hours': row.deductibleHours || 0,
+                    'Ded Pay': row.deductibleHoursPay || 0,
+                    'Other Deduction': getValue(row, 'otherDeduction'),
+                    'Advance': getValue(row, 'advanceSalaryDeduction'),
+                    'Net Deductions': netDeductions,
+                    'Total': total,
+                    'WPS Pay': wpsPay,
+                    'Balance': Math.round(balance),
+                    'WPS Cap': wpsCapApplied ? 'Y' : '',
+                };
+                if (isAlMaraghi) {
+                    obj['Open Leave Salary'] = getValue(row, 'open_leave_salary');
+                    obj['Variable Salary'] = getValue(row, 'variable_salary');
+                }
+                return obj;
+            });
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
-        XLSX.writeFile(wb, `${report?.report_name || 'Salary'}_${report?.date_from}_to_${report?.date_to}.xlsx`);
-        toast.success('Excel file downloaded');
-        */
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Salary Report');
+            XLSX.writeFile(wb, `${report?.report_name || 'Salary'}_${report?.date_from}_to_${report?.date_to}.xlsx`);
+            toast.success('Excel file downloaded');
+        }).catch(() => {
+            toast.error('Failed to load Excel library. Please refresh and try again.');
+        });
     };
 
     // ============================================
