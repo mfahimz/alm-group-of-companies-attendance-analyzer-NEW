@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import { formatInUAE } from '@/components/ui/timezone';
 import { usePageTitle } from '@/components/ui/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,11 +46,12 @@ export default function Employees() {
             'Department': emp.department || '',
             'Weekly Off': emp.weekly_off || '',
             'Status': emp.active ? 'Active' : 'Inactive',
+            'Joining Date': emp.joining_date || '',
             'Grace Minutes': emp.carried_grace_minutes || 0,
             'Other Minutes Limit': emp.approved_other_minutes_limit || 120
         }));
         const ws = XLSX.utils.json_to_sheet(exportData);
-        const colWidths = [12, 14, 25, 20, 18, 12, 10, 14, 18];
+        const colWidths = [12, 14, 25, 20, 18, 12, 10, 14, 14, 18];
         ws['!cols'] = colWidths.map(w => ({ wch: w }));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Employees');
@@ -690,6 +692,9 @@ export default function Employees() {
                                     <SortableTableHead sortKey="department" currentSort={sort} onSort={setSort}>
                                         Department
                                     </SortableTableHead>
+                                    <SortableTableHead sortKey="joining_date" currentSort={sort} onSort={setSort}>
+                                        Joining Date
+                                    </SortableTableHead>
                                     <SortableTableHead sortKey="active" currentSort={sort} onSort={setSort}>
                                         Status
                                     </SortableTableHead>
@@ -723,6 +728,11 @@ export default function Employees() {
                                             </TableCell>
                                             <TableCell className="text-slate-600">{employee.company || '-'}</TableCell>
                                             <TableCell className="text-slate-600">{employee.department || '-'}</TableCell>
+                                            <TableCell className="text-slate-600">
+                                                {employee.joining_date
+                                                    ? formatInUAE(new Date(employee.joining_date), 'dd/MM/yyyy')
+                                                    : '—'}
+                                            </TableCell>
                                             <TableCell>
                                                 <span className={`
                                                     px-2 py-1 rounded-full text-xs font-medium

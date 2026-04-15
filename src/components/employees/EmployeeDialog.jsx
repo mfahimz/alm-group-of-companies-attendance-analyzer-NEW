@@ -23,7 +23,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
         department: '',
         weekly_off: 'Sunday',
         active: true,
-        carried_grace_minutes: 0
+        carried_grace_minutes: 0,
+        joining_date: ''
     });
     const [showNewDeptDialog, setShowNewDeptDialog] = useState(false);
     const [showNewSubDeptDialog, setShowNewSubDeptDialog] = useState(false);
@@ -55,7 +56,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                 department: employee.department || '',
                 weekly_off: employee.weekly_off || 'Sunday',
                 active: employee.active ?? true,
-                carried_grace_minutes: employee.carried_grace_minutes || 0
+                carried_grace_minutes: employee.carried_grace_minutes || 0,
+                joining_date: employee.joining_date || ''
             });
         } else if (open && !employee) {
             // Auto-generate HRMS ID for new employees
@@ -74,7 +76,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         department: '',
                         weekly_off: 'Sunday',
                         active: true,
-                        carried_grace_minutes: 0
+                        carried_grace_minutes: 0,
+                        joining_date: ''
                     });
                 } catch (error) {
                     toast.error('Failed to generate HRMS ID');
@@ -89,7 +92,8 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                         department: '',
                         weekly_off: 'Sunday',
                         active: true,
-                        carried_grace_minutes: 0
+                        carried_grace_minutes: 0,
+                        joining_date: ''
                     });
                 } finally {
                     setGeneratingHrmsId(false);
@@ -207,6 +211,7 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             if (oldData.name !== data.name) changes.push(`Name: ${oldData.name} → ${data.name}`);
             if (oldData.attendance_id !== data.attendance_id) changes.push(`Attendance ID: ${oldData.attendance_id} → ${data.attendance_id}`);
             if (oldData.weekly_off !== data.weekly_off) changes.push(`Weekly Off: ${oldData.weekly_off} → ${data.weekly_off}`);
+            if ((oldData.joining_date || '') !== (data.joining_date || '')) changes.push(`Joining Date: ${oldData.joining_date || 'N/A'} → ${data.joining_date || 'N/A'}`);
             
             if (changes.length > 0) {
                 try {
@@ -275,6 +280,11 @@ export default function EmployeeDialog({ open, onClose, employee }) {
             hrms_id: String(formData.hrms_id).trim(),
             attendance_id: formData.attendance_id ? String(formData.attendance_id).trim() : ''
         };
+
+        // Only include joining_date in payload if a value is provided
+        if (!cleanedData.joining_date) {
+            delete cleanedData.joining_date;
+        }
 
         if (employee) {
             updateMutation.mutate({ id: employee.id, data: cleanedData, oldData: employee });
@@ -467,6 +477,17 @@ export default function EmployeeDialog({ open, onClose, employee }) {
                                 <SelectItem value="Saturday">Saturday</SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="joining_date">Joining Date</Label>
+                        <Input
+                            id="joining_date"
+                            type="date"
+                            value={formData.joining_date || ''}
+                            onChange={(e) => setFormData({ ...formData, joining_date: e.target.value })}
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Optional — date the employee joined the company</p>
                     </div>
 
                     <div>

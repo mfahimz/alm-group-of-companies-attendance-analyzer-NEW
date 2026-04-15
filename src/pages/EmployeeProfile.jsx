@@ -253,6 +253,14 @@ export default function EmployeeProfile() {
                             <label className="text-sm text-slate-500">Weekly Off</label>
                             <p className="font-medium text-slate-900">{employee.weekly_off || 'Sunday'}</p>
                         </div>
+                        {employee.joining_date && (
+                            <div>
+                                <label className="text-sm text-slate-500">Joining Date</label>
+                                <p className="font-medium text-slate-900">
+                                    {formatInUAE(new Date(employee.joining_date), 'dd/MM/yyyy')}
+                                </p>
+                            </div>
+                        )}
                         <div>
                             <label className="text-sm text-slate-500">Employment Status</label>
                             <p className="font-medium text-slate-900">{employee.active ? 'Active' : 'Inactive'}</p>
