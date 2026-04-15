@@ -23,6 +23,8 @@ import PINLock from '../components/ui/PINLock';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import SalarySnapshotDialog from '../components/salary/SalarySnapshotDialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import OnHoldTab from '../components/salary/OnHoldTab';
 
 
 export default function SalaryReportDetail() {
@@ -43,6 +45,7 @@ export default function SalaryReportDetail() {
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [adminEditMode, setAdminEditMode] = useState(false);
+    const [activeTab, setActiveTab] = useState('salary');
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -725,8 +728,19 @@ export default function SalaryReportDetail() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        {/* Search */}
+                    <CardContent className="p-0">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <div className="px-6 py-2 border-b bg-slate-50/50">
+                                <TabsList className="bg-slate-200/50">
+                                    <TabsTrigger value="salary" className="px-6">Salary Report</TabsTrigger>
+                                    <TabsTrigger value="onhold" className="px-6 flex gap-2">
+                                        On Hold
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
+
+                            <TabsContent value="salary" className="p-6 pt-4 m-0">
+                                {/* Search */}
                         <div className="mb-4">
                             <div className="relative max-w-md">
                                 <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -969,7 +983,12 @@ export default function SalaryReportDetail() {
                                     })}
                                 </tbody>
                             </table>
-                        </div>
+                            </TabsContent>
+
+                            <TabsContent value="onhold" className="p-6 m-0">
+                                <OnHoldTab report={report} project={project} />
+                            </TabsContent>
+                        </Tabs>
                     </CardContent>
                 </Card>
             )}
