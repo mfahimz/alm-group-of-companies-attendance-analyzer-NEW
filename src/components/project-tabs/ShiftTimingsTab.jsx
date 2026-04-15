@@ -878,7 +878,9 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                 }
             });
             
-            console.log(`Duplicate check for ${blockLabel}: Found ${duplicates.length} duplicates out of ${shifts.length} shifts`);
+            if (import.meta.env.DEV) {
+                console.log(`Duplicate check for ${blockLabel}: Found ${duplicates.length} duplicates out of ${shifts.length} shifts`);
+            }
             return duplicates;
         };
         const blockRange = blockDateRanges[blockId] || { from: project.date_from, to: project.date_to };

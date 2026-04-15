@@ -497,7 +497,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     error?.message?.includes('Too Many');
                 if (isRateLimit && attempt < maxRetries) {
                     const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 500;
-                    console.warn(`Rate limited (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(delay)}ms...`);
+                    if (import.meta.env.DEV) {
+                        console.warn(`Rate limited (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${Math.round(delay)}ms...`);
+                    }
                     await new Promise(r => setTimeout(r, delay));
                     continue;
                 }
@@ -576,7 +578,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         analysis_result_id: analysisResult.id
                     })
                 ).catch(recalcErr => {
-                    console.warn('Backend recalc failed, using local calculation:', recalcErr);
+                    if (import.meta.env.DEV) {
+                        console.warn('Backend recalc failed, using local calculation:', recalcErr);
+                    }
                 })
             );
 

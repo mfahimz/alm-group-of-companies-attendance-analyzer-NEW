@@ -378,7 +378,9 @@ export default function AstraImportTab({ project, employees }) {
 
                     if (isRateLimit && attempt < RETRY_DELAYS.length) {
                         const delay = RETRY_DELAYS[attempt];
-                        console.warn(`${context}: Rate limit hit, retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS.length})`);
+                        if (import.meta.env.DEV) {
+                            console.warn(`${context}: Rate limit hit, retrying in ${delay}ms (attempt ${attempt + 1}/${RETRY_DELAYS.length})`);
+                        }
                         await new Promise(r => setTimeout(r, delay));
                     } else {
                         throw err;
@@ -423,7 +425,9 @@ export default function AstraImportTab({ project, employees }) {
                         await base44.entities.Punch.update(p.id, { calendar_period_id: null });
                     } catch (e) {
                         // Non-critical — tag left behind won't affect functionality
-                        console.warn('Failed to clear batch tag for', p.id, e);
+                        if (import.meta.env.DEV) {
+                            console.warn('Failed to clear batch tag for', p.id, e);
+                        }
                     }
                 }
                 if (i + BATCH_SIZE < uploadedPunches.length) {

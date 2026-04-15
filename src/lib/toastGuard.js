@@ -31,12 +31,16 @@ export function installToastGuard() {
     toast.error = function (message, options) {
         // Check the message itself
         if (looksLikeRateLimitMessage(message)) {
-            console.warn('[ToastGuard] Suppressed rate-limit error toast:', message);
+            if (import.meta.env.DEV) {
+                console.warn('[ToastGuard] Suppressed rate-limit error toast:', message);
+            }
             return;
         }
         // Check the description if provided
         if (options?.description && looksLikeRateLimitMessage(options.description)) {
-            console.warn('[ToastGuard] Suppressed rate-limit error toast (desc):', options.description);
+            if (import.meta.env.DEV) {
+                console.warn('[ToastGuard] Suppressed rate-limit error toast (desc):', options.description);
+            }
             return;
         }
         return originalError.call(this, message, options);
@@ -47,5 +51,5 @@ export function installToastGuard() {
     // Can't easily replace the default export, but error is the main concern
 
     toast.__guardInstalled = true;
-    console.log('[ToastGuard] Installed — rate-limit error toasts will be suppressed');
+    // Installed silently
 }

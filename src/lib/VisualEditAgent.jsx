@@ -432,7 +432,9 @@ export default function VisualEditAgent() {
 							message.data.replace || false
 						);
 					} else {
-						console.warn('[Agent] Invalid update-classes message:', message);
+						if (import.meta.env.DEV) {
+							console.warn('[Agent] Invalid update-classes message:', message);
+						}
 					}
 					break;
 
@@ -451,7 +453,9 @@ export default function VisualEditAgent() {
 							message.data.content
 						);
 					} else {
-						console.warn('[Agent] Invalid update-content message:', message);
+						if (import.meta.env.DEV) {
+							console.warn('[Agent] Invalid update-content message:', message);
+						}
 					}
 					break;
 

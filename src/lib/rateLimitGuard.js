@@ -77,9 +77,11 @@ async function retryOnRateLimit(fn) {
                 const backoff = Math.min(BASE_BACKOFF_MS * Math.pow(2, attempt), MAX_BACKOFF_MS);
                 const jitter = Math.random() * JITTER_MAX_MS;
                 const delay = backoff + jitter;
-                console.warn(
-                    `[RateLimitGuard] 429 detected, retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(delay)}ms`
-                );
+                if (import.meta.env.DEV) {
+                    console.warn(
+                        `[RateLimitGuard] 429 detected, retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(delay)}ms`
+                    );
+                }
                 await sleep(delay);
                 continue;
             }
@@ -177,7 +179,7 @@ export function installRateLimitGuard(base44) {
     }
 
     base44.__rateLimitGuardInstalled = true;
-    console.log('[RateLimitGuard] Installed — all API calls are now rate-limit resilient');
+    // Installed silently
 }
 
 /**

@@ -113,8 +113,7 @@ export default function Layout({ children, currentPageName }) {
             }
         });
 
-        console.log('Navigation Structure:', JSON.stringify(structure, null, 2));
-        console.log('Current User Role:', userRole);
+
         return structure;
     }, [currentUser, canAccessPage]);
 
@@ -127,8 +126,7 @@ export default function Layout({ children, currentPageName }) {
     }, []);
 
     useEffect(() => {
-        console.log('App Timezone: UAE (Asia/Dubai)');
-        console.log('Current UAE Time:', formatInUAE(new Date(), 'yyyy-MM-dd HH:mm:ss'));
+
     }, []);
 
     // Redirect department heads/assistant GMs to their dashboard immediately

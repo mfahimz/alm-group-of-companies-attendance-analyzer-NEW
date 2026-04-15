@@ -103,7 +103,7 @@ export default function SalaryTab({ project }) {
                 project_id: project.id,
                 report_run_id: finalReport.id
             }, null, 5000);
-            console.log(`[SalaryTab] 📊 FETCHED ${snapshots.length} salary snapshots for report ${finalReport.id}`);
+
             return snapshots;
         },
         enabled: !!project?.id && !!finalReport?.id && finalReport?.is_final === true,

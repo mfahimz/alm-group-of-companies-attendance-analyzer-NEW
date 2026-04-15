@@ -17,7 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
-    console.log('[ReportTab] Rendering with:', { projectId: project?.id, isDepartmentHead });
+
     
     const queryClient = useQueryClient();
     const [progressDialog, setProgressDialog] = React.useState({
@@ -57,7 +57,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const canModifyAttendance = (isAdmin || isSupervisor || isCEO || isHRManager) && !isSeniorAccountant;
     const canDeleteReports = (isAdmin || isSupervisor || isUser || isCEO || isHRManager) && !isSeniorAccountant;
 
-    console.log('[ReportTab] User role:', { userRole, isDepartmentHead, isAdmin, isSupervisor });
+
 
     // LIGHTWEIGHT COUNTS ONLY - no heavy paginated fetches
     // Analysis runs on backend, so we only need counts for the UI status display
@@ -255,12 +255,11 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         queryFn: async () => {
             // Double-check to prevent any execution for non-department heads
             if (!isDepartmentHead) {
-                console.log('[ReportTab] Skipping dept head verification - not a department head');
                 return null;
             }
-            console.log('[ReportTab] Verifying department head');
+
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
-            console.log('[ReportTab] Department head verification result:', data);
+
             return data;
         },
         enabled: isDepartmentHead && !!currentUser,
@@ -277,9 +276,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const { data: allReportRuns = [], error: reportRunsError } = useQuery({
         queryKey: ['reportRuns', project.id],
         queryFn: async () => {
-            console.log('[ReportTab] Fetching report runs for project:', project.id);
+
             const runs = await base44.entities.ReportRun.filter({ project_id: project.id }, '-created_date', 5000);
-            console.log('[ReportTab] Fetched', runs.length, 'report runs');
+
             return runs;
         },
         staleTime: 5 * 60 * 1000,
@@ -300,12 +299,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         ? allReportRuns.filter(r => r.id === project.last_saved_report_id)
         : allReportRuns;
 
-    console.log('[ReportTab] Report runs filtered:', {
-        total: allReportRuns.length,
-        filtered: reportRuns.length,
-        isClosed: project.status === 'closed',
-        lastSavedId: project.last_saved_report_id
-    });
+
 
     // Don't fetch all results upfront - fetch per report when needed
     // This prevents loading hundreds of duplicate analysis results from all historical runs
@@ -315,7 +309,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         queryKey: ['departmentEmployees', project.id, isDepartmentHead, deptHeadVerification?.assignment?.managed_employee_ids],
         queryFn: async () => {
             if (!isDepartmentHead || !deptHeadVerification?.verified) {
-                console.log('[ReportTab] Skipping employee fetch - not dept head or not verified');
+
                 return [];
             }
             
@@ -323,10 +317,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
                 : [];
             
-            console.log('[ReportTab] Managed employee IDs:', managedIds);
+
             
             if (managedIds.length === 0) {
-                console.log('[ReportTab] No managed employees found');
+    
                 return [];
             }
             
@@ -336,7 +330,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 active: true
             }, null, 5000);
 
-            console.log('[ReportTab] Fetched', allEmployees.length, 'total employees in company');
+
 
             // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
             // CRITICAL: Exclude department head from the list
@@ -345,7 +339,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
             );
 
-            console.log('[ReportTab] Filtered to', filtered.length, 'managed employees (excluding dept head)');
+
             return filtered;
         },
         enabled: isDepartmentHead && !!deptHeadVerification?.verified
@@ -395,7 +389,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 const attendanceIds = [...new Set(resultsToDelete.map(r => String(r.attendance_id)).filter(Boolean))];
                 
                 if (attendanceIds.length > 0) {
-                    console.log(`[ReportTab] Checking for GIFT_MINUTES exceptions to clean up for ${attendanceIds.length} employees...`);
+
                     
                     // Fetch all GIFT_MINUTES exceptions for this project
                     const allGiftExceptions = await fetchAllRecords(base44.entities.Exception, {
@@ -420,7 +414,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             } catch (error) {
                                 const isRateLimit = error.status === 429 || error.message?.toLowerCase().includes('rate limit');
                                 if (isRateLimit && attempt < RETRY_DELAYS.length) {
-                                    console.warn(`[ReportTab] Rate limited during exception deletion for ${id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
+                                    if (import.meta.env.DEV) {
+                                        console.warn(`[ReportTab] Rate limited during exception deletion for ${id}, retrying in ${RETRY_DELAYS[attempt]}ms...`);
+                                    }
                                     await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
                                     return deleteExceptionWithRetry(id, attempt + 1);
                                 }
@@ -436,7 +432,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 await new Promise(resolve => setTimeout(resolve, EXCEPTION_BATCH_DELAY));
                             }
                         }
-                        console.log(`[ReportTab] Successfully cleaned up ${exceptionsToDelete.length} GIFT_MINUTES exceptions`);
+
                     }
                 }
 

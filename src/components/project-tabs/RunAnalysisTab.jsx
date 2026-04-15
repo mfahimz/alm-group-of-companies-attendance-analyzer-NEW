@@ -310,16 +310,14 @@ export default function RunAnalysisTab({ project }) {
                 const matches = (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
                     e.use_in_analysis !== false &&
                     e.is_custom_type !== true;
-                if (matches && e.type === 'SICK_LEAVE') {
-                    console.log(`Found SICK_LEAVE exception for attendance_id ${attendanceIdStr}:`, e);
-                }
+
                 return matches;
             } catch (error) {
                 console.error(`Error filtering exception ${e.id}:`, error);
                 return false;
             }
         });
-        console.log(`Employee ${attendanceIdStr} - Total exceptions: ${employeeExceptions.length}, SICK_LEAVE: ${employeeExceptions.filter(e => e.type === 'SICK_LEAVE').length}`);
+
 
         // Get employee to determine weekly off day
         const employee = employees.find(e => String(e.attendance_id) === attendanceIdStr);

@@ -809,7 +809,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     if ((isRateLimit || isServerError) && batchRetries < MAX_BATCH_RETRIES) {
                         batchRetries++;
                         const backoffDelay = Math.min(3000 * Math.pow(2, batchRetries - 1), 15000);
-                        console.warn(`[ReportDetailView] Batch at position ${batchStart} failed (attempt ${batchRetries}/${MAX_BATCH_RETRIES}), retrying in ${backoffDelay}ms...`);
+                        if (import.meta.env.DEV) {
+                            console.warn(`[ReportDetailView] Batch at position ${batchStart} failed (attempt ${batchRetries}/${MAX_BATCH_RETRIES}), retrying in ${backoffDelay}ms...`);
+                        }
                         setFinalizationProgress(prev => ({
                             ...prev,
                             status: `Rate limited - waiting ${Math.round(backoffDelay / 1000)}s before retry (attempt ${batchRetries}/${MAX_BATCH_RETRIES})...`
@@ -829,7 +831,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     reportRunId: reportRun.id,
                     action: 'upsert'
                 });
-                console.log('[ReportDetailView] Auto-checklist tasks created successfully');
+
             } catch (checklistError) {
                 console.warn('[ReportDetailView] Failed to create checklist tasks:', checklistError.message);
             }

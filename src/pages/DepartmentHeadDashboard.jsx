@@ -61,7 +61,7 @@ export default function DepartmentHeadDashboard() {
             }
 
             if (!canVerifyDeptHead) {
-                console.log('[DeptHeadDashboard] Skipping verification - not a department head role or no dept head link');
+
                 return null;
             }
             const { data } = await base44.functions.invoke('verifyDepartmentHead', {});
@@ -101,24 +101,14 @@ export default function DepartmentHeadDashboard() {
             const today = nowInUAE();
             const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             
-            console.log('🔍 Project Search:', {
-                company: deptHeadAssignment.company,
-                department: deptHeadAssignment.department,
-                todayDateOnly
-            });
+
             
             // Get all projects for this company
             const projects = await base44.entities.Project.filter({
                 company: deptHeadAssignment.company
             });
             
-            console.log('📊 Projects found:', projects.length, projects.map(p => ({
-                name: p.name,
-                company: p.company,
-                department: p.department,
-                date_from: p.date_from,
-                date_to: p.date_to
-            })));
+
             
             // Find project whose date range contains today (projects apply to all departments in a company)
             const activeProject = projects.find(p => {
@@ -134,7 +124,7 @@ export default function DepartmentHeadDashboard() {
                 return isInDateRange;
             });
             
-            console.log('✅ Active project:', activeProject?.name || 'NONE');
+
             return activeProject || null;
         },
         enabled: !!deptHeadAssignment,

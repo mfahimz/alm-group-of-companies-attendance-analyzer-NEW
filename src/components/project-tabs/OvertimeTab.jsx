@@ -394,11 +394,7 @@ export default function OvertimeTab({ project }) {
      */
     const flattenToSum = (val, fieldName, empName) => {
         if (Array.isArray(val)) {
-            val.forEach(entry => {
-                if (entry.desc) {
-                    console.log(`[Adjustment Metadata] Employee: ${empName}, Field: ${fieldName}, Amount: ${entry.amount}, Desc: ${entry.desc}`);
-                }
-            });
+
             return val.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
         }
         return parseFloat(val) || 0;

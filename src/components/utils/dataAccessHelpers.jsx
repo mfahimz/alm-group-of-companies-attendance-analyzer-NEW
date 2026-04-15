@@ -31,7 +31,7 @@ export async function fetchAllRecords(entitySDK, filter = {}, sortKey = '-create
     let hasMore = true;
     let offset = 0;
 
-    console.log(`[fetchAllRecords] Starting fetch with filter:`, filter);
+
 
     while (hasMore) {
         const batch = await entitySDK.list(sortKey, batchSize, offset);
@@ -45,7 +45,7 @@ export async function fetchAllRecords(entitySDK, filter = {}, sortKey = '-create
 
         allRecords.push(...filteredBatch);
         
-        console.log(`[fetchAllRecords] Batch fetched: ${batch.length} records (${filteredBatch.length} after filter), total: ${allRecords.length}`);
+
 
         // If batch is smaller than batchSize, we've reached the end
         hasMore = batch.length === batchSize;
@@ -53,12 +53,14 @@ export async function fetchAllRecords(entitySDK, filter = {}, sortKey = '-create
 
         // Safety limit to prevent infinite loops
         if (offset > 50000) {
-            console.warn(`[fetchAllRecords] Safety limit reached at ${offset} records`);
+            if (import.meta.env.DEV) {
+                console.warn(`[fetchAllRecords] Safety limit reached at ${offset} records`);
+            }
             break;
         }
     }
 
-    console.log(`[fetchAllRecords] Complete: ${allRecords.length} total records`);
+
     return allRecords;
 }
 
@@ -84,7 +86,7 @@ export async function fetchWithLimit(entitySDK, filter = {}, sortKey = null, lim
         throw new Error('fetchWithLimit: limit parameter is REQUIRED to prevent silent truncation');
     }
 
-    console.log(`[fetchWithLimit] Fetching with explicit limit: ${limit}`);
+
     
     return await entitySDK.filter(filter, sortKey, limit);
 }

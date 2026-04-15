@@ -22,7 +22,7 @@ export default function Dashboard() {
     // Redirect department heads immediately via React Router (no full page reload)
     const userRoleForRedirect = currentUser?.extended_role || currentUser?.role || 'user';
     const isDeptHead = userRoleForRedirect === 'department_head' || userRoleForRedirect === 'assistant_gm';
-    
+
     React.useEffect(() => {
         if (currentUser && isDeptHead) {
             navigate('/DepartmentHeadDashboard', { replace: true });
@@ -176,7 +176,7 @@ export default function Dashboard() {
                 </h1>
                 <p className="text-slate-600 mt-2 text-lg">View your attendance and submit requests</p>
             </div>
-            
+
             <UserDashboard currentUser={currentUser} projects={projects} />
 
         </div>

@@ -390,7 +390,7 @@ export default function UserDialog({ open, onClose, user }) {
         }
 
         if (user) {
-            console.log('Updating user with data:', dataToSubmit);
+
             updateMutation.mutate({ id: user.id, data: dataToSubmit, previousUser: user });
         } else {
             toast.info('To add new users, please use the invite feature in your admin dashboard');

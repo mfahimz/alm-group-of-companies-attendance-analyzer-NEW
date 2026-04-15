@@ -103,7 +103,9 @@ export default function CreateProjectDialog({ open, onClose }) {
                     await base44.functions.invoke('seedRecurringAdjustments', {
                         projectId: project.id
                     });
-                    console.log(`[CreateProjectDialog] Recurring adjustments seeded for project ${project.id}`);
+                    if (import.meta.env.DEV) {
+                        console.log(`[CreateProjectDialog] Recurring adjustments seeded for project ${project.id}`);
+                    }
                 } catch (error) {
                     console.error('[CreateProjectDialog] Failed to seed recurring adjustments:', error);
                     toast.error('Project created, but failed to seed recurring adjustments');

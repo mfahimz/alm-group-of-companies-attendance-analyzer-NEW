@@ -64,26 +64,16 @@ export default function Projects() {
     });
 
     useEffect(() => {
-        console.log('🔍 PROJECTS PAGE ACCESS CHECK:', {
-            userRole,
-            hasCurrentUser: !!currentUser,
-            permissionsCount: permissions.length,
-            permissions: permissions.map(p => ({ page: p.page_name, roles: p.allowed_roles }))
-        });
+
 
         if (currentUser && permissions.length > 0) {
             const permission = permissions.find(p => p.page_name === 'Projects');
-            console.log('🔐 Projects Permission Check:', {
-                permissionFound: !!permission,
-                allowedRoles: permission?.allowed_roles,
-                userRole,
-                willRedirect: permission ? !permission.allowed_roles.split(',').map(r => r.trim()).includes(userRole) : false
-            });
+
 
             if (permission) {
                 const allowedRoles = permission.allowed_roles.split(',').map(r => r.trim());
                 if (!allowedRoles.includes(userRole)) {
-                    console.log('❌ ACCESS DENIED - Redirecting to Dashboard');
+
                     toast.error('Access denied.');
                     navigate(createPageUrl('Dashboard'));
                 }
@@ -99,25 +89,16 @@ export default function Projects() {
             const isAdminRole = role === 'admin' || role === 'supervisor' || role === 'ceo' || role === 'hr_manager';
             const isDeptHead = role === 'department_head';
 
-            console.log('[Projects] Fetching projects for user:', {
-                company: currentUser?.company,
-                role,
-                isDeptHead,
-                page,
-                pageSize
-            });
 
-            if (!currentUser) {
-                console.log('[Projects] No current user, returning empty');
-                return { items: [], total: 0 };
-            }
+
+        if (!currentUser) return { items: [], total: 0 };
             
             const skip = (page - 1) * pageSize;
             
             try {
                 // Department heads see only the LATEST closed project from their company
                 if (isDeptHead) {
-                    console.log('[Projects] Fetching LATEST CLOSED project for department head, company:', currentUser.company);
+
                     const allClosed = await base44.entities.Project.filter({
                         company: currentUser.company,
                         status: 'closed'
@@ -125,34 +106,34 @@ export default function Projects() {
                     // Sort by date_to descending to get the most recent closed project
                     allClosed.sort((a, b) => new Date(b.date_to) - new Date(a.date_to));
                     const latestClosed = allClosed.length > 0 ? [allClosed[0]] : [];
-                    console.log('[Projects] Showing latest closed project:', latestClosed[0]?.name || 'none');
+
                     return { items: latestClosed, total: latestClosed.length };
                 }
                 
                 // Admin, Supervisor, CEO can see all projects OR filtered by company if company is set
                 if (isAdminRole) {
                     if (currentUser.company) {
-                        console.log('[Projects] Fetching projects for selected company (admin/supervisor/ceo):', currentUser.company);
+
                         const items = await base44.entities.Project.filter({
                             company: currentUser.company
                         }, '-created_date', pageSize, skip);
-                        console.log('[Projects] Fetched', items.length, 'projects for company');
+
                         return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
                     } else {
-                        console.log('[Projects] Fetching all projects (admin/supervisor/ceo)');
+
                         const items = await base44.entities.Project.list('-created_date', pageSize, skip);
-                        console.log('[Projects] Fetched', items.length, 'projects');
+
                         return { items, total: items.length === pageSize ? (page + 1) * pageSize : skip + items.length };
                     }
                 }
                 
                 // Regular users see all non-closed projects from their company
-                console.log('[Projects] Fetching non-closed projects for regular user, company:', currentUser.company);
+
                 const items = await base44.entities.Project.filter({
                     company: currentUser.company,
                     status: { $ne: 'closed' }
                 }, '-created_date', pageSize);
-                console.log('[Projects] Fetched', items.length, 'non-closed projects for user');
+
                 return { items, total: items.length === pageSize ? (page + 1) * pageSize : items.length };
             } catch (error) {
                 console.error('[Projects] Error fetching projects:', error);

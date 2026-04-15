@@ -44,7 +44,9 @@ export const secureAuditProxy = {
             }
 
         } catch (err) {
-            console.warn(`[SecureAuditProxy Frontend] Backend proxy failed for ${entityName}, engaging fallback:`, err.message);
+            if (import.meta.env.DEV) {
+                console.warn(`[SecureAuditProxy Frontend] Backend proxy failed for ${entityName}, engaging fallback:`, err.message);
+            }
             
             // 2. Safety Fallback: Use standard front-end entities call.
             // This relies on user-scoped permissions and is always safe to call client-side.

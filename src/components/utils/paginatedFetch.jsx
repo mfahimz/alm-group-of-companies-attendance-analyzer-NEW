@@ -35,7 +35,9 @@ async function fetchWithRetry(fn, retries = MAX_RETRIES) {
             const isRateLimit = status === 429 || msg.includes('429') || msg.includes('Rate limit');
             if (isRateLimit && attempt < retries) {
                 const delay = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), 30000);
-                console.warn(`[paginatedFetch] Rate limited, retry ${attempt + 1}/${retries} after ${delay}ms`);
+                if (import.meta.env.DEV) {
+                    console.warn(`[paginatedFetch] Rate limited, retry ${attempt + 1}/${retries} after ${delay}ms`);
+                }
                 await new Promise(r => setTimeout(r, delay));
                 continue;
             }
