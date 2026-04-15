@@ -49,7 +49,7 @@ export default function SalaryReportDetail() {
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
     const [adminEditMode, setAdminEditMode] = useState(false);
-    const [activeTab, setActiveTab] = useState('salary');
+    const [activeTab, setActiveTab] = useState('branch');
     // Tracks which employee hrms_ids currently have an active ON_HOLD PayrollHold
     // record for this report. Keyed by hrms_id, value is the PayrollHold record id.
     const [activeHolds, setActiveHolds] = useState({});
@@ -163,6 +163,16 @@ export default function SalaryReportDetail() {
     const isAdminOrSupervisorOrHR = ['admin', 'supervisor', 'hr_manager', 'senior_accountant'].includes(userRole);
     // Users allowed to place or release manual leave salary holds
     const canManageHolds = ['admin', 'hr_manager', 'senior_accountant'].includes(userRole);
+    
+    // Tab visibility rules by role
+    // Salary Report tab: admin and ceo only
+    const canSeeSalaryReport = userRole === 'admin' || userRole === 'ceo';
+
+    // Cash Salary and Summary tabs: all except supervisor
+    const canSeeCashAndSummary = ['admin', 'ceo', 'hr_manager', 'senior_accountant'].includes(userRole);
+
+    // Branch, Body Shop, On Hold: all roles
+    const canSeeBranchTabs = true;
     // Allow access for Al Maraghi Auto Repairs projects for all users with project access
     const isAlMaraghi = project?.company === 'Al Maraghi Motors';
     const canAccessSalaryReport = isAdminOrCEO || isSeniorAccountant || isAlMaraghi;
@@ -872,330 +882,383 @@ export default function SalaryReportDetail() {
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <div className="px-6 py-2 border-b bg-slate-50/50">
                                 <TabsList className="bg-slate-200/50">
-                                    <TabsTrigger value="salary" className="px-6">Salary Report</TabsTrigger>
-                                    <TabsTrigger value="onhold" className="px-6 flex gap-2">
-                                        On Hold
-                                    </TabsTrigger>
-                                    <TabsTrigger value="summary" className="px-6">Summary</TabsTrigger>
+                                    {/* Branch tab — visible to all roles */}
                                     <TabsTrigger value="branch" className="px-6">Branch</TabsTrigger>
+
+                                    {/* Body Shop tab — visible to all roles */}
                                     <TabsTrigger value="bodyshop" className="px-6">Body Shop</TabsTrigger>
-                                    <TabsTrigger value="cashsalary" className="px-6">Cash Salary</TabsTrigger>
+
+                                    {/* On Hold tab — visible to all roles */}
+                                    <TabsTrigger value="onhold" className="px-6">On Hold</TabsTrigger>
+
+                                    {/* Cash Salary tab — hidden from supervisor */}
+                                    {canSeeCashAndSummary && (
+                                        <TabsTrigger value="cashsalary" className="px-6">Cash Salary</TabsTrigger>
+                                    )}
+
+                                    {/* Summary tab — hidden from supervisor */}
+                                    {canSeeCashAndSummary && (
+                                        <TabsTrigger value="summary" className="px-6">Summary</TabsTrigger>
+                                    )}
+
+                                    {/* Salary Report tab — admin and ceo only */}
+                                    {canSeeSalaryReport && (
+                                        <TabsTrigger value="salary" className="px-6">Salary Report</TabsTrigger>
+                                    )}
                                 </TabsList>
                             </div>
 
-                            <TabsContent value="salary" className="p-6 pt-4 m-0">
-                                {/* Search */}
-                        <div className="mb-4">
-                            <div className="relative max-w-md">
-                                <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search by name, ID, or department..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                />
-                            </div>
-                            <div className="flex items-center gap-4 mt-2">
-                                <p className="text-sm text-slate-500">
-                                    Showing {filteredData.length} of {salaryData.length} employees
-                                </p>
-                                <p className="text-sm text-slate-500">
-                                    Verified: <span className="font-medium text-green-600">{verifiedEmployees.length}</span> / {salaryData.length}
-                                </p>
-                                <Button
-                                    onClick={verifyAllClean}
-                                    variant="outline"
-                                    size="sm"
-                                    className="ml-auto"
-                                >
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Verify All Positive
-                                </Button>
-                            </div>
-                            </div>
+                            {canSeeSalaryReport && (
+                                <TabsContent value="salary" className="p-6 pt-4 m-0">
+                                    {/* Search */}
+                            <div className="mb-4">
+                                <div className="relative max-w-md">
+                                    <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name, ID, or department..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-4 mt-2">
+                                    <p className="text-sm text-slate-500">
+                                        Showing {filteredData.length} of {salaryData.length} employees
+                                    </p>
+                                    <p className="text-sm text-slate-500">
+                                        Verified: <span className="font-medium text-green-600">{verifiedEmployees.length}</span> / {salaryData.length}
+                                    </p>
+                                    <Button
+                                        onClick={verifyAllClean}
+                                        variant="outline"
+                                        size="sm"
+                                        className="ml-auto"
+                                    >
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Verify All Positive
+                                    </Button>
+                                </div>
+                                </div>
 
-                        {/* Salary Table */}
-                        <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[70vh]">
-                            <table className="w-full min-w-max text-xs">
-                                <thead className="sticky top-0 z-10">
-                                    {/* Group Header Row */}
-                                    <tr className="border-b border-slate-300">
-                                        <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
-                                        <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
-                                        <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                                        <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
-                                        <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
-                                        <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
-                                    </tr>
-                                    {/* Column Header Row */}
-                                    <tr className="border-b border-slate-300 bg-slate-50">
-                                        {/* Sticky Left: Checkbox, ID, Name */}
-                                        <TableHead className="w-8 bg-slate-100 px-1 sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">✓</TableHead>
-                                        <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[32px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">ID</SortableTableHead>
-                                        <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[82px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-300">Name</SortableTableHead>
-                                        <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Basic</SortableTableHead>
-                                        <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.</SortableTableHead>
-                                        <SortableTableHead sortKey="allowances_with_bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.+B</SortableTableHead>
-                                        <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2 font-bold">Total Sal.</SortableTableHead>
-                                        <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">WD</SortableTableHead>
-                                        <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Pres.</SortableTableHead>
-                                        <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50 px-2">LOP</SortableTableHead>
-                                        <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50 px-2 border-r border-slate-300">Leave</SortableTableHead>
-                                        {/* Additions Group */}
-                                        <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">SL Days</SortableTableHead>
-                                        <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">SL Amt</SortableTableHead>
-                                        <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Bonus</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-emerald-50 px-2">N.OT Hrs</TableHead>
-                                        <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">N.OT Sal</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-emerald-50 px-2">S.OT Hrs</TableHead>
-                                        <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">S.OT Sal</SortableTableHead>
-                                        <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Tot OT</SortableTableHead>
-                                        <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Incentive</SortableTableHead>
-                                        {isAlMaraghi && <SortableTableHead sortKey="open_leave_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Open Leave Salary</SortableTableHead>}
-                                        {isAlMaraghi && <SortableTableHead sortKey="variable_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Variable Salary</SortableTableHead>}
-                                        <TableHead className="whitespace-nowrap bg-emerald-200 px-2 font-bold border-r border-slate-300">Net Add.</TableHead>
-                                        {/* Deductions Group */}
-                                        <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Days</SortableTableHead>
-                                        <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Ded.</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Hrs</SortableTableHead>
-                                        <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Pay</SortableTableHead>
-                                        <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Other</SortableTableHead>
-                                        <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Advance</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">Net Ded.</TableHead>
-                                        {/* Final Group */}
-                                        <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Total</SortableTableHead>
-                                        <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">WPS</SortableTableHead>
-                                        <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Balance</SortableTableHead>
-                                        <TableHead className="whitespace-nowrap bg-indigo-50 px-2 text-center border-r border-slate-300">Cap</TableHead>
-                                        {/* Hold/Release column header */}
-                                        <th className="px-3 py-2 text-center text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-indigo-50">
-                                            Leave Hold
-                                        </th>
-                                        <TableHead className="whitespace-nowrap bg-slate-100 px-1 text-center sticky right-0 z-20 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">👁</TableHead>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredData.length === 0 ? (
-                                    <tr>
-                                    <td colSpan={35} className="text-center py-12">
-                                                <p className="text-slate-500">No employees match your search</p>
-                                            </td>
+                            {/* Salary Table */}
+                            <div className="border rounded-lg overflow-x-auto overflow-y-auto max-h-[70vh]">
+                                <table className="w-full min-w-max text-xs">
+                                    <thead className="sticky top-0 z-10">
+                                        {/* Group Header Row */}
+                                        <tr className="border-b border-slate-300">
+                                            <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
+                                            <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
+                                            <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
+                                            <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                                            <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
+                                            <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                                         </tr>
-                                    ) : filteredData.map((row, idx) => {
-                                        const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
-                                        
-                                        // Determine if this employee is eligible for a manual leave salary hold
-                                        // Condition: at least 2 LOP days OR at least 2 annual leave days, and has leave salary
-                                        const isHoldEligible = ((row.full_absence_count || 0) >= 2 || (row.annual_leave_count || 0) >= 2)
-                                            && (row.salaryLeaveAmount || 0) > 0;
-
-                                        // Check if a hold is currently active for this employee in this report
-                                        const isHeld = !!activeHolds[row.hrms_id];
-
-                                        // If held, subtract salaryLeaveAmount from displayed total and wpsPay
-                                        // This is display-only — does not modify the underlying snapshot_data
-                                        const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
-                                        const displayWpsPay = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
-
-                                        const stripe = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
-                                        const cellBase = `px-2 py-1.5 align-middle text-xs tabular-nums`;
-                                        return (
-                                            <tr key={row.hrms_id} className={`border-b border-slate-100 hover:bg-blue-50/40 transition-colors ${stripe}`}>
-                                                {/* Sticky Left: Checkbox, ID, Name */}
-                                                <td className={`${cellBase} px-1 sticky left-0 z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
-                                                    <Checkbox
-                                                        checked={row.isVerified}
-                                                        onCheckedChange={() => toggleVerification(row.attendance_id)}
-                                                        className="h-3.5 w-3.5"
-                                                    />
-                                                </td>
-                                                <td className={`${cellBase} font-medium text-slate-700 sticky left-[32px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
-                                                <td className={`${cellBase} font-medium text-slate-800 sticky left-[82px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
-                                                <td className={`${cellBase} text-slate-500`}>{Math.round(row.basic_salary || 0)}</td>
-                                                <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances || 0)}</td>
-                                                <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances_with_bonus || 0)}</td>
-                                                <td className={`${cellBase} font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'total_salary')} onChange={(e) => handleChange(row.hrms_id, 'total_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
-                                                    ) : Math.round(row.total_salary || 0)}
-                                                </td>
-                                                <td className={`${cellBase}`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'working_days')} onChange={(e) => handleChange(row.hrms_id, 'working_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : row.working_days || 0}
-                                                </td>
-                                                <td className={`${cellBase}`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'present_days')} onChange={(e) => handleChange(row.hrms_id, 'present_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : row.present_days || 0}
-                                                </td>
-                                                <td className={`${cellBase} text-red-600 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'full_absence_count')} onChange={(e) => handleChange(row.hrms_id, 'full_absence_count', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : ((row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))}
-                                                </td>
-                                                <td className={`${cellBase} text-blue-600 border-r border-slate-200`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count')} onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0)}
-                                                </td>
-
-                                                {/* Additions */}
-                                                <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'salary_leave_days') || getValue(row, 'salaryLeaveDays')} onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : (asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'salaryLeaveAmount')} onChange={(e) => handleChange(row.hrms_id, 'salaryLeaveAmount', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : (asNumber(row.salaryLeaveAmount)).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-emerald-50/50 px-1`}>
-                                                    <Input type="number" step="0.01" value={getValue(row, 'bonus')} onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                </td>
-                                                <td className={`${cellBase} bg-emerald-50/50`}>{(getValue(row, 'normalOtHours') || 0).toFixed(2)}</td>
-                                                <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'normalOtSalary')} onChange={(e) => handleChange(row.hrms_id, 'normalOtSalary', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : normalOtSalary.toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-emerald-50/50`}>{(getValue(row, 'specialOtHours') || 0).toFixed(2)}</td>
-                                                <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'specialOtSalary')} onChange={(e) => handleChange(row.hrms_id, 'specialOtSalary', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : specialOtSalary.toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-emerald-50/50 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'totalOtSalary')} onChange={(e) => handleChange(row.hrms_id, 'totalOtSalary', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : totalOtSalary.toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-emerald-50/50 px-1`}>
-                                                    <Input type="number" step="0.01" value={getValue(row, 'incentive')} onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                </td>
-                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
-                                                    <Input type="number" step="0.01" value={getValue(row, 'open_leave_salary')} onChange={(e) => handleChange(row.hrms_id, 'open_leave_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
-                                                </td>}
-                                                {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
-                                                    <Input type="number" step="0.01" value={getValue(row, 'variable_salary')} onChange={(e) => handleChange(row.hrms_id, 'variable_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
-                                                </td>}
-                                                <td className={`${cellBase} bg-emerald-100 font-bold border-r border-slate-200`}>{netAdditions.toFixed(2)}</td>
-
-                                                {/* Deductions */}
-                                                <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)} readOnly className="h-6 text-xs w-12 px-1 bg-slate-100" />
-                                                    ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'leavePay')} onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : (asNumber(row.leavePay)).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-50/50 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'netDeduction')} onChange={(e) => handleChange(row.hrms_id, 'netDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : (row.netDeduction || 0).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'deductibleHours')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHours', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                    ) : (row.deductibleHours || 0).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                    {adminEditMode && isAdmin ? (
-                                                        <Input type="number" step="0.01" value={getValue(row, 'deductibleHoursPay')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHoursPay', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    ) : (row.deductibleHoursPay || 0).toFixed(2)}
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-50/50 px-1`}>
-                                                    <Input type="number" step="0.01" value={getValue(row, 'otherDeduction')} onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-50/50 px-1`}>
-                                                    <Input type="number" step="0.01" value={getValue(row, 'advanceSalaryDeduction')} onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                </td>
-                                                <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
-
-                                                {/* Final */}
-                                                <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{displayTotal.toFixed(2)}</td>
-                                                <td className={`${cellBase} bg-indigo-50 font-bold text-green-700`}>{displayWpsPay.toFixed(2)}</td>
-                                                <td className={`${cellBase} bg-indigo-50 font-bold text-amber-700`}>{Math.round(balance)}</td>
-                                                <td className={`${cellBase} bg-indigo-50 text-center`}>
-                                                    {wpsCapApplied ? (
-                                                        <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded text-[10px] font-medium">Y</span>
-                                                    ) : (
-                                                        <span className="text-slate-300">—</span>
-                                                    )}
-                                                </td>
-
-                                                {/* Manual leave salary hold button — only shown for eligible rows */}
-                                                <td className={`${cellBase} bg-indigo-50 text-center whitespace-nowrap pb-2`}>
-                                                    {isHoldEligible && canManageHolds ? (
-                                                        <Button
-                                                            size="sm"
-                                                            variant={isHeld ? "outline" : "destructive"}
-                                                            className={isHeld
-                                                                ? "text-xs px-2 py-1 h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
-                                                                : "text-xs px-2 py-1 h-7"
-                                                            }
-                                                            onClick={() => handleToggleHold(row)}
-                                                        >
-                                                            {isHeld ? "Release" : "Hold"}
-                                                        </Button>
-                                                    ) : (
-                                                        <span className="text-slate-300 text-xs">—</span>
-                                                    )}
-                                                </td>
-
-                                                <td className={`${cellBase} text-center sticky right-0 z-10 ${stripe} shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setSelectedSnapshot(row)}
-                                                        title="View Salary Details"
-                                                        className="h-6 w-6 p-0"
-                                                    >
-                                                        <Eye className="w-3.5 h-3.5 text-indigo-600" />
-                                                    </Button>
+                                        {/* Column Header Row */}
+                                        <tr className="border-b border-slate-300 bg-slate-50">
+                                            {/* Sticky Left: Checkbox, ID, Name */}
+                                            <TableHead className="w-8 bg-slate-100 px-1 sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">✓</TableHead>
+                                            <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[32px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">ID</SortableTableHead>
+                                            <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[82px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-300">Name</SortableTableHead>
+                                            <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Basic</SortableTableHead>
+                                            <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.</SortableTableHead>
+                                            <SortableTableHead sortKey="allowances_with_bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.+B</SortableTableHead>
+                                            <SortableTableHead sortKey="total_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2 font-bold">Total Sal.</SortableTableHead>
+                                            <SortableTableHead sortKey="working_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">WD</SortableTableHead>
+                                            <SortableTableHead sortKey="present_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Pres.</SortableTableHead>
+                                            <SortableTableHead sortKey="full_absence_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-red-700 bg-slate-50 px-2">LOP</SortableTableHead>
+                                            <SortableTableHead sortKey="annual_leave_count" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap text-blue-700 bg-slate-50 px-2 border-r border-slate-300">Leave</SortableTableHead>
+                                            {/* Additions Group */}
+                                            <SortableTableHead sortKey="salary_leave_days" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">SL Days</SortableTableHead>
+                                            <SortableTableHead sortKey="salaryLeaveAmount" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">SL Amt</SortableTableHead>
+                                            <SortableTableHead sortKey="bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Bonus</SortableTableHead>
+                                            <TableHead className="whitespace-nowrap bg-emerald-50 px-2">N.OT Hrs</TableHead>
+                                            <SortableTableHead sortKey="normalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">N.OT Sal</SortableTableHead>
+                                            <TableHead className="whitespace-nowrap bg-emerald-50 px-2">S.OT Hrs</TableHead>
+                                            <SortableTableHead sortKey="specialOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">S.OT Sal</SortableTableHead>
+                                            <SortableTableHead sortKey="totalOtSalary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Tot OT</SortableTableHead>
+                                            <SortableTableHead sortKey="incentive" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Incentive</SortableTableHead>
+                                            {isAlMaraghi && <SortableTableHead sortKey="open_leave_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Open Leave Salary</SortableTableHead>}
+                                            {isAlMaraghi && <SortableTableHead sortKey="variable_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Variable Salary</SortableTableHead>}
+                                            <TableHead className="whitespace-nowrap bg-emerald-200 px-2 font-bold border-r border-slate-300">Net Add.</TableHead>
+                                            {/* Deductions Group */}
+                                            <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Days</SortableTableHead>
+                                            <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Pay</SortableTableHead>
+                                            <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Ded.</SortableTableHead>
+                                            <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Hrs</SortableTableHead>
+                                            <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Pay</SortableTableHead>
+                                            <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Other</SortableTableHead>
+                                            <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Advance</SortableTableHead>
+                                            <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">Net Ded.</TableHead>
+                                            {/* Final Group */}
+                                            <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Total</SortableTableHead>
+                                            <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">WPS</SortableTableHead>
+                                            <SortableTableHead sortKey="balance" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Balance</SortableTableHead>
+                                            <TableHead className="whitespace-nowrap bg-indigo-50 px-2 text-center border-r border-slate-300">Cap</TableHead>
+                                            {/* Hold/Release column header */}
+                                            <th className="px-3 py-2 text-center text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-indigo-50">
+                                                Leave Hold
+                                            </th>
+                                            <TableHead className="whitespace-nowrap bg-slate-100 px-1 text-center sticky right-0 z-20 shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.1)]">👁</TableHead>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredData.length === 0 ? (
+                                        <tr>
+                                        <td colSpan={35} className="text-center py-12">
+                                                    <p className="text-slate-500">No employees match your search</p>
                                                 </td>
                                             </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                            </div>
-                            </TabsContent>
+                                        ) : filteredData.map((row, idx) => {
+                                            const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
+                                            
+                                            // Determine if this employee is eligible for a manual leave salary hold
+                                            // Condition: at least 2 LOP days OR at least 2 annual leave days, and has leave salary
+                                            const isHoldEligible = ((row.full_absence_count || 0) >= 2 || (row.annual_leave_count || 0) >= 2)
+                                                && (row.salaryLeaveAmount || 0) > 0;
+
+                                            // Check if a hold is currently active for this employee in this report
+                                            const isHeld = !!activeHolds[row.hrms_id];
+
+                                            // If held, subtract salaryLeaveAmount from displayed total and wpsPay
+                                            // This is display-only — does not modify the underlying snapshot_data
+                                            const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
+                                            const displayWpsPay = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
+
+                                            const stripe = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
+                                            const cellBase = `px-2 py-1.5 align-middle text-xs tabular-nums`;
+                                            return (
+                                                <tr key={row.hrms_id} className={`border-b border-slate-100 hover:bg-blue-50/40 transition-colors ${stripe}`}>
+                                                    {/* Sticky Left: Checkbox, ID, Name */}
+                                                    <td className={`${cellBase} px-1 sticky left-0 z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
+                                                        <Checkbox
+                                                            checked={verifiedEmployees.includes(String(row.attendance_id))}
+                                                            onCheckedChange={() => toggleVerification(row.attendance_id)}
+                                                            className="h-3.5 w-3.5"
+                                                        />
+                                                    </td>
+                                                    <td className={`${cellBase} font-medium text-slate-700 sticky left-[32px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
+                                                    <td className={`${cellBase} font-medium text-slate-800 sticky left-[82px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                                    <td className={`${cellBase} text-slate-500`}>{Math.round(row.basic_salary || 0)}</td>
+                                                    <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances || 0)}</td>
+                                                    <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances_with_bonus || 0)}</td>
+                                                    <td className={`${cellBase} font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'total_salary')} onChange={(e) => handleChange(row.hrms_id, 'total_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
+                                                        ) : Math.round(row.total_salary || 0)}
+                                                    </td>
+                                                    <td className={`${cellBase}`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'working_days')} onChange={(e) => handleChange(row.hrms_id, 'working_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
+                                                        ) : row.working_days || 0}
+                                                    </td>
+                                                    <td className={`${cellBase}`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'present_days')} onChange={(e) => handleChange(row.hrms_id, 'present_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
+                                                        ) : row.present_days || 0}
+                                                    </td>
+                                                    <td className={`${cellBase} text-red-600 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'full_absence_count')} onChange={(e) => handleChange(row.hrms_id, 'full_absence_count', e.target.value)} className="h-6 text-xs w-12 px-1" />
+                                                        ) : ((row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))}
+                                                    </td>
+                                                    <td className={`${cellBase} text-blue-600 border-r border-slate-200`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count')} onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
+                                                        ) : (row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0)}
+                                                    </td>
+
+                                                    {/* Additions */}
+                                                    <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'salary_leave_days') || getValue(row, 'salaryLeaveDays')} onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)} className="h-6 text-xs w-12 px-1" />
+                                                        ) : (asNumber(row.salary_leave_days || row.salaryLeaveDays)).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'salaryLeaveAmount')} onChange={(e) => handleChange(row.hrms_id, 'salaryLeaveAmount', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : (asNumber(row.salaryLeaveAmount)).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                                        <Input type="number" step="0.01" value={getValue(row, 'bonus')} onChange={(e) => handleChange(row.hrms_id, 'bonus', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+                                                    <td className={`${cellBase} bg-emerald-50/50`}>{(getValue(row, 'normalOtHours') || 0).toFixed(2)}</td>
+                                                    <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'normalOtSalary')} onChange={(e) => handleChange(row.hrms_id, 'normalOtSalary', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : normalOtSalary.toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-emerald-50/50`}>{(getValue(row, 'specialOtHours') || 0).toFixed(2)}</td>
+                                                    <td className={`${cellBase} bg-emerald-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'specialOtSalary')} onChange={(e) => handleChange(row.hrms_id, 'specialOtSalary', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : specialOtSalary.toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-emerald-50/50 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'totalOtSalary')} onChange={(e) => handleChange(row.hrms_id, 'totalOtSalary', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : totalOtSalary.toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                                        <Input type="number" step="0.01" value={getValue(row, 'incentive')} onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+                                                    {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                                        <Input type="number" step="0.01" value={getValue(row, 'open_leave_salary')} onChange={(e) => handleChange(row.hrms_id, 'open_leave_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
+                                                    </td>}
+                                                    {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                                        <Input type="number" step="0.01" value={getValue(row, 'variable_salary')} onChange={(e) => handleChange(row.hrms_id, 'variable_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
+                                                    </td>}
+                                                    <td className={`${cellBase} bg-emerald-100 font-bold border-r border-slate-200`}>{netAdditions.toFixed(2)}</td>
+
+                                                    {/* Deductions */}
+                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)} readOnly className="h-6 text-xs w-12 px-1 bg-slate-100" />
+                                                        ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'leavePay')} onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : (asNumber(row.leavePay)).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-50/50 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'netDeduction')} onChange={(e) => handleChange(row.hrms_id, 'netDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : (row.netDeduction || 0).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'deductibleHours')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHours', e.target.value)} className="h-6 text-xs w-12 px-1" />
+                                                        ) : (row.deductibleHours || 0).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01" value={getValue(row, 'deductibleHoursPay')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHoursPay', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                        ) : (row.deductibleHoursPay || 0).toFixed(2)}
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
+                                                        <Input type="number" step="0.01" value={getValue(row, 'otherDeduction')} onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
+                                                        <Input type="number" step="0.01" value={getValue(row, 'advanceSalaryDeduction')} onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+                                                    <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
+
+                                                    {/* Final */}
+                                                    <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{displayTotal.toFixed(2)}</td>
+                                                    <td className={`${cellBase} bg-indigo-50 font-bold text-green-700`}>{displayWpsPay.toFixed(2)}</td>
+                                                    <td className={`${cellBase} bg-indigo-50 font-bold text-amber-700`}>{Math.round(balance)}</td>
+                                                    <td className={`${cellBase} bg-indigo-50 text-center`}>
+                                                        {wpsCapApplied ? (
+                                                            <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded text-[10px] font-medium">Y</span>
+                                                        ) : (
+                                                            <span className="text-slate-300">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Manual leave salary hold button — only shown for eligible rows */}
+                                                    <td className={`${cellBase} bg-indigo-50 text-center whitespace-nowrap pb-2`}>
+                                                        {isHoldEligible && canManageHolds ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant={isHeld ? "outline" : "destructive"}
+                                                                className={isHeld
+                                                                    ? "text-xs px-2 py-1 h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
+                                                                    : "text-xs px-2 py-1 h-7"
+                                                                }
+                                                                onClick={() => handleToggleHold(row)}
+                                                            >
+                                                                {isHeld ? "Release" : "Hold"}
+                                                            </Button>
+                                                        ) : (
+                                                            <span className="text-slate-300 text-xs">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    <td className={`${cellBase} text-center sticky right-0 z-10 ${stripe} shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            onClick={() => setSelectedSnapshot(row)}
+                                                            title="View Salary Details"
+                                                            className="h-6 w-6 p-0"
+                                                        >
+                                                            <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                                </div>
+                                </TabsContent>
+                            )}
 
                             <TabsContent value="onhold" className="p-6 m-0">
                                 <OnHoldTab report={report} project={project} />
                             </TabsContent>
 
                             {/* Summary tab — mirrors Main Sheet from Excel payroll file */}
-                            <TabsContent value="summary" className="p-6 m-0">
-                                <SummaryTab
-                                    salaryData={salaryData}
-                                    report={report}
-                                    project={project}
-                                    onSaveManualFields={handleSaveManualFields}
-                                />
-                            </TabsContent>
+                            {canSeeCashAndSummary && (
+                                <TabsContent value="summary" className="p-6 m-0">
+                                    <SummaryTab
+                                        salaryData={salaryData}
+                                        report={report}
+                                        project={project}
+                                        onSaveManualFields={handleSaveManualFields}
+                                    />
+                                </TabsContent>
+                            )}
 
                             {/* Branch tab — all employees except Bodyshop department */}
                             <TabsContent value="branch" className="p-6 m-0">
-                                <BranchPayrollTab salaryData={salaryData} />
+                                <BranchPayrollTab 
+                                    salaryData={salaryData}
+                                    adminEditMode={adminEditMode}
+                                    setAdminEditMode={setAdminEditMode}
+                                    editableData={editableData}
+                                    handleChange={handleChange}
+                                    handleSave={handleSave}
+                                    getValue={getValue}
+                                    calculateTotals={calculateTotals}
+                                    activeHolds={activeHolds}
+                                    handleToggleHold={handleToggleHold}
+                                    canManageHolds={canManageHolds}
+                                    verifiedEmployees={verifiedEmployees}
+                                    toggleVerification={toggleVerification}
+                                    isAdmin={isAdmin}
+                                    userRole={userRole}
+                                />
                             </TabsContent>
 
                             {/* Body Shop tab — Bodyshop department employees only */}
                             <TabsContent value="bodyshop" className="p-6 m-0">
-                                <BodyShopPayrollTab salaryData={salaryData} />
+                                <BodyShopPayrollTab 
+                                    salaryData={salaryData}
+                                    adminEditMode={adminEditMode}
+                                    setAdminEditMode={setAdminEditMode}
+                                    editableData={editableData}
+                                    handleChange={handleChange}
+                                    handleSave={handleSave}
+                                    getValue={getValue}
+                                    calculateTotals={calculateTotals}
+                                    activeHolds={activeHolds}
+                                    handleToggleHold={handleToggleHold}
+                                    canManageHolds={canManageHolds}
+                                    verifiedEmployees={verifiedEmployees}
+                                    toggleVerification={toggleVerification}
+                                    isAdmin={isAdmin}
+                                    userRole={userRole}
+                                />
                             </TabsContent>
 
                             {/* Cash Salary tab — employees with balance > 0 after WPS cap */}
-                            <TabsContent value="cashsalary" className="p-6 m-0">
-                                <CashSalaryTab salaryData={salaryData} />
-                            </TabsContent>
+                            {canSeeCashAndSummary && (
+                                <TabsContent value="cashsalary" className="p-6 m-0">
+                                    <CashSalaryTab salaryData={salaryData} />
+                                </TabsContent>
+                            )}
                         </Tabs>
                     </CardContent>
                 </Card>
