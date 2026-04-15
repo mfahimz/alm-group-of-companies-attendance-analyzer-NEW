@@ -983,6 +983,7 @@ export default function SalaryReportDetail() {
                                     })}
                                 </tbody>
                             </table>
+                            </div>
                             </TabsContent>
 
                             <TabsContent value="onhold" className="p-6 m-0">
