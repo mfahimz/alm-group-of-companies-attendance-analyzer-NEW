@@ -15,7 +15,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { toast } from 'sonner';
 import Breadcrumb from '../components/ui/Breadcrumb';
@@ -54,6 +54,14 @@ export default function SalaryReportDetail() {
     // record for this report. Keyed by hrms_id, value is the PayrollHold record id.
     const [activeHolds, setActiveHolds] = useState({});
 
+    // Controls visibility of the stats bar — hidden by default on page open
+    const [showStats, setShowStats] = useState(false);
+
+    // Tracks inline edits to divisor fields in the header
+    const [divisorEdits, setDivisorEdits] = useState({});
+
+    const navigate = useNavigate();
+
     // Saves finance team manual entries for the summary reconciliation section
     // Persists to SalaryReport.summary_manual_fields via Base44 entity update
     const handleSaveManualFields = async (fields) => {
@@ -64,6 +72,27 @@ export default function SalaryReportDetail() {
             toast.success("Summary fields saved");
         } catch (err) {
             toast.error("Failed to save summary fields");
+        }
+    };
+
+    // Saves edited salary_divisor and ot_divisor to the SalaryReport entity
+    const saveDivisors = async () => {
+        try {
+            const updates = {};
+            if (divisorEdits.salary_divisor !== undefined)
+                updates.salary_divisor = Number(divisorEdits.salary_divisor);
+            if (divisorEdits.ot_divisor !== undefined)
+                updates.ot_divisor = Number(divisorEdits.ot_divisor);
+
+            if (Object.keys(updates).length === 0) return;
+
+            await base44.entities.SalaryReport.update(report.id, updates);
+            setDivisorEdits({});
+            queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            toast.success('Divisors updated');
+        } catch (err) {
+            console.error('Failed to save divisors:', err);
+            toast.error('Failed to save divisors');
         }
     };
 
@@ -262,6 +291,33 @@ export default function SalaryReportDetail() {
             return sortColumn.direction === 'asc' ? compareResult : -compareResult;
         });
     }, [salaryData, searchQuery, sortColumn]);
+
+    // Compute summary stats from salaryData for the header stats bar
+    const headerStats = useMemo(() => {
+        let totalWps = 0, totalNet = 0, totalCash = 0, verifiedCount = 0, onHoldCount = 0;
+        salaryData.forEach(row => {
+            const { total, wpsPay, balance } = calculateTotals(row);
+            const isHeld = !!activeHolds[row.hrms_id];
+            
+            // Logic for display stats matching the table's display logic
+            const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
+            const displayWps = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
+            
+            totalWps += displayWps;
+            totalNet += displayTotal;
+            totalCash += (row.balance || balance || 0);
+            if (verifiedEmployees.includes(String(row.attendance_id))) verifiedCount++;
+            if (activeHolds[row.hrms_id]) onHoldCount++;
+        });
+        return {
+            totalWps,
+            totalNet,
+            totalCash,
+            verifiedCount,
+            totalEmployees: salaryData.length,
+            onHoldCount
+        };
+    }, [salaryData, activeHolds, verifiedEmployees, calculateTotals]);
 
     // ============================================
     // HANDLERS
@@ -808,74 +864,222 @@ export default function SalaryReportDetail() {
 
             {salaryUnlocked && (
                 <Card className="border-0 shadow-lg">
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="flex items-center gap-2">
-                                    <AEDIcon className="w-6 h-6" />
-                                    {report.report_name}
-                                </CardTitle>
-                                <p className="text-sm text-slate-500 mt-1">
-                                    {report.date_from} to {report.date_to} • {report.employee_count} employees • {report.company}
-                                    {report.salary_divisor && <span className="ml-2">• Salary Divisor: {report.salary_divisor}</span>}
-                                    {report.ot_divisor && <span className="ml-2">• OT Divisor: {report.ot_divisor}</span>}
-                                    {salaryData[0]?.prev_month_divisor > 0 && <span className="ml-2">• Prev Month Divisor: {salaryData[0]?.prev_month_divisor}</span>}
-                                </p>
-                                <div className="mt-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
-                                    <strong>Note:</strong> If you see incorrect deductible hours (e.g., 0.18 hrs instead of 0.22 hrs), re-finalize the report in the Report tab to regenerate with correct values.
+                    <CardHeader className="pb-0">
+                        <div className="flex items-start justify-between gap-4 flex-wrap">
+
+                            {/* Left: title block */}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-xs font-medium uppercase tracking-widest text-slate-400">
+                                    Salary Report
+                                </span>
+                                <h2 className="text-lg font-medium text-slate-900">
+                                    {report.report_name || `${report.date_from} to ${report.date_to}`}
+                                </h2>
+
+                                {/* Meta chips row */}
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {/* Date range chip */}
+                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200">
+                                        {report.date_from} — {report.date_to}
+                                    </span>
+                                    {/* Employee count chip */}
+                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200">
+                                        {report.employee_count} employees
+                                    </span>
+                                    {/* Company chip */}
+                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200">
+                                        {report.company}
+                                    </span>
+
+                                    {/* Salary divisor — inline editable chip */}
+                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
+                                        Salary divisor:&nbsp;
+                                        {isAdmin ? (
+                                            <input
+                                                type="number"
+                                                value={divisorEdits.salary_divisor !== undefined
+                                                    ? divisorEdits.salary_divisor
+                                                    : (report.salary_divisor || '')}
+                                                onChange={e => setDivisorEdits(prev => ({
+                                                    ...prev,
+                                                    salary_divisor: e.target.value
+                                                }))}
+                                                onBlur={saveDivisors}
+                                                onKeyDown={e => e.key === 'Enter' && saveDivisors()}
+                                                className="w-10 bg-white border border-slate-300 rounded px-1 text-xs text-center
+                            focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            />
+                                        ) : (
+                                            <span>{report.salary_divisor}</span>
+                                        )}
+                                    </span>
+
+                                    {/* OT / Prev Month divisor — inline editable chip */}
+                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
+                                        OT / Prev month divisor:&nbsp;
+                                        {isAdmin ? (
+                                            <input
+                                                type="number"
+                                                value={divisorEdits.ot_divisor !== undefined
+                                                    ? divisorEdits.ot_divisor
+                                                    : (report.ot_divisor || '')}
+                                                onChange={e => setDivisorEdits(prev => ({
+                                                    ...prev,
+                                                    ot_divisor: e.target.value
+                                                }))}
+                                                onBlur={saveDivisors}
+                                                onKeyDown={e => e.key === 'Enter' && saveDivisors()}
+                                                className="w-10 bg-white border border-slate-300 rounded px-1 text-xs text-center
+                            focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            />
+                                        ) : (
+                                            <span>{report.ot_divisor}</span>
+                                        )}
+                                        {salaryData[0]?.prev_month_divisor > 0 && <span className="opacity-60">/ {salaryData[0].prev_month_divisor}</span>}
+                                    </span>
                                 </div>
-                                {isAlMaraghi && (
-                                    <div className="mt-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-700 inline-block">
-                                        <strong>Note:</strong> As per Al Maraghi Motors payroll rules, the last 2 days of the month are treated as present for salary calculation.
-                                    </div>
-                                )}
                             </div>
-                            <div className="flex gap-2">
+
+                            {/* Right: action buttons */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {/* Admin Edit Mode toggle */}
                                 {isAdmin && (
                                     <Button
                                         onClick={() => setAdminEditMode(!adminEditMode)}
                                         variant={adminEditMode ? "default" : "ghost"}
                                         size="sm"
-                                        className={adminEditMode ? "bg-indigo-600 hover:bg-indigo-700" : "text-slate-400 hover:text-slate-600"}
+                                        className={adminEditMode ? "bg-indigo-600 hover:bg-indigo-700 text-sm h-9" : "text-slate-400 hover:text-slate-600 text-sm h-9"}
                                         title="Double-click any cell to edit (Admin only)"
                                     >
-                                        {adminEditMode ? 'Edit Mode: ON' : '⚡'}
+                                        {adminEditMode ? 'Edit Mode: ON' : '⚡ Edit Mode'}
                                     </Button>
                                 )}
-                                <Button
-                                            onClick={handleSave}
-                                            disabled={isSaving}
-                                            className="bg-green-600 hover:bg-green-700"
-                                        >
-                                    <Save className="w-4 h-4 mr-2" />
-                                    {isSaving ? 'Saving...' : 'Save Changes'}
-                                </Button>
+
+                                {/* Save Changes button — only shown when edits exist */}
+                                {(Object.keys(editableData).length > 0 || adminEditMode) && (
+                                    <Button
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 h-9"
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {isSaving ? 'Saving...' : 'Save changes'}
+                                    </Button>
+                                )}
+
+                                {/* Recalculate All — existing logic preserved */}
                                 {canRecalculate && (
                                     <Button
+                                        variant="outline"
+                                        size="sm"
                                         onClick={() => setConfirmRecalcAll(true)}
                                         disabled={recalculatingAll || salaryData.length === 0}
-                                        variant="outline"
-                                        className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                                        className="text-sm h-9 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
                                     >
                                         <RefreshCw className={`w-4 h-4 mr-2 ${recalculatingAll ? 'animate-spin' : ''}`} />
-                                        {recalculatingAll ? 'Recalculating...' : 'Recalculate All'}
+                                        Recalculate all
                                     </Button>
                                 )}
+
+                                {/* Export Excel — existing logic preserved */}
                                 <Button
-                                    onClick={handleExportToExcel}
                                     variant="outline"
-                                    className="border-green-300 text-green-700 hover:bg-green-50"
+                                    size="sm"
+                                    onClick={handleExportToExcel}
+                                    className="text-sm h-9 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                                 >
                                     <Download className="w-4 h-4 mr-2" />
                                     Export Excel
                                 </Button>
+
+                                {/* Divider */}
+                                <div className="w-px h-6 bg-slate-200 mx-1" />
+
+                                {/* Back to project — using Link since it was existing, but styled as button */}
                                 <Link to={createPageUrl('ProjectDetail') + `?id=${project?.id}`}>
-                                    <Button variant="outline">
+                                    <Button variant="ghost" size="sm" className="text-sm h-9 text-slate-500">
                                         <ArrowLeft className="w-4 h-4 mr-2" />
-                                        Back to Project
+                                        Back to project
                                     </Button>
                                 </Link>
                             </div>
+                        </div>
+
+                        {/* Stats bar — collapsible, hidden by default */}
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                            <button
+                                onClick={() => setShowStats(prev => !prev)}
+                                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600
+                    transition-colors mb-2 select-none"
+                            >
+                                {/* Toggle arrow */}
+                                <span style={{
+                                    display: 'inline-block',
+                                    transform: showStats ? 'rotate(90deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.15s'
+                                }}>▶</span>
+                                {showStats ? 'Hide summary' : 'Show summary'}
+                            </button>
+
+                            {showStats && (
+                                <div className="flex flex-wrap gap-x-6 gap-y-3 pb-4">
+
+                                    {/* Total WPS payable */}
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs text-slate-400">Total WPS payable</span>
+                                        <span className="text-base font-medium text-emerald-700 tabular-nums">
+                                            AED {headerStats.totalWps.toLocaleString('en-AE', {
+                                                minimumFractionDigits: 2, maximumFractionDigits: 2
+                                            })}
+                                        </span>
+                                    </div>
+
+                                    <div className="w-px bg-slate-200 self-stretch" />
+
+                                    {/* Net payable */}
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs text-slate-400">Net payable</span>
+                                        <span className="text-base font-medium text-emerald-700 tabular-nums">
+                                            AED {headerStats.totalNet.toLocaleString('en-AE', {
+                                                minimumFractionDigits: 2, maximumFractionDigits: 2
+                                            })}
+                                        </span>
+                                    </div>
+
+                                    <div className="w-px bg-slate-200 self-stretch" />
+
+                                    {/* Cash balance */}
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs text-slate-400">Cash balance</span>
+                                        <span className="text-base font-medium text-amber-600 tabular-nums">
+                                            AED {headerStats.totalCash.toLocaleString('en-AE', {
+                                                minimumFractionDigits: 2, maximumFractionDigits: 2
+                                            })}
+                                        </span>
+                                    </div>
+
+                                    <div className="w-px bg-slate-200 self-stretch" />
+
+                                    {/* Verified */}
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs text-slate-400">Verified</span>
+                                        <span className="text-base font-medium text-slate-700 tabular-nums">
+                                            {headerStats.verifiedCount} / {headerStats.totalEmployees}
+                                        </span>
+                                    </div>
+
+                                    <div className="w-px bg-slate-200 self-stretch" />
+
+                                    {/* On hold */}
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-xs text-slate-400">On hold</span>
+                                        <span className="text-base font-medium text-amber-600 tabular-nums">
+                                            {headerStats.onHoldCount} {headerStats.onHoldCount === 1 ? 'employee' : 'employees'}
+                                        </span>
+                                    </div>
+
+                                </div>
+                            )}
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
