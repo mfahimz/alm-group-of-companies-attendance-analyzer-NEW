@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
 
         // PERMISSION CHECK: Admin, Supervisor, HR Manager
         const userRole = user?.extended_role || user?.role || 'user';
-        const allowedRoles = ['admin', 'supervisor', 'hr_manager'];
+        const allowedRoles = ['admin', 'supervisor', 'hr_manager', 'senior_accountant'];
         if (!allowedRoles.includes(userRole)) {
             return Response.json({ error: 'Access denied: Insufficient permissions' }, { status: 403 });
         }

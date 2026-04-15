@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
         // PERMISSION CHECK: Only Admin, Supervisor, HR Manager
         const userRole = user?.extended_role || user?.role || 'user';
-        const allowedRoles = ['admin', 'supervisor', 'hr_manager'];
+        const allowedRoles = ['admin', 'supervisor', 'hr_manager', 'senior_accountant'];
         if (!allowedRoles.includes(userRole)) {
             return Response.json({ 
                 error: 'Access denied: Only Admin, Supervisor, or HR Manager can recalculate salaries' 
