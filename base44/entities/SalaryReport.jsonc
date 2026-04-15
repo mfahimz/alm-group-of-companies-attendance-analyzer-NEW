@@ -1,0 +1,80 @@
+{
+  "name": "SalaryReport",
+  "type": "object",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "Reference to project"
+    },
+    "report_run_id": {
+      "type": "string",
+      "description": "Reference to the finalized attendance report"
+    },
+    "report_name": {
+      "type": "string",
+      "description": "User-defined name for this salary report"
+    },
+    "date_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Report period start date"
+    },
+    "date_to": {
+      "type": "string",
+      "format": "date",
+      "description": "Report period end date"
+    },
+    "company": {
+      "type": "string",
+      "description": "Company name"
+    },
+    "salary_divisor": {
+      "type": "number",
+      "description": "DIVISOR_LEAVE_DEDUCTION: Divisor used for Leave Pay, Salary Leave Amount, Deductible Hours Pay (from project.salary_calculation_days at generation time). [MERGE_NOTE: If merging, this becomes the single divisor]"
+    },
+    "ot_divisor": {
+      "type": "number",
+      "description": "DIVISOR_OT: Divisor used for OT Hourly Rate calculation (from project.ot_calculation_days at generation time). [MERGE_NOTE: If merging, remove this field]"
+    },
+    "employee_count": {
+      "type": "number",
+      "description": "Number of employees in report"
+    },
+    "total_salary_amount": {
+      "type": "number",
+      "description": "Sum of all employee totals"
+    },
+    "total_deductions": {
+      "type": "number",
+      "description": "Sum of all deductions"
+    },
+    "total_ot_salary": {
+      "type": "number",
+      "description": "Sum of all OT salaries"
+    },
+    "snapshot_data": {
+      "type": "string",
+      "description": "JSON string of all salary snapshot data at time of report generation"
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "Email of user who generated this report"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes for this report"
+    },
+    "summary_manual_fields": {
+      "type": "object",
+      "description": "JSON object storing manual field overrides for salary summary calculations"
+    }
+  },
+  "required": [
+    "project_id",
+    "report_run_id",
+    "report_name",
+    "date_from",
+    "date_to",
+    "company"
+  ]
+}

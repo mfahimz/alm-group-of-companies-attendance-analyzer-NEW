@@ -91,10 +91,6 @@
       "type": "string",
       "format": "date-time",
       "description": "Timestamp when this record was last updated"
-    },
-    "summary_manual_fields": {
-      "type": "object",
-      "description": "JSON object storing manual field overrides for salary summary calculations"
     }
   },
   "required": [
