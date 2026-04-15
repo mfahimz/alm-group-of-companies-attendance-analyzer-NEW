@@ -54,7 +54,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const isHRManager = userRole === 'hr_manager';
     const isSeniorAccountant = userRole === 'senior_accountant';
     const isUser = userRole === 'user';
-    const canModifyAttendance = (isAdmin || isSupervisor || isCEO || isHRManager) && !isSeniorAccountant;
+    const isAdminOrSupervisor = isAdmin || isSupervisor || isCEO || isHRManager;
+    const canModifyAttendance = isAdminOrSupervisor && !isSeniorAccountant;
     const canDeleteReports = (isAdmin || isSupervisor || isUser || isCEO || isHRManager) && !isSeniorAccountant;
 
 
