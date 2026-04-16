@@ -1432,6 +1432,14 @@ export default function SalaryReportDetail() {
                                     toggleVerification={toggleVerification}
                                     isAdmin={isAdmin}
                                     userRole={userRole}
+                                    searchQuery={searchQuery}
+                                    setSearchQuery={setSearchQuery}
+                                    sortColumn={sortColumn}
+                                    setSortColumn={setSortColumn}
+                                    verifyAllClean={verifyAllClean}
+                                    setSelectedSnapshot={setSelectedSnapshot}
+                                    isAlMaraghi={isAlMaraghi}
+                                    asNumber={asNumber}
                                 />
                             </TabsContent>
 
@@ -1453,6 +1461,14 @@ export default function SalaryReportDetail() {
                                     toggleVerification={toggleVerification}
                                     isAdmin={isAdmin}
                                     userRole={userRole}
+                                    searchQuery={searchQuery}
+                                    setSearchQuery={setSearchQuery}
+                                    sortColumn={sortColumn}
+                                    setSortColumn={setSortColumn}
+                                    verifyAllClean={verifyAllClean}
+                                    setSelectedSnapshot={setSelectedSnapshot}
+                                    isAlMaraghi={isAlMaraghi}
+                                    asNumber={asNumber}
                                 />
                             </TabsContent>
 
