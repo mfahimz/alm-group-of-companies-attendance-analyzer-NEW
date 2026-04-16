@@ -5,7 +5,7 @@
 // Data model: cards array stored in report.summary_manual_fields
 // Template: loaded from SummaryTemplate entity per company, saved back on template save
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
