@@ -40,15 +40,30 @@ export default function BranchPayrollTab({
         return salaryData.filter(row => row.department !== 'Bodyshop');
     }, [salaryData]);
 
+    // Filter branch employees by search query then sort by sortColumn
+    // Mirrors the exact sort logic used in SalaryReportDetail.jsx
     const filteredData = useMemo(() => {
-        const query = searchQuery.toLowerCase();
-        return branchEmployees.filter(row =>
+        const query = (searchQuery || '').toLowerCase();
+        const filtered = branchEmployees.filter(row =>
             !searchQuery ||
             row.name?.toLowerCase().includes(query) ||
             String(row.attendance_id).includes(query) ||
             row.department?.toLowerCase().includes(query)
         );
-    }, [branchEmployees, searchQuery]);
+        return [...filtered].sort((a, b) => {
+            const key = sortColumn?.key;
+            if (!key) return 0;
+            const aVal = a[key];
+            const bVal = b[key];
+            let compareResult = 0;
+            if (typeof aVal === 'string') {
+                compareResult = (aVal || '').localeCompare(bVal || '');
+            } else if (typeof aVal === 'number') {
+                compareResult = (aVal || 0) - (bVal || 0);
+            }
+            return sortColumn?.direction === 'asc' ? compareResult : -compareResult;
+        });
+    }, [branchEmployees, searchQuery, sortColumn]);
 
     const grandTotals = useMemo(() => {
         return branchEmployees.reduce((acc, row) => {
