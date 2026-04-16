@@ -32,6 +32,11 @@ const CALCULATED_KEYS = [
   { key: 'totalWpsPayable (A)', label: 'Total WPS Payable (A)' },
   { key: 'branchWpsTotal', label: 'Branch WPS Total' },
   { key: 'bodyshopWpsTotal', label: 'Body Shop WPS Total' },
+  { key: 'bodyshopTotalSalary', label: 'Body Shop Total Salary' },
+  { key: 'bodyshopNetPayable', label: 'Body Shop Net Payable' },
+  { key: 'bodyshopLeaveSalary', label: 'Body Shop Leave Salary' },
+  { key: 'bodyshopOtPayable', label: 'Body Shop OT Payable' },
+  { key: 'bodyshopCashSalary', label: 'Body Shop Cash Salary' },
   { key: 'totalLeaveSalary (B)', label: 'Total Leave Salary (B)' },
   { key: 'totalOpenLeaveSalary (C)', label: 'Total Open Leave Salary (C)' },
   { key: 'totalOtPayable (D)', label: 'Total OT Payable (D)' },
@@ -54,6 +59,11 @@ const VALID_CALCULATED_KEYS = [
   { key: 'totalWpsPayable', label: 'Total WPS Payable (A)' },
   { key: 'branchWpsTotal', label: 'Branch WPS Total' },
   { key: 'bodyshopWpsTotal', label: 'Body Shop WPS Total' },
+  { key: 'bodyshopTotalSalary', label: 'Body Shop Total Salary' },
+  { key: 'bodyshopNetPayable', label: 'Body Shop Net Payable' },
+  { key: 'bodyshopLeaveSalary', label: 'Body Shop Leave Salary' },
+  { key: 'bodyshopOtPayable', label: 'Body Shop OT Payable' },
+  { key: 'bodyshopCashSalary', label: 'Body Shop Cash Salary' },
   { key: 'totalLeaveSalary', label: 'Total Leave Salary (B)' },
   { key: 'totalOpenLeaveSalary', label: 'Total Open Leave Salary (C)' },
   { key: 'totalOtPayable', label: 'Total OT Payable (D)' },
@@ -100,6 +110,61 @@ const DEFAULT_TEMPLATE = {
       ]
     },
     {
+      id: 'card_bodyshop',
+      title: 'Body Shop — Payroll Summary',
+      rows: [
+        {
+          id: 'r_bs1',
+          label: 'Total Salary & Allowances',
+          valueType: 'calculated',
+          calculatedKey: 'bodyshopTotalSalary',
+          manualValue: null
+        },
+        {
+          id: 'r_bs2',
+          label: 'Net Payable',
+          valueType: 'calculated',
+          calculatedKey: 'bodyshopNetPayable',
+          manualValue: null
+        },
+        {
+          id: 'r_bs3',
+          label: 'WPS Transfer',
+          valueType: 'calculated',
+          calculatedKey: 'bodyshopWpsTotal',
+          manualValue: null
+        },
+        {
+          id: 'r_bs4',
+          label: 'WPS Service Charges',
+          valueType: 'manual',
+          calculatedKey: null,
+          manualValue: 0
+        },
+        {
+          id: 'r_bs5',
+          label: 'Leave Salary',
+          valueType: 'calculated',
+          calculatedKey: 'bodyshopLeaveSalary',
+          manualValue: null
+        },
+        {
+          id: 'r_bs6',
+          label: 'OT Payable',
+          valueType: 'calculated',
+          calculatedKey: 'bodyshopOtPayable',
+          manualValue: null
+        },
+        {
+          id: 'r_bs7',
+          label: 'Cash Salary',
+          valueType: 'calculated',
+          calculatedKey: 'bodyshopCashSalary',
+          manualValue: null
+        },
+      ]
+    },
+    {
       id: 'card_reconciliation',
       title: 'Professional Charges Reconciliation',
       rows: [
@@ -133,6 +198,11 @@ export default function SummaryTab({
         let totalWpsPayable = 0;
         let branchWpsTotal = 0;
         let bodyshopWpsTotal = 0;
+        let bodyshopNetPayable = 0;
+        let bodyshopLeaveSalary = 0;
+        let bodyshopOtPayable = 0;
+        let bodyshopCashSalary = 0;
+        let bodyshopTotalSalary = 0;
         let totalLeaveSalary = 0;
         let totalOpenLeaveSalary = 0;
         let totalOtPayable = 0;
@@ -146,6 +216,11 @@ export default function SummaryTab({
             totalWpsPayable += (row.wpsPay || 0);
             if (row.department === 'Bodyshop') {
                 bodyshopWpsTotal += (row.wpsPay || 0);
+                bodyshopNetPayable += (row.total || 0);
+                bodyshopLeaveSalary += (row.salaryLeaveAmount || 0);
+                bodyshopOtPayable += ((row.normalOtSalary || 0) + (row.specialOtSalary || 0));
+                bodyshopCashSalary += (row.balance || 0);
+                bodyshopTotalSalary += (row.total_salary || 0);
             } else {
                 branchWpsTotal += (row.wpsPay || 0);
             }
@@ -163,6 +238,11 @@ export default function SummaryTab({
             totalWpsPayable,
             branchWpsTotal,
             bodyshopWpsTotal,
+            bodyshopNetPayable,
+            bodyshopLeaveSalary,
+            bodyshopOtPayable,
+            bodyshopCashSalary,
+            bodyshopTotalSalary,
             totalLeaveSalary,
             totalOpenLeaveSalary,
             totalOtPayable,
