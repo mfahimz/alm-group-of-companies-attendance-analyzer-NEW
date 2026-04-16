@@ -156,7 +156,11 @@ export default function BodyShopPayrollTab({
                         Showing {filteredData.length} of {bodyShopEmployees.length} employees
                     </p>
                     <p className="text-sm text-slate-500">
-                        Verified: <span className="font-medium text-green-600">{verifiedEmployees.length}</span> / {salaryData.length}
+                        {/* Count verified employees within body shop only */}
+                        {/* verifiedEmployees is an array of attendance_id strings */}
+                        Verified: <span className="font-medium text-green-600">
+                            {bodyShopEmployees.filter(row => verifiedEmployees.includes(String(row.attendance_id))).length}
+                        </span> / {bodyShopEmployees.length}
                     </p>
                     <Button
                         onClick={verifyAllClean}
@@ -250,18 +254,21 @@ export default function BodyShopPayrollTab({
                             const displayWpsPay = isHeld ? wpsPay - (row.salaryLeaveAmount || 0) : wpsPay;
 
                             const stripe = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50';
+                            // Opaque stripe for sticky cells — semi-transparent backgrounds
+                            // show through when sticky columns overlap scrolling content
+                            const stickyStripe = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
                             const cellBase = `px-2 py-1.5 align-middle text-xs tabular-nums`;
                             return (
                                 <tr key={row.hrms_id} className={`border-b border-slate-100 hover:bg-blue-50/40 transition-colors ${stripe}`}>
-                                    <td className={`${cellBase} px-1 sticky left-0 z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
+                                    <td className={`${cellBase} px-1 sticky left-0 z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
                                         <Checkbox
                                             checked={verifiedEmployees.includes(String(row.attendance_id))}
                                             onCheckedChange={() => toggleVerification(row.attendance_id)}
                                             className="h-3.5 w-3.5"
                                         />
                                     </td>
-                                    <td className={`${cellBase} font-medium text-slate-700 sticky left-[32px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
-                                    <td className={`${cellBase} font-medium text-slate-800 sticky left-[82px] z-10 ${stripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                    <td className={`${cellBase} font-medium text-slate-700 sticky left-[32px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
+                                    <td className={`${cellBase} font-medium text-slate-800 sticky left-[82px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
                                     <td className={`${cellBase} text-slate-500`}>{Math.round(row.basic_salary || 0)}</td>
                                     <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances || 0)}</td>
                                     <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances_with_bonus || 0)}</td>
@@ -394,7 +401,7 @@ export default function BodyShopPayrollTab({
                                         )}
                                     </td>
 
-                                    <td className={`${cellBase} text-center sticky right-0 z-10 ${stripe} shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
+                                    <td className={`${cellBase} text-center sticky right-0 z-10 ${stickyStripe} shadow-[-2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
                                         <Button
                                             size="sm"
                                             variant="ghost"
