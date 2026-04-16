@@ -75,6 +75,59 @@ export default function SalaryReportDetail() {
         }
     };
 
+    // Loads the company summary template from SummaryTemplate entity
+    // Returns the cards array if a template exists, or null if none found
+    const handleLoadTemplate = async () => {
+        try {
+            const templates = await base44.entities.SummaryTemplate.filter({
+                company: project?.company
+            }, null, 1);
+            if (templates && templates.length > 0) {
+                const tmpl = templates[0];
+                const data = typeof tmpl.template_data === 'string'
+                    ? JSON.parse(tmpl.template_data)
+                    : tmpl.template_data;
+                if (data?.cards && Array.isArray(data.cards)) {
+                    return data.cards;
+                }
+            }
+            return null;
+        } catch (err) {
+            console.error('Failed to load summary template:', err);
+            return null;
+        }
+    };
+
+    // Saves the current summary card layout as the company template
+    // Upserts: updates existing template if one exists, creates new if not
+    const handleSaveAsTemplate = async (cards) => {
+        try {
+            const existing = await base44.entities.SummaryTemplate.filter({
+                company: project?.company
+            }, null, 1);
+            const templateData = { cards };
+            if (existing && existing.length > 0) {
+                // Update existing template
+                await base44.entities.SummaryTemplate.update(existing[0].id, {
+                    template_data: templateData,
+                    updated_by: currentUser?.email || currentUser?.id || 'unknown',
+                    updated_date: new Date().toISOString()
+                });
+            } else {
+                // Create new template for this company
+                await base44.entities.SummaryTemplate.create({
+                    company: project?.company,
+                    template_data: templateData,
+                    updated_by: currentUser?.email || currentUser?.id || 'unknown',
+                    updated_date: new Date().toISOString()
+                });
+            }
+        } catch (err) {
+            console.error('Failed to save summary template:', err);
+            throw err;
+        }
+    };
+
     // Saves edited salary_divisor and ot_divisor to the SalaryReport entity
     const saveDivisors = async () => {
         try {
@@ -1410,6 +1463,10 @@ export default function SalaryReportDetail() {
                                         report={report}
                                         project={project}
                                         onSaveManualFields={handleSaveManualFields}
+                                        onLoadTemplate={handleLoadTemplate}
+                                        onSaveAsTemplate={handleSaveAsTemplate}
+                                        userRole={userRole}
+                                        currentUser={currentUser}
                                     />
                                 </TabsContent>
                             )}
