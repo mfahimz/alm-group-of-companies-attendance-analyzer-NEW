@@ -85,7 +85,10 @@ Deno.serve(async (req) => {
 
             for (let i = 0; i <= retryDelays.length; i++) {
                 try {
-                    const response = await base44.functions.invoke('recalculateSalarySnapshot', {
+                    // Using asServiceRole.functions.invoke instead of functions.invoke to avoid
+                    // user session token rate limiting when processing large employee batches (50+).
+                    // Confirmed supported pattern per Base44 SDK documentation.
+                    const response = await base44.asServiceRole.functions.invoke('recalculateSalarySnapshot', {
                         project_id,
                         report_run_id,
                         attendance_id: attendanceId,
