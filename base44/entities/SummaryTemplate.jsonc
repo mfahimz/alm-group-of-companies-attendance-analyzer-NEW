@@ -1,0 +1,28 @@
+{
+  "name": "SummaryTemplate",
+  "type": "object",
+  "properties": {
+    "company": {
+      "type": "string",
+      "description": "Company name \u2014 one template record per company",
+      "unique": true
+    },
+    "template_data": {
+      "type": "object",
+      "description": "JSON object storing the default payroll summary card layout template"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Email of user who last updated this template"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when this template was last updated"
+    }
+  },
+  "required": [
+    "company",
+    "template_data"
+  ]
+}
