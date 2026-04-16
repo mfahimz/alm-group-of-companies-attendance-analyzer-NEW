@@ -25,52 +25,190 @@ import {
 
 // --- PART A: CONSTANTS ---
 
-// Calculated values available to insert as locked rows in any card
-const CALCULATED_KEYS = [
-  { key: 'totalSalaryAndAllowances', label: 'Total Salary & Allowances' },
-  { key: 'totalSalariesPayable', label: 'Total Salaries Payable' },
-  { key: 'totalWpsPayable (A)', label: 'Total WPS Payable (A)' },
-  { key: 'branchWpsTotal', label: 'Branch WPS Total' },
-  { key: 'bodyshopWpsTotal', label: 'Body Shop WPS Total' },
-  { key: 'bodyshopTotalSalary', label: 'Body Shop Total Salary' },
-  { key: 'bodyshopNetPayable', label: 'Body Shop Net Payable' },
-  { key: 'bodyshopLeaveSalary', label: 'Body Shop Leave Salary' },
-  { key: 'bodyshopOtPayable', label: 'Body Shop OT Payable' },
-  { key: 'bodyshopCashSalary', label: 'Body Shop Cash Salary' },
-  { key: 'totalLeaveSalary (B)', label: 'Total Leave Salary (B)' },
-  { key: 'totalOpenLeaveSalary (C)', label: 'Total Open Leave Salary (C)' },
-  { key: 'totalOtPayable (D)', label: 'Total OT Payable (D)' },
-  { key: 'totalIncentivePayable', label: 'Total Incentive Payable' },
-  { key: 'totalOtherAllowances (E)', label: 'Total Other Allowances (E)' },
-  { key: 'totalCashSalary', label: 'Total Cash Salary' },
+// Grouped calculated value picker for accountants
+// Names and descriptions are plain English — no programmer keys shown
+// Only post-deduction final values are included — no gross/package rows
+const CALCULATED_KEY_GROUPS = [
+  {
+    group: 'Overall payroll totals',
+    items: [
+      {
+        key: 'totalSalariesPayable',
+        name: 'Total net payable',
+        description: 'Final amount owed to all employees after deductions'
+      },
+      {
+        key: 'totalWpsPayable',
+        name: 'Total WPS bank transfer',
+        description: 'Total amount sent to bank via WPS this month'
+      },
+      {
+        key: 'totalCashSalary',
+        name: 'Total cash salary',
+        description: 'Cash paid outside WPS — employees over the WPS cap'
+      },
+    ]
+  },
+  {
+    group: 'Leave & variable pay',
+    items: [
+      {
+        key: 'totalLeaveSalary',
+        name: 'Leave salary this month',
+        description: 'Annual leave salary paid out this payroll period'
+      },
+      {
+        key: 'totalOpenLeaveSalary',
+        name: 'Open leave salary',
+        description: 'Accumulated leave being paid out as cash this month'
+      },
+      {
+        key: 'totalOtPayable',
+        name: 'Total overtime',
+        description: 'Normal OT (1.25×) and special OT (1.5×) combined'
+      },
+      {
+        key: 'totalIncentivePayable',
+        name: 'Total incentives',
+        description: 'Performance incentives added this payroll period'
+      },
+      {
+        key: 'totalOtherAllowances',
+        name: 'Other allowances',
+        description: 'Miscellaneous allowances added this month'
+      },
+    ]
+  },
+  {
+    group: 'Branch only',
+    items: [
+      {
+        key: 'branchWpsTotal',
+        name: 'Branch WPS transfer',
+        description: 'WPS bank transfer for branch employees only'
+      },
+    ]
+  },
+  {
+    group: 'Body Shop only',
+    items: [
+      {
+        key: 'bodyshopNetPayable',
+        name: 'Body Shop net payable',
+        description: 'Final amount owed to Body Shop employees'
+      },
+      {
+        key: 'bodyshopWpsTotal',
+        name: 'Body Shop WPS transfer',
+        description: 'WPS bank transfer for Body Shop employees only'
+      },
+      {
+        key: 'bodyshopCashSalary',
+        name: 'Body Shop cash salary',
+        description: 'Cash paid to Body Shop employees outside WPS'
+      },
+      {
+        key: 'bodyshopLeaveSalary',
+        name: 'Body Shop leave salary',
+        description: 'Annual leave salary for Body Shop employees'
+      },
+      {
+        key: 'bodyshopOtPayable',
+        name: 'Body Shop overtime',
+        description: 'Overtime paid to Body Shop employees'
+      },
+    ]
+  },
 ];
 
-/**
- * NOTE: The CALCULATED_KEYS array above includes some labels in the keys 
- * if they are meant to match the calculatedValues object keys.
- * However, the user's CALCULATED_KEYS list had keys like 'totalWpsPayable' 
- * and labels like 'Total WPS Payable (A)'.
- * I will stick to the literal keys from the PART B memo to ensure resolveValue works.
- */
+// Flat lookup helper derived from groups — used for resolving keys to names
+const CALCULATED_KEY_MAP = CALCULATED_KEY_GROUPS.reduce((acc, group) => {
+  group.items.forEach(item => { acc[item.key] = item; });
+  return acc;
+}, {});
 
-const VALID_CALCULATED_KEYS = [
-  { key: 'totalSalaryAndAllowances', label: 'Total Salary & Allowances' },
-  { key: 'totalSalariesPayable', label: 'Total Salaries Payable' },
-  { key: 'totalWpsPayable', label: 'Total WPS Payable (A)' },
-  { key: 'branchWpsTotal', label: 'Branch WPS Total' },
-  { key: 'bodyshopWpsTotal', label: 'Body Shop WPS Total' },
-  { key: 'bodyshopTotalSalary', label: 'Body Shop Total Salary' },
-  { key: 'bodyshopNetPayable', label: 'Body Shop Net Payable' },
-  { key: 'bodyshopLeaveSalary', label: 'Body Shop Leave Salary' },
-  { key: 'bodyshopOtPayable', label: 'Body Shop OT Payable' },
-  { key: 'bodyshopCashSalary', label: 'Body Shop Cash Salary' },
-  { key: 'totalLeaveSalary', label: 'Total Leave Salary (B)' },
-  { key: 'totalOpenLeaveSalary', label: 'Total Open Leave Salary (C)' },
-  { key: 'totalOtPayable', label: 'Total OT Payable (D)' },
-  { key: 'totalIncentivePayable', label: 'Total Incentive Payable' },
-  { key: 'totalOtherAllowances', label: 'Total Other Allowances (E)' },
-  { key: 'totalCashSalary', label: 'Total Cash Salary' },
-];
+// ValuePicker — inline dropdown shown on each row in edit mode
+// Shows grouped calculated values with friendly names and descriptions
+// Also shows a "Enter amount manually" option for manual rows
+const ValuePicker = ({ currentKey, currentValueType, onSelectCalculated, onSelectManual }) => {
+  const [open, setOpen] = useState(false);
+
+  const currentItem = currentKey ? CALCULATED_KEY_MAP[currentKey] : null;
+  const buttonLabel = currentValueType === 'calculated' && currentItem
+    ? currentItem.name
+    : 'Enter amount manually';
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      {/* Trigger button */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-xs px-2 py-1 rounded border border-slate-200
+                   bg-slate-50 text-slate-600 hover:bg-slate-100
+                   flex items-center gap-1 whitespace-nowrap"
+        title="Change value source"
+      >
+        <span>{buttonLabel}</span>
+        <span className="text-slate-400">▾</span>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-50 bg-white border
+                     border-slate-200 rounded-lg shadow-lg overflow-hidden"
+          style={{ minWidth: '280px', maxHeight: '320px', overflowY: 'auto' }}
+        >
+          {/* Manual entry option at top */}
+          <div
+            onClick={() => { onSelectManual(); setOpen(false); }}
+            className="px-3 py-2 hover:bg-slate-50 cursor-pointer
+                       border-b border-slate-100"
+          >
+            <div className="text-xs font-medium text-slate-700">
+              Enter amount manually
+            </div>
+            <div className="text-xs text-slate-400">
+              Type a custom number for this row
+            </div>
+          </div>
+
+          {/* Grouped calculated values */}
+          {CALCULATED_KEY_GROUPS.map(group => (
+            <div key={group.group}>
+              {/* Group label */}
+              <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100">
+                <span className="text-[10px] font-medium uppercase
+                                 tracking-wider text-slate-400">
+                  {group.group}
+                </span>
+              </div>
+              {/* Items */}
+              {group.items.map(item => (
+                <div
+                  key={item.key}
+                  onClick={() => { onSelectCalculated(item.key); setOpen(false); }}
+                  className={`px-3 py-2 hover:bg-slate-50 cursor-pointer
+                              border-b border-slate-50 last:border-0
+                              ${currentKey === item.key
+                                ? 'bg-emerald-50'
+                                : ''}`}
+                >
+                  <div className="text-xs font-medium text-slate-700">
+                    {item.name}
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    {item.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 // Default card layout used when no SummaryTemplate exists for this company
 const DEFAULT_TEMPLATE = {
@@ -288,9 +426,6 @@ export default function SummaryTab({
     // Saving state
     const [isSaving, setIsSaving] = useState(false);
 
-    // State for add row picker — tracks which card is showing the add row dropdown
-    const [addRowCardId, setAddRowCardId] = useState(null);
-
     // State for add card form
     const [showAddCard, setShowAddCard] = useState(false);
     const [newCardTitle, setNewCardTitle] = useState('');
@@ -438,24 +573,61 @@ export default function SummaryTab({
         });
     };
 
-    // Add a calculated row to a card
     const handleAddCalculatedRow = (cardId, calcKey) => {
-        const calcDef = VALID_CALCULATED_KEYS.find(k => k.key === calcKey);
-        if (!calcDef) return;
-        setCards(prev => prev.map(c =>
-            c.id === cardId ? {
-                ...c,
-                rows: [...c.rows, {
-                    id: genId(),
-                    label: calcDef.label,
-                    valueType: 'calculated',
-                    calculatedKey: calcKey,
-                    manualValue: null
-                }]
-            } : c
-        ));
-        setAddRowCardId(null);
+      // Use CALCULATED_KEY_MAP for accountant-friendly label lookup
+      const calcDef = CALCULATED_KEY_MAP[calcKey];
+      if (!calcDef) return;
+      setCards(prev => prev.map(c =>
+        c.id === cardId ? {
+          ...c,
+          rows: [...c.rows, {
+            id: genId(),
+            label: calcDef.name,
+            valueType: 'calculated',
+            calculatedKey: calcKey,
+            manualValue: null
+          }]
+        } : c
+      ));
     };
+
+    // Switch a row from manual to calculated
+    const handleSetRowCalculated = (cardId, rowId, calcKey) => {
+      const calcDef = CALCULATED_KEY_MAP[calcKey];
+      if (!calcDef) return;
+      setCards(prev => prev.map(c =>
+        c.id === cardId ? {
+          ...c,
+          rows: c.rows.map(r =>
+            r.id === rowId ? {
+              ...r,
+              label: r.label || calcDef.name,
+              valueType: 'calculated',
+              calculatedKey: calcKey,
+              manualValue: null
+            } : r
+          )
+        } : c
+      ));
+    };
+
+    // Switch a row from calculated to manual
+    const handleSetRowManual = (cardId, rowId) => {
+      setCards(prev => prev.map(c =>
+        c.id === cardId ? {
+          ...c,
+          rows: c.rows.map(r =>
+            r.id === rowId ? {
+              ...r,
+              valueType: 'manual',
+              calculatedKey: null,
+              manualValue: r.manualValue ?? 0
+            } : r
+          )
+        } : c
+      ));
+    };
+
 
     // Add a manual row to a card
     const handleAddManualRow = (cardId) => {
@@ -471,7 +643,6 @@ export default function SummaryTab({
                 }]
             } : c
         ));
-        setAddRowCardId(null);
     };
 
     // Delete a row
@@ -664,7 +835,7 @@ export default function SummaryTab({
                                         </div>
 
                                         {/* Row Value */}
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex flex-col items-end gap-1.5 min-w-[140px]">
                                             {row.valueType === 'calculated' ? (
                                                 <div className="flex items-center gap-2">
                                                     <Lock className="w-3 h-3 text-slate-400" />
@@ -678,7 +849,7 @@ export default function SummaryTab({
                                                         type="number"
                                                         value={row.manualValue}
                                                         onChange={(e) => handleRowValueChange(card.id, row.id, Number(e.target.value) || 0)}
-                                                        className="h-8 w-28 text-right text-xs font-bold bg-white"
+                                                        className="h-8 w-32 text-right text-xs font-bold bg-white"
                                                     />
                                                 ) : (
                                                     <span className="text-sm font-bold text-slate-800 tabular-nums">
@@ -687,16 +858,27 @@ export default function SummaryTab({
                                                 )
                                             )}
                                             
-                                            {editMode && (
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-7 w-7 text-slate-300 hover:text-rose-500 transition-colors"
-                                                    onClick={() => handleDeleteRow(card.id, row.id)}
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </Button>
-                                            )}
+                                            <div className="flex items-center gap-1">
+                                                {editMode && (
+                                                    <ValuePicker
+                                                        currentKey={row.calculatedKey}
+                                                        currentValueType={row.valueType}
+                                                        onSelectCalculated={(key) => handleSetRowCalculated(card.id, row.id, key)}
+                                                        onSelectManual={() => handleSetRowManual(card.id, row.id)}
+                                                    />
+                                                )}
+
+                                                {editMode && (
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-7 w-7 text-slate-300 hover:text-rose-500 transition-colors"
+                                                        onClick={() => handleDeleteRow(card.id, row.id)}
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -709,42 +891,29 @@ export default function SummaryTab({
                             </div>
 
                             {editMode && (
-                                <div className="p-3 bg-slate-50 border-t flex items-center justify-center relative">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={() => setAddRowCardId(addRowCardId === card.id ? null : card.id)}
-                                        className="text-[10px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-900"
+                                <div className="flex gap-2 mt-2 pt-2 border-t border-slate-100 p-3 bg-slate-50/50 justify-center">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-xs h-7"
+                                        onClick={() => handleAddManualRow(card.id)}
                                     >
                                         <Plus className="w-3 h-3 mr-1" />
-                                        Add Row
+                                        Manual row
                                     </Button>
-
-                                    {addRowCardId === card.id && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-64 bg-white border rounded-lg shadow-xl z-50 overflow-hidden">
-                                            <div className="p-2 border-b bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">Input Type</div>
-                                            <button 
-                                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2"
-                                                onClick={() => handleAddManualRow(card.id)}
-                                            >
-                                                <Edit2 className="w-3 h-3 text-slate-400" />
-                                                Manual Entry Row
-                                            </button>
-                                            <div className="p-2 border-b border-t bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">Calculated Values</div>
-                                            <div className="max-h-48 overflow-y-auto">
-                                                {VALID_CALCULATED_KEYS.map(k => (
-                                                    <button 
-                                                        key={k.key}
-                                                        className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 border-b last:border-0"
-                                                        onClick={() => handleAddCalculatedRow(card.id, k.key)}
-                                                    >
-                                                        <Lock className="w-3 h-3 text-emerald-500" />
-                                                        {k.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-xs h-7"
+                                        onClick={() => {
+                                            // Add a calculated row with the first available key as default
+                                            // Accountant can then change it via the ValuePicker on the row
+                                            handleAddCalculatedRow(card.id, 'totalSalariesPayable');
+                                        }}
+                                    >
+                                        <Plus className="w-3 h-3 mr-1" />
+                                        Calculated row
+                                    </Button>
                                 </div>
                             )}
                         </CardContent>
