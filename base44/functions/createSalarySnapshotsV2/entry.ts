@@ -943,7 +943,9 @@ Deno.serve(async (req) => {
                 extraLopDays: extraLopDays,
                 extraLopPay: Math.round(extraLopPay),
                 extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay),
-                prevMonthDivisor: prevMonthDivisorForCalc
+                prevMonthDivisor: prevMonthDivisorForCalc,
+                // V2: Return other_minutes separately so current month can be isolated
+                extraOtherMinutes: totalOtherMinutes
             };
         };
 
@@ -1211,6 +1213,20 @@ Deno.serve(async (req) => {
                     )
                 };
                 console.log(`[createSalarySnapshotsV2] Employee ${emp.attendance_id}: prev month LOP override — ${v2PrevMonthLopDays} days from AnalysisResult`);
+            }
+
+            // V2: Subtract prev month other_minutes from full range total
+            // AnalysisResult.other_minutes covers the full project range (prev + current months)
+            // We must isolate current month only so deductibleHours is not overstated
+            // extraOtherMinutes comes from calculateExtraPrevMonthData scanning the overflow days
+            if (isAlMaraghi && hasExtraPrevMonthRange) {
+                const prevOther = extraPrevMonthData.extraOtherMinutes || 0;
+                if (prevOther > 0) {
+                    calculated.otherMinutes = Math.max(0,
+                        (calculated.otherMinutes || 0) - prevOther
+                    );
+                    console.log(`[createSalarySnapshotsV2] Employee ${emp.attendance_id}: subtracted ${prevOther} prev month other_minutes from current month total`);
+                }
             }
 
             const salaryLeaveDaysOverride = calculateSalaryLeaveDaysOverride(emp.attendance_id, allExceptions, project.date_from, project.date_to);
