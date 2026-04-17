@@ -1,5 +1,101 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-import { calculateEmployeeSalary, calculateSalaryLeaveDaysOverride, parseAdjustmentValue } from '../_shared/salary/calculateEmployeeSalary.ts';
+// ============================================================
+// INLINED HELPERS (no local imports allowed in Deno functions)
+// ============================================================
+
+const parseAdjustmentValue = (value) => {
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '' || trimmed === 'null') return 0;
+        if (trimmed.startsWith('[')) {
+            try {
+                const arr = JSON.parse(trimmed);
+                if (Array.isArray(arr)) {
+                    return arr.reduce((sum, item) => {
+                        const amt = typeof item === 'object' && item !== null ? Number(item.amount || 0) : Number(item || 0);
+                        return sum + (isNaN(amt) ? 0 : amt);
+                    }, 0);
+                }
+            } catch { return 0; }
+        }
+        const n = Number(trimmed);
+        return isNaN(n) ? 0 : n;
+    }
+    if (Array.isArray(value)) {
+        return value.reduce((sum, item) => {
+            const amt = typeof item === 'object' && item !== null ? Number(item.amount || 0) : Number(item || 0);
+            return sum + (isNaN(amt) ? 0 : amt);
+        }, 0);
+    }
+    return 0;
+};
+
+const calculateSalaryLeaveDaysOverride = (attendanceId, allExceptions, dateFrom, dateTo) => {
+    if (!attendanceId) return 0;
+    const leaveExceptions = allExceptions.filter(ex =>
+        ex.type === 'ANNUAL_LEAVE' &&
+        String(ex.attendance_id) === String(attendanceId) &&
+        ex.salary_leave_days != null &&
+        ex.date_from <= dateTo &&
+        ex.date_to >= dateFrom
+    );
+    if (leaveExceptions.length === 0) return 0;
+    return leaveExceptions.reduce((sum, ex) => sum + (Number(ex.salary_leave_days) || 0), 0);
+};
+
+const calculateEmployeeSalary = (input) => {
+    const { salary, prevMonthSalary, attendance, adjustments, settings } = input;
+    const { isAlMaraghi = false, divisor = 30, otDivisor = 30, prevMonthDivisor = 30, otNormalRate = 1.25, otSpecialRate = 1.5, wpsCapEnabled = false, wpsCapAmount = 4900, balanceRoundingRule = 'EXACT', leavePayFormula = 'TOTAL_SALARY', salaryLeaveFormula = 'BASIC_PLUS_ALLOWANCES' } = settings || {};
+    const basicSalary = salary.basic_salary || 0;
+    const allowances = salary.allowances || 0;
+    const allowancesWithBonus = salary.allowances_with_bonus || 0;
+    const totalSalary = salary.total_salary || 0;
+    const workingHours = salary.working_hours || 9;
+    const prevMonthTotalSalary = prevMonthSalary?.total_salary || totalSalary;
+    const { fullAbsenceCount = 0, annualLeaveCount = 0, deductibleMinutes = 0, ramadanGiftMinutes = 0, graceMinutes = 15, salaryLeaveDays: rawSalaryLeaveDays = 0 } = attendance || {};
+    const salaryLeaveDays = rawSalaryLeaveDays || annualLeaveCount;
+    const leaveDays = annualLeaveCount + fullAbsenceCount;
+    const leavePayBase = leavePayFormula === 'TOTAL_SALARY' ? totalSalary : basicSalary;
+    const leavePay = leaveDays > 0 ? Math.round((leavePayBase / divisor) * leaveDays) : 0;
+    const salaryLeaveBase = salaryLeaveFormula === 'BASIC_PLUS_ALLOWANCES' ? basicSalary + allowances : totalSalary;
+    const rawSalaryLeaveAmount = salaryLeaveDays > 0 ? (salaryLeaveBase / divisor) * salaryLeaveDays : 0;
+    const salaryLeaveAmount = Math.round(rawSalaryLeaveAmount * 100) / 100;
+    const netDeduction = Math.max(0, Math.round((leavePay - salaryLeaveAmount) * 100) / 100);
+    const effectiveDeductibleMinutes = Math.max(0, (deductibleMinutes || 0) - (ramadanGiftMinutes || 0));
+    const deductibleHours = Math.round((effectiveDeductibleMinutes / 60) * 100) / 100;
+    const hourlyRateDeduction = totalSalary / divisor / workingHours;
+    const deductibleHoursPay = Math.round(hourlyRateDeduction * deductibleHours * 100) / 100;
+    const otHourlyRate = prevMonthTotalSalary / otDivisor / workingHours;
+    const normalOtHours = adjustments?.normalOtHours || 0;
+    const specialOtHours = adjustments?.specialOtHours || 0;
+    const normalOtSalary = Math.round(otHourlyRate * otNormalRate * normalOtHours * 100) / 100;
+    const specialOtSalary = Math.round(otHourlyRate * otSpecialRate * specialOtHours * 100) / 100;
+    const totalOtSalary = Math.round((normalOtSalary + specialOtSalary) * 100) / 100;
+    const bonus = adjustments?.bonus || 0;
+    const incentive = adjustments?.incentive || 0;
+    const openLeaveSalary = adjustments?.open_leave_salary || 0;
+    const variableSalary = adjustments?.variable_salary || 0;
+    const otherDeduction = adjustments?.otherDeduction || 0;
+    const advanceSalaryDeduction = adjustments?.advanceSalaryDeduction || 0;
+    const isOperationsDept = (input.employee?.department || '').toLowerCase() === 'operations';
+    const effectiveOtOrIncentive = isOperationsDept ? Math.max(totalOtSalary, incentive) : totalOtSalary + incentive;
+    const rawTotal = totalSalary + bonus + effectiveOtOrIncentive + openLeaveSalary + variableSalary - netDeduction - deductibleHoursPay - otherDeduction - advanceSalaryDeduction;
+    const bonusHasDecimals = (bonus || 0) % 1 !== 0;
+    const total = bonusHasDecimals ? Math.round(rawTotal * 100) / 100 : Math.round(rawTotal);
+    let wpsPay = total, balance = 0, wpsCapApplied = false;
+    if (wpsCapEnabled) {
+        if (total <= 0) { wpsPay = 0; balance = 0; }
+        else {
+            const rawExcess = Math.max(0, total - wpsCapAmount);
+            balance = rawExcess > 0 ? (balanceRoundingRule === 'UP_TO_100' ? Math.ceil(rawExcess / 100) * 100 : Math.floor(rawExcess / 100) * 100) : 0;
+            wpsPay = Math.round((total - balance) * 100) / 100;
+            wpsCapApplied = rawExcess > 0;
+        }
+    } else if (total <= 0) { wpsPay = 0; balance = 0; }
+    return { basic_salary: basicSalary, allowances, allowances_with_bonus: allowancesWithBonus, total_salary: totalSalary, working_hours: workingHours, working_days: attendance?.workingDays || 0, present_days: attendance?.presentDays || 0, full_absence_count: fullAbsenceCount, annual_leave_count: annualLeaveCount, sick_leave_count: attendance?.sickLeaveCount || 0, late_minutes: attendance?.lateMinutes || 0, early_checkout_minutes: attendance?.earlyCheckoutMinutes || 0, other_minutes: attendance?.otherMinutes || 0, approved_minutes: attendance?.approvedMinutes || 0, grace_minutes: graceMinutes, deductible_minutes: effectiveDeductibleMinutes, ramadan_gift_minutes: ramadanGiftMinutes || 0, salary_divisor: divisor, ot_divisor: otDivisor, prev_month_divisor: prevMonthDivisor, salary_leave_days: salaryLeaveDays, leaveDays, leavePay, salaryLeaveAmount, netDeduction, deductibleHours, deductibleHoursPay, normalOtHours, normalOtSalary, specialOtHours, specialOtSalary, totalOtSalary, bonus, incentive, open_leave_salary: openLeaveSalary, variable_salary: variableSalary, otherDeduction, advanceSalaryDeduction, total, wpsPay, balance, wps_cap_enabled: wpsCapEnabled, wps_cap_amount: wpsCapAmount, wps_cap_applied: wpsCapApplied };
+};
 
 
 /**
