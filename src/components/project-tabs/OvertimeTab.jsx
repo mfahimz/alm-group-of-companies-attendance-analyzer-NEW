@@ -578,10 +578,15 @@ export default function OvertimeTab({ project }) {
                     advanceSalaryDeduction: JSON.stringify(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction)
                 };
 
-                // SalarySnapshot receives the same adjustment data as OvertimeData.
-                // Seeded recurring entries are already materialized in the entries arrays,
-                // so no re-injection from live RecurringAdjustment rules is needed.
-                const snapshotAdjustmentData = { ...otAdjustmentData };
+                // SalarySnapshot receives numeric sums (not JSON strings) — entity fields are typed as number
+                const snapshotAdjustmentData = {
+                    bonus: flattenToSum(edits.bonus ?? employee.bonus),
+                    incentive: flattenToSum(edits.incentive ?? employee.incentive),
+                    open_leave_salary: flattenToSum(edits.open_leave_salary ?? employee.open_leave_salary),
+                    variable_salary: flattenToSum(edits.variable_salary ?? employee.variable_salary),
+                    otherDeduction: flattenToSum(edits.otherDeduction ?? employee.otherDeduction),
+                    advanceSalaryDeduction: flattenToSum(edits.advanceSalaryDeduction ?? employee.advanceSalaryDeduction)
+                };
 
                 // Save to OvertimeData (always)
                 if (employee.otRecordId) {
