@@ -97,6 +97,8 @@ export default function BodyShopPayrollTab({
             acc.deductibleHoursPay += Number(row.deductibleHoursPay || 0);
             acc.otherDeduction += asNumber(getValue(row, 'otherDeduction'));
             acc.advanceSalaryDeduction += asNumber(getValue(row, 'advanceSalaryDeduction'));
+            acc.prevMonthLopDays += (row.extra_prev_month_lop_days || 0);
+            acc.prevMonthLopPay += (row.extra_prev_month_lop_pay || 0);
             acc.netDeductions += netDeductions;
             acc.total += displayTotal;
             acc.wpsPay += displayWpsPay;
@@ -109,7 +111,7 @@ export default function BodyShopPayrollTab({
             bonus: 0, normalOtHours: 0, normalOtSalary: 0, specialOtHours: 0, specialOtSalary: 0, 
             totalOtSalary: 0, incentive: 0, open_leave_salary: 0, variable_salary: 0, netAdditions: 0, 
             leavePay: 0, netDeduction: 0, deductibleHours: 0, deductibleHoursPay: 0, 
-            otherDeduction: 0, advanceSalaryDeduction: 0, netDeductions: 0, total: 0, wpsPay: 0, balance: 0
+            otherDeduction: 0, advanceSalaryDeduction: 0, prevMonthLopDays: 0, prevMonthLopPay: 0, netDeductions: 0, total: 0, wpsPay: 0, balance: 0
         });
     }, [bodyShopEmployees, calculateTotals, activeHolds, getValue, isAlMaraghi, asNumber]);
 
@@ -183,7 +185,7 @@ export default function BodyShopPayrollTab({
                             <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                             <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                            <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                            <th colSpan={10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                             <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                             <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                         </tr>
@@ -222,6 +224,12 @@ export default function BodyShopPayrollTab({
                             <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Pay</SortableTableHead>
                             <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Other</SortableTableHead>
                             <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Advance</SortableTableHead>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">
+                                Prev LOP Days
+                            </th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">
+                                Prev LOP Pay
+                            </th>
                             <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">Net Ded.</TableHead>
                             {/* Final Group */}
                             <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Total</SortableTableHead>
@@ -238,7 +246,7 @@ export default function BodyShopPayrollTab({
                     <tbody>
                         {filteredData.length === 0 ? (
                         <tr>
-                            <td colSpan={35} className="text-center py-12">
+                            <td colSpan={37} className="text-center py-12">
                                 <p className="text-slate-500">No employees match your search</p>
                             </td>
                         </tr>
@@ -370,6 +378,14 @@ export default function BodyShopPayrollTab({
                                     <td className={`${cellBase} bg-rose-50/50 px-1`}>
                                         <Input type="number" step="0.01" value={getValue(row, 'advanceSalaryDeduction')} onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
                                     </td>
+                                    {/* Previous month LOP days from AnalysisResult via createSalarySnapshotsV2 */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">
+                                        {(row.extra_prev_month_lop_days || 0).toFixed(0)}
+                                    </td>
+                                    {/* Previous month LOP pay calculated at previous month salary rate */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">
+                                        {(row.extra_prev_month_lop_pay || 0).toFixed(2)}
+                                    </td>
                                     <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
 
                                     <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{displayTotal.toFixed(2)}</td>
@@ -451,6 +467,8 @@ export default function BodyShopPayrollTab({
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.deductibleHoursPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.otherDeduction.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.advanceSalaryDeduction.toFixed(2)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopDays.toFixed(0)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-rose-900 border-r border-slate-600">{grandTotals.netDeductions.toFixed(2)}</td>
                             
                             <td className="px-2 py-1.5 text-right tabular-nums bg-indigo-900">{grandTotals.total.toFixed(2)}</td>

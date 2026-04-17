@@ -1206,7 +1206,7 @@ export default function SalaryReportDetail() {
                                             <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                                             <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                                            <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                                            <th colSpan={10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                                             <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                                             <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                                         </tr>
@@ -1245,6 +1245,22 @@ export default function SalaryReportDetail() {
                                             <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Pay</SortableTableHead>
                                             <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Other</SortableTableHead>
                                             <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Advance</SortableTableHead>
+                                            <SortableTableHead
+                                                sortKey="extra_prev_month_lop_days"
+                                                currentSort={sortColumn}
+                                                onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2"
+                                            >
+                                                Prev LOP Days
+                                            </SortableTableHead>
+                                            <SortableTableHead
+                                                sortKey="extra_prev_month_lop_pay"
+                                                currentSort={sortColumn}
+                                                onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2"
+                                            >
+                                                Prev LOP Pay
+                                            </SortableTableHead>
                                             <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">Net Ded.</TableHead>
                                             {/* Final Group */}
                                             <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Total</SortableTableHead>
@@ -1261,7 +1277,7 @@ export default function SalaryReportDetail() {
                                     <tbody>
                                         {filteredData.length === 0 ? (
                                         <tr>
-                                        <td colSpan={35} className="text-center py-12">
+                                            <td colSpan={37} className="text-center py-12">
                                                     <p className="text-slate-500">No employees match your search</p>
                                                 </td>
                                             </tr>
@@ -1397,6 +1413,14 @@ export default function SalaryReportDetail() {
                                                     </td>
                                                     <td className={`${cellBase} bg-rose-50/50 px-1`}>
                                                         <Input type="number" step="0.01" value={getValue(row, 'advanceSalaryDeduction')} onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+                                                    {/* Previous month LOP days from AnalysisResult via createSalarySnapshotsV2 */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}>
+                                                        {(row.extra_prev_month_lop_days || 0).toFixed(0)}
+                                                    </td>
+                                                    {/* Previous month LOP pay calculated at previous month salary rate */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}>
+                                                        {(row.extra_prev_month_lop_pay || 0).toFixed(2)}
                                                     </td>
                                                     <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
 
