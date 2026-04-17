@@ -1,0 +1,1825 @@
+// createSalarySnapshotsV2/entry.ts
+// Safe parallel version of createSalarySnapshots.
+// Identical to original except:
+//   - LOP days derived from AnalysisResult.lop_dates (no re-analysis)
+//   - LOP adjacent derived from AnalysisResult.lop_adjacent_weekly_off_dates
+//   - Other minutes split using calculateExtraPrevMonthData for overflow days
+//   - extra_prev_month_* snapshot fields are now populated (not zeroed)
+// Original createSalarySnapshots/entry.ts is completely untouched.
+// To revert: change finalize call back to createSalarySnapshots.
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { calculateEmployeeSalary, calculateSalaryLeaveDaysOverride, parseAdjustmentValue } from '../_shared/salary/calculateEmployeeSalary.ts';
+
+
+/**
+ * DATA ACCESS LAYER - EXPLICIT LIMITS ENFORCED
+ * 
+ * CRITICAL RULE: All .filter() calls MUST include explicit limit parameter.
+ * Base44 SDK default limit causes silent data truncation.
+ * 
+ * Pattern: entitySDK.filter(filterObj, sortKey, EXPLICIT_LIMIT)
+ * Example: Employee.filter({ active: true }, null, 5000)
+ */
+
+/**
+ * CREATE SALARY SNAPSHOTS
+ * 
+ * CORE RULE: Every active employee MUST have a SalarySnapshot when a report is finalized.
+ * Attendance quality does NOT decide salary inclusion.
+ * 
+ * Active Employee Definition:
+ * - employee.company === project.company
+ * - employee.active === true
+ * - A valid EmployeeSalary record exists
+ * 
+ * Algorithm:
+ * 1. Fetch ALL active employees for the project company with valid salary records
+ * 2. For EACH employee:
+ *    - Try to find AnalysisResult for the finalized report_run_id
+ *    - If found → use attendance values, set attendance_source = "ANALYZED"
+ *    - If NOT found → create ZERO-ATTENDANCE snapshot, set attendance_source = "NO_ATTENDANCE_DATA"
+ * 
+ * SALARY-ONLY EMPLOYEES:
+ * - Employees without attendance_id (has_attendance_tracking=false) are supported
+ * - They will have NO_ATTENDANCE_DATA status (no deductions from attendance)
+ * - Only their base salary + allowances + manual adjustments are paid
+ */
+
+Deno.serve(async (req) => {
+    try {
+        console.log('[createSalarySnapshots] Function invoked');
+        const base44 = createClientFromRequest(req);
+
+        // Paginated fetch helper to avoid SDK truncation on large datasets
+        const fetchAllPages = async (fetcher: (skip: number, limit: number) => Promise<any[]>) => {
+            const all: any[] = [];
+            let skip = 0;
+            const limit = 1000;
+            while (true) {
+                const results = await fetcher(skip, limit);
+                if (!results || results.length === 0) break;
+                all.push(...results);
+                if (results.length < limit) break;
+                skip += limit;
+            }
+            return all;
+        };
+
+        // Allow service role calls (from markFinalReport)
+        let user = null;
+        try {
+            user = await base44.auth.me();
+        } catch (authError) {
+            console.log('[createSalarySnapshots] No user auth, likely service role call');
+        }
+
+        const { project_id, report_run_id, batch_mode = false, batch_start = 0, batch_size = 10 } = await req.json();
+        console.log('[createSalarySnapshots] Params:', { project_id, report_run_id });
+
+        if (!project_id || !report_run_id) {
+            return Response.json({
+                error: 'project_id and report_run_id are required'
+            }, { status: 400 });
+        }
+
+        // Fetch project
+        const projects = await base44.asServiceRole.entities.Project.filter({ id: project_id });
+        if (projects.length === 0) {
+            return Response.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        const project = projects[0];
+
+        // ============================================================
+        // USE PROJECT-LEVEL DEFAULTS (Settings entity removed)
+        // ============================================================
+        const settings = null;
+
+        // DIVISOR_LEAVE_DEDUCTION: Used for current month Leave Pay, Salary Leave Amount, Deductible Hours Pay
+        let divisor = settings?.salary_divisor || project.salary_calculation_days || 30;
+        if (!divisor || divisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid salary_divisor from settings, using default 30');
+            divisor = 30;
+        }
+
+        // DIVISOR_OT: Used for OT Hourly Rate, Previous Month LOP Days, Previous Month Deductible Minutes
+        let otDivisor = settings?.ot_divisor || project.ot_calculation_days || divisor;
+        if (!otDivisor || otDivisor <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_divisor from settings, using default divisor');
+            otDivisor = divisor;
+        }
+        const isAlMaraghi = project.company === 'Al Maraghi Motors';
+
+        // OT Rates from settings
+        let otNormalRate = settings?.ot_normal_rate || 1.25;
+        let otSpecialRate = settings?.ot_special_rate || 1.5;
+        if (!otNormalRate || otNormalRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_normal_rate, using default 1.25');
+            otNormalRate = 1.25;
+        }
+        if (!otSpecialRate || otSpecialRate <= 0) {
+            console.warn('[createSalarySnapshots] Invalid ot_special_rate, using default 1.5');
+            otSpecialRate = 1.5;
+        }
+
+        // WPS Cap settings
+        const wpsCapEnabledGlobal = settings?.wps_cap_enabled ?? (isAlMaraghi ? true : false);
+        const wpsCapAmountGlobal = settings?.wps_cap_amount ?? 4900;
+        const balanceRoundingRule = settings?.balance_rounding_rule || 'EXACT';
+
+        // Formula settings
+        const leavePayFormula = settings?.leave_pay_formula || 'TOTAL_SALARY';
+        const salaryLeaveFormula = settings?.salary_leave_formula || 'BASIC_PLUS_ALLOWANCES';
+        const assumedPresentLastDays = settings?.assumed_present_last_days ?? (isAlMaraghi ? 2 : 0);
+
+        console.log('[createSalarySnapshots] ============================================');
+        console.log('[createSalarySnapshots] CALCULATION SETTINGS (from Project):');
+        console.log('[createSalarySnapshots]   Salary Divisor:', divisor);
+        console.log('[createSalarySnapshots]   OT Divisor:', otDivisor);
+        console.log('[createSalarySnapshots]   WPS Cap Enabled:', wpsCapEnabledGlobal);
+        console.log('[createSalarySnapshots]   Assumed Present Days:', assumedPresentLastDays);
+        console.log('[createSalarySnapshots] ============================================');
+
+        // ============================================================
+        // UNIVERSAL IDEMPOTENCY CHECK (BATCH & NON-BATCH)
+        // CRITICAL: Must run FIRST before ANY processing to prevent duplicates
+        // Handles: double-clicks, network retries, concurrent requests, simultaneous batch starts
+        // ============================================================
+        const existingSnapshots = await base44.asServiceRole.entities.SalarySnapshot.filter({
+            project_id: project_id,
+            report_run_id: report_run_id
+        }, null, 5000);
+
+        const existingSnapshotKeys = new Set(
+            existingSnapshots.map(s => String(s.attendance_id || s.hrms_id)).filter(Boolean)
+        );
+
+        if (existingSnapshots.length > 0) {
+            console.log(`[createSalarySnapshots] 🛑 IDEMPOTENCY GATE: ${existingSnapshots.length} snapshots already exist for report_run_id ${report_run_id}`);
+            console.log(`[createSalarySnapshots] ⚠️ Request type: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}`);
+
+            // SELF-HEAL: Ensure existing snapshots preserve finalized attendance fields AS-IS.
+            // Legacy snapshots may have deductible_minutes polluted with other_minutes.
+            // We repair those fields from AnalysisResult without creating duplicates.
+            const analysisResultsForRepair = await base44.asServiceRole.entities.AnalysisResult.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            }, null, 5000);
+            const overtimeDataForRepair = await base44.asServiceRole.entities.OvertimeData.filter({
+                project_id: project_id
+            }, null, 5000);
+
+            let repairedSnapshots = 0;
+            for (const snapshot of existingSnapshots) {
+                if (!snapshot.attendance_id) continue; // Salary-only employee (no AnalysisResult)
+
+                const analysisResult = analysisResultsForRepair.find(r =>
+                    String(r.attendance_id) === String(snapshot.attendance_id)
+                );
+                if (!analysisResult) continue;
+
+                const rawDeductibleMinutes = Math.max(0, analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0);
+                const ramadanGiftMinutes = Math.max(0, analysisResult.ramadan_gift_minutes || 0);
+                const finalizedDeductibleMinutes = Math.max(0, rawDeductibleMinutes - ramadanGiftMinutes);
+                const finalizedOtherMinutes = Math.max(0, analysisResult.other_minutes || 0);
+
+                const otRecord = overtimeDataForRepair.find(ot =>
+                    String(ot.attendance_id || '') === String(snapshot.attendance_id || '') ||
+                    String(ot.hrms_id || '') === String(snapshot.hrms_id || '')
+                );
+                const openLeaveSalary = Math.max(0, Number(otRecord?.open_leave_salary ?? snapshot.open_leave_salary ?? 0));
+                const variableSalary = Math.max(0, Number(otRecord?.variable_salary ?? snapshot.variable_salary ?? 0));
+
+                if (
+                    Number(snapshot.deductible_minutes || 0) !== Number(finalizedDeductibleMinutes) ||
+                    Number(snapshot.other_minutes || 0) !== Number(finalizedOtherMinutes) ||
+                    Number(snapshot.open_leave_salary || 0) !== Number(openLeaveSalary) ||
+                    Number(snapshot.variable_salary || 0) !== Number(variableSalary)
+                ) {
+                    const previousOpenLeaveSalary = Math.max(0, Number(snapshot.open_leave_salary || 0));
+                    const previousVariableSalary = Math.max(0, Number(snapshot.variable_salary || 0));
+                    const repairedTotal = Math.round(((Number(snapshot.total || 0) - previousOpenLeaveSalary - previousVariableSalary + openLeaveSalary + variableSalary) * 100)) / 100;
+
+                    const wpsCapEnabled = snapshot.wps_cap_enabled || false;
+                    const wpsCapAmount = snapshot.wps_cap_amount ?? 4900;
+                    let repairedWpsPay = repairedTotal;
+                    let repairedBalance = 0;
+                    let repairedWpsCapApplied = false;
+
+                    if (wpsCapEnabled) {
+                        if (repairedTotal <= 0) {
+                            repairedWpsPay = 0;
+                            repairedBalance = 0;
+                        } else {
+                            const rawExcess = Math.max(0, repairedTotal - wpsCapAmount);
+                            repairedBalance = rawExcess > 0 ? Math.ceil(rawExcess / 100) * 100 : 0;
+                            repairedWpsPay = Math.round((repairedTotal - repairedBalance) * 100) / 100;
+                            repairedWpsCapApplied = rawExcess > 0;
+                        }
+                    } else if (repairedTotal <= 0) {
+                        repairedWpsPay = 0;
+                        repairedBalance = 0;
+                    }
+
+                    await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, {
+                        deductible_minutes: finalizedDeductibleMinutes,
+                        ramadan_gift_minutes: ramadanGiftMinutes,
+                        other_minutes: finalizedOtherMinutes,
+                        open_leave_salary: openLeaveSalary,
+                        variable_salary: variableSalary,
+                        total: repairedTotal,
+                        wpsPay: repairedWpsPay,
+                        balance: repairedBalance,
+                        wps_cap_applied: repairedWpsCapApplied
+                    });
+                    repairedSnapshots++;
+                }
+            }
+
+            console.log(`[createSalarySnapshots] 🔧 SELF-HEAL COMPLETE: repaired ${repairedSnapshots} existing snapshots`);
+
+            // NON-BATCH MODE: Return early — all employees already processed
+            if (!batch_mode) {
+                return Response.json({
+                    success: true,
+                    snapshots_created: 0,
+                    existing_snapshots: existingSnapshots.length,
+                    repaired_snapshots: repairedSnapshots,
+                    message: `Snapshots already exist for this report (${existingSnapshots.length} found). Repaired ${repairedSnapshots} snapshots and prevented duplicates.`
+                });
+            }
+
+            // BATCH MODE: Do NOT return early. The existingSnapshotKeys set already tracks
+            // which employees have snapshots. The main loop below will skip them via the
+            // existingSnapshotKeys.has() check and only create snapshots for NEW employees.
+            console.log(`[createSalarySnapshots] ✅ BATCH CONTINUE MODE: ${existingSnapshots.length} existing snapshots tracked; continuing to process remaining employees`);
+        }
+
+        console.log(`[createSalarySnapshots] ✅ IDEMPOTENCY GATE PASSED: proceeding with snapshot creation flow`);
+        console.log(`[createSalarySnapshots] Request mode: ${batch_mode ? 'BATCH' : 'STANDARD'}, batch_start: ${batch_start}, batch_size: ${batch_size}`);
+
+        // ============================================================
+        // AL MARAGHI MOTORS: Calculate salary month ranges
+        // ============================================================
+        let salaryMonthStartStr = null;
+        let salaryMonthEndStr = null;
+        let extraPrevMonthFrom = null;
+        let extraPrevMonthTo = null;
+        let hasExtraPrevMonthRange = false;
+
+        // ============================================================
+        // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS (Last 2 days of month)
+        // Per payroll rules, the last 2 days of the salary month are treated
+        // as FULLY PRESENT for salary calculation only:
+        // - No LOP days
+        // - No late minutes  
+        // - No early checkout minutes
+        // - No other minutes
+        // - No deductible minutes
+        // This does NOT affect attendance data (runAnalysis.js).
+        // Exception: If employee has ANNUAL_LEAVE on those days, honor the leave.
+        // ============================================================
+        let assumedPresentDays = [];
+
+        if (isAlMaraghi) {
+            const projectDateTo = new Date(project.date_to);
+            const salaryMonthStart = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth(), 1);
+            const salaryMonthEnd = new Date(projectDateTo.getFullYear(), projectDateTo.getMonth() + 1, 0);
+
+            salaryMonthStartStr = salaryMonthStart.toISOString().split('T')[0];
+            salaryMonthEndStr = salaryMonthEnd.toISOString().split('T')[0];
+
+            // Calculate assumed present days based on settings
+            // assumedPresentLastDays = 2 means last 2 days, = 0 means none
+            if (assumedPresentLastDays > 0) {
+                for (let i = 0; i < assumedPresentLastDays; i++) {
+                    const assumedDay = new Date(projectDateTo);
+                    assumedDay.setDate(assumedDay.getDate() - i);
+                    assumedPresentDays.push(assumedDay.toISOString().split('T')[0]);
+                }
+            }
+
+            // Extra previous month range
+            const projectDateFrom = new Date(project.date_from);
+            const dayBeforeSalaryMonth = new Date(salaryMonthStart);
+            dayBeforeSalaryMonth.setDate(dayBeforeSalaryMonth.getDate() - 1);
+
+            if (projectDateFrom < salaryMonthStart) {
+                extraPrevMonthFrom = project.date_from;
+                extraPrevMonthTo = dayBeforeSalaryMonth.toISOString().split('T')[0];
+                hasExtraPrevMonthRange = true;
+            }
+
+            console.log('[createSalarySnapshots] Al Maraghi salary month ranges:', {
+                salary_month_start: salaryMonthStartStr,
+                salary_month_end: salaryMonthEndStr,
+                extra_prev_month_from: extraPrevMonthFrom,
+                extra_prev_month_to: extraPrevMonthTo,
+                has_extra_range: hasExtraPrevMonthRange,
+                assumed_present_days: assumedPresentDays
+            });
+        }
+
+
+
+        // Verify report exists
+        const reports = await base44.asServiceRole.entities.ReportRun.filter({ id: report_run_id, project_id: project_id });
+        if (reports.length === 0) {
+            return Response.json({ error: 'Report not found for this project' }, { status: 404 });
+        }
+        const reportRun = reports[0];
+
+        // Fetch core data
+        // CRITICAL: .filter() has DEFAULT LIMIT of 50 - must specify higher limit or use list()
+        const [employees, salaries, _legacyAnalysisResults, allExceptions, salaryIncrements, rulesData, punches, shifts, allOvertimeData, allHolds] = await Promise.all([
+            base44.asServiceRole.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
+            base44.asServiceRole.entities.EmployeeSalary.filter({ company: project.company, active: true }, null, 5000),
+            base44.asServiceRole.entities.AnalysisResult.filter({
+                project_id: project_id,
+                report_run_id: report_run_id
+            }, null, 5000),
+            base44.asServiceRole.entities.Exception.filter({ project_id: project_id }, null, 5000),
+            isAlMaraghi
+                ? base44.asServiceRole.entities.SalaryIncrement.filter({ company: 'Al Maraghi Motors', active: true }, null, 5000)
+                : Promise.resolve([]),
+            base44.asServiceRole.entities.AttendanceRules.filter({ company: project.company }, null, 5000),
+            base44.asServiceRole.entities.Punch.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.ShiftTiming.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.OvertimeData.filter({ project_id: project_id }, null, 5000),
+            base44.asServiceRole.entities.PayrollHold.filter({ company: project.company }, null, 5000)
+        ]);
+
+        // V2 ADDITION: Fetch AnalysisResult records for this report run
+        // Used to read lop_dates and lop_adjacent_weekly_off_dates
+        // per employee from the already-finalized attendance report.
+        // READ-ONLY — does not modify any attendance or analysis data.
+        const analysisResults = await fetchAllPages(
+            (skip: number, limit: number) =>
+                base44.asServiceRole.entities.AnalysisResult.filter(
+                    { report_run_id: String(report_run_id) },
+                    null,
+                    limit,
+                    skip
+                )
+        );
+
+        // Build lookup map: attendance_id string -> AnalysisResult record
+        // Used in per-employee loop to get lop_dates for prev month split
+        const analysisResultMap: Record<string, any> = {};
+        analysisResults.forEach((ar: any) => {
+            analysisResultMap[String(ar.attendance_id)] = ar;
+        });
+
+        console.log(`[createSalarySnapshotsV2] Loaded ${analysisResults.length} AnalysisResult records for report ${report_run_id}`);
+
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] EXECUTION TRACE START`);
+        console.log(`[createSalarySnapshots] BATCH_MODE=${batch_mode}, BATCH_START=${batch_start}, BATCH_SIZE=${batch_size}`);
+        console.log(`[createSalarySnapshots] RAW DATA FETCHED: ${employees.length} employees, ${salaries.length} salaries, ${analysisResults.length} analysis results, ${allOvertimeData.length} overtime records`);
+        console.log(`[createSalarySnapshots] ============================================`);
+
+        // Parse rules
+        let rules = null;
+        if (rulesData && rulesData.length > 0) {
+            try {
+                rules = JSON.parse(rulesData[0].rules_json);
+            } catch (e) {
+                console.warn('[createSalarySnapshots] Failed to parse rules, using defaults');
+            }
+        }
+
+        // Helper: Parse OvertimeData adjustment arrays or legacy numbers
+        // OvertimeData stores these fields as either JSON arrays of amount+desc objects 
+        // or plain numbers depending on whether recurring adjustments are merged.
+
+
+        // Helper: Parse time string to Date object
+        const parseTime = (timeStr) => {
+            try {
+                if (!timeStr || timeStr === '—' || timeStr === '-') return null;
+
+                // Priority 1: Format with seconds
+                let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = parseInt(timeMatch[3]);
+                    const period = timeMatch[4].toUpperCase();
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
+                }
+
+                // Priority 2: Standard AM/PM
+                timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+                if (timeMatch) {
+                    let hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const period = timeMatch[3].toUpperCase();
+                    if (period === 'PM' && hours !== 12) hours += 12;
+                    if (period === 'AM' && hours === 12) hours = 0;
+                    const date = new Date();
+                    date.setHours(hours, minutes, 0, 0);
+                    return date;
+                }
+
+                // Priority 3: 24-hour with optional seconds
+                timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+                if (timeMatch) {
+                    const hours = parseInt(timeMatch[1]);
+                    const minutes = parseInt(timeMatch[2]);
+                    const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
+                    const date = new Date();
+                    date.setHours(hours, minutes, seconds, 0);
+                    return date;
+                }
+
+                return null;
+            } catch {
+                return null;
+            }
+        };
+
+        // Helper: Filter duplicate punches within 10 minutes
+        const filterMultiplePunches = (punchList) => {
+            if (punchList.length <= 1) return punchList;
+            const punchesWithTime = punchList.map(p => ({
+                ...p,
+                time: parseTime(p.timestamp_raw)
+            })).filter(p => p.time);
+            if (punchesWithTime.length === 0) return punchList;
+
+            const deduped = [];
+            for (const current of punchesWithTime) {
+                const isDuplicate = deduped.some(p => Math.abs(current.time.getTime() - p.time.getTime()) / (1000 * 60) < 10);
+                if (!isDuplicate) deduped.push(current);
+            }
+            return deduped.sort((a, b) => a.time.getTime() - b.time.getTime());
+        };
+
+        // Helper: Match punches to shift points
+        const matchPunchesToShiftPoints = (dayPunches, shift) => {
+            if (!shift || dayPunches.length === 0) return [];
+
+            const punchesWithTime = dayPunches.map(p => ({
+                ...p,
+                time: p.time || parseTime(p.timestamp_raw)
+            })).filter((p: any) => p.time).sort((a: any, b: any) => a.time.getTime() - b.time.getTime());
+
+            if (punchesWithTime.length === 0) return [];
+
+            // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
+            const pmEndTime = parseTime(shift.pm_end);
+            let adjustedPmEnd = pmEndTime;
+            if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
+                adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
+            }
+
+            const shiftPoints = [
+                { type: 'AM_START', time: parseTime(shift.am_start) },
+                { type: 'AM_END', time: parseTime(shift.am_end) },
+                { type: 'PM_START', time: parseTime(shift.pm_start) },
+                { type: 'PM_END', time: adjustedPmEnd }
+            ].filter(sp => sp.time);
+
+            const matches = [];
+            const usedShiftPoints = new Set();
+
+            for (const punch of punchesWithTime) {
+                let closestMatch = null;
+                let minDistance = Infinity;
+
+                // Phase 1: Normal match (±60 min)
+                for (const shiftPoint of shiftPoints) {
+                    if (usedShiftPoints.has(shiftPoint.type)) continue;
+                    const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+                    if (distance <= 60 && distance < minDistance) {
+                        minDistance = distance;
+                        closestMatch = shiftPoint;
+                    }
+                }
+
+                // Phase 2: Extended match (±120 min)
+                if (!closestMatch) {
+                    for (const shiftPoint of shiftPoints) {
+                        if (usedShiftPoints.has(shiftPoint.type)) continue;
+                        const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+                        if (distance <= 120 && distance < minDistance) {
+                            minDistance = distance;
+                            closestMatch = shiftPoint;
+                        }
+                    }
+                }
+
+                // Phase 3: Far extended match (±180 min)
+                if (!closestMatch) {
+                    for (const shiftPoint of shiftPoints) {
+                        if (usedShiftPoints.has(shiftPoint.type)) continue;
+                        const distance = Math.abs(punch.time.getTime() - shiftPoint.time.getTime()) / (1000 * 60);
+                        if (distance <= 180 && distance < minDistance) {
+                            minDistance = distance;
+                            closestMatch = shiftPoint;
+                        }
+                    }
+                }
+
+                if (closestMatch) {
+                    matches.push({ punch, matchedTo: closestMatch.type, shiftTime: closestMatch.time });
+                    usedShiftPoints.add(closestMatch.type);
+                }
+            }
+
+            return matches;
+        };
+
+        // RECALCULATE attendance for each employee (same logic as UI)
+        // For Al Maraghi Motors: assumedPresentDays are treated as fully present for salary
+        const calculateInclusiveDays = (fromDate, toDate) => {
+            const msPerDay = 24 * 60 * 60 * 1000;
+            return Math.floor((toDate.getTime() - fromDate.getTime()) / msPerDay) + 1;
+        };
+
+
+
+        const recalculateEmployeeAttendance = (emp, dateFrom, dateTo, assumedDays = []) => {
+            const attendanceIdStr = String(emp.attendance_id);
+            const includeSeconds = true; // Unified
+
+            const employeePunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= dateFrom &&
+                p.punch_date <= dateTo
+            );
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
+            const employeeExceptions = allExceptions.filter(e =>
+                (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                e.use_in_analysis !== false &&
+                e.is_custom_type !== true
+            );
+
+            const dayNameToNumber = {
+                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+            };
+
+            let workingDays = 0;
+            let presentDays = 0;
+            let fullAbsenceCount = 0;
+            let halfAbsenceCount = 0;
+            let sickLeaveCount = 0;
+            let annualLeaveCount = 0;
+            let lateMinutes = 0;
+            let earlyCheckoutMinutes = 0;
+            let otherMinutes = 0;
+            let approvedMinutes = 0;
+
+            const startDate = new Date(dateFrom);
+            const endDate = new Date(dateTo);
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDate = new Date(d);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                // CRITICAL BUG FIX #6: Use getUTCDay() consistently for weekly off detection
+                const dayOfWeek = currentDate.getUTCDay();
+
+                // Check weekly off
+                let weeklyOffDay = null;
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (emp.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[emp.weekly_off];
+                }
+
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    continue;
+                }
+
+                // ============================================================
+                // AL MARAGHI MOTORS: ASSUMED PRESENT DAYS LOGIC
+                // If this day is in assumedDays array, treat as fully present
+                // UNLESS employee has ANNUAL_LEAVE on this day
+                // CRITICAL FIX: Check if assumed day is employee's weekly off - if so, don't mark present
+                // ============================================================
+                const isAssumedPresentDay = assumedDays.includes(dateStr);
+
+                if (isAssumedPresentDay) {
+                    // Check if this assumed day is the employee's weekly off
+                    // Each employee has their own weekly_off field
+                    const assumedDayOfWeek = currentDate.getUTCDay();
+                    const employeeWeeklyOff = emp.weekly_off ? dayNameToNumber[emp.weekly_off] : null;
+
+                    // If assumed day is employee's weekly off, skip it (don't mark as present)
+                    if (employeeWeeklyOff !== null && assumedDayOfWeek === employeeWeeklyOff) {
+                        console.log(`[createSalarySnapshots] ${emp.name}: Skipping assumed present day ${dateStr} - it's their weekly off (${emp.weekly_off})`);
+                        continue; // Don't mark as present, it's their weekly off
+                    }
+
+                    // Check if employee has annual leave on this assumed day
+                    const hasAnnualLeaveOnAssumedDay = employeeExceptions.some(ex => {
+                        if (ex.type !== 'ANNUAL_LEAVE') return false;
+                        try {
+                            return dateStr >= ex.date_from && dateStr <= ex.date_to;
+                        } catch (e) {
+                            console.warn(`[createSalarySnapshots] Invalid date format in ANNUAL_LEAVE exception for ${emp.name} (${ex.id}): ${e.message}`);
+                            return false;
+                        }
+                    });
+
+                    if (!hasAnnualLeaveOnAssumedDay) {
+                        // Assumed present: count as working day, present day, NO deductions
+                        workingDays++;
+                        presentDays++;
+                        console.log(`[createSalarySnapshots] ${emp.name}: Assumed present on ${dateStr} (last 2 days of month)`);
+                        // Skip all other processing for this day - no late/early/absence tracking
+                        continue;
+                    }
+                    // If annual leave exists, fall through to normal processing
+                }
+
+                // Get ALL matching exceptions for this date BEFORE incrementing workingDays
+                // This allows PUBLIC_HOLIDAY to completely skip the day
+                // FIX Issue 3: Use date string comparison to avoid timezone issues
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    try {
+                        return dateStr >= ex.date_from && dateStr <= ex.date_to;
+                    } catch { return false; }
+                });
+
+                // Check for PUBLIC_HOLIDAY - day is NOT a working day
+                const hasPublicHoliday = matchingExceptions.some(ex =>
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+
+                // Check for MANUAL_ABSENT on the same date (even if it's a public holiday)
+                const hasManualAbsent = matchingExceptions.some(ex => ex.type === 'MANUAL_ABSENT');
+
+                if (hasPublicHoliday) {
+                    // PUBLIC_HOLIDAY: Day is NOT a working day
+                    // BUT if there's also a MANUAL_ABSENT, count LOP without adding to working days
+                    // This handles the case where employee was marked absent on a holiday
+                    if (hasManualAbsent) {
+                        fullAbsenceCount++;
+                    }
+                    // Skip rest of day processing - not a working day
+                    continue;
+                }
+
+                // Now it's safe to count as a working day
+                workingDays++;
+
+                // Get the most recent exception (PUBLIC_HOLIDAY already handled above)
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                    : null;
+
+                // Handle special exception types
+                if (dateException) {
+                    if (dateException.type === 'MANUAL_PRESENT') {
+                        presentDays++;
+                        continue;
+                    } else if (dateException.type === 'MANUAL_ABSENT') {
+                        fullAbsenceCount++;
+                        continue;
+
+                    } else if (dateException.type === 'SICK_LEAVE') {
+                        sickLeaveCount++;
+                        continue;
+                    }
+                }
+
+                // Check for annual leave
+                // FIX Issue 3: Use date string comparison to avoid timezone issues
+                const annualLeaveException = employeeExceptions.find(ex => {
+                    try {
+                        return ex.type === 'ANNUAL_LEAVE' && dateStr >= ex.date_from && dateStr <= ex.date_to;
+                    } catch { return false; }
+                });
+
+                const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+
+                if (annualLeaveException && rawDayPunches.length === 0) {
+                    workingDays--;
+                    continue;
+                }
+
+                // Get shift for this day
+                const isShiftEffective = (s) => {
+                    if (!s.effective_from || !s.effective_to) return true;
+                    const from = new Date(s.effective_from);
+                    const to = new Date(s.effective_to);
+                    return currentDate >= from && currentDate <= to;
+                };
+
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDayName = dayNames[dayOfWeek];
+
+                let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+                if (!shift) {
+                    const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
+                    for (const s of applicableShifts) {
+                        if (s.applicable_days) {
+                            try {
+                                const applicableDaysArray = JSON.parse(s.applicable_days);
+                                if (Array.isArray(applicableDaysArray) && applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
+                                    shift = s;
+                                    break;
+                                }
+                            } catch { }
+                        }
+                    }
+                    if (!shift) {
+                        if (dayOfWeek === 5) {
+                            shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
+                                employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        } else {
+                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        }
+                    }
+                }
+
+                // Apply shift override from exception
+                if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                    const isFriday = dayOfWeek === 5;
+                    if (dateException.include_friday || !isFriday) {
+                        shift = {
+                            am_start: dateException.new_am_start,
+                            am_end: dateException.new_am_end,
+                            pm_start: dateException.new_pm_start,
+                            pm_end: dateException.new_pm_end
+                        };
+                    }
+                }
+
+                const dayPunches = filterMultiplePunches(rawDayPunches);
+
+                // Track allowed minutes
+                let allowedMinutesForDay = 0;
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' &&
+                    dateException.approval_status === 'approved_dept_head') {
+                    allowedMinutesForDay = dateException.allowed_minutes || 0;
+                    approvedMinutes += allowedMinutesForDay;
+                }
+
+                // Check for manual time exception
+                const hasManualTimeException = dateException && (
+                    dateException.type === 'MANUAL_LATE' ||
+                    dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                    (dateException.late_minutes > 0) ||
+                    (dateException.early_checkout_minutes > 0) ||
+                    (dateException.other_minutes > 0)
+                );
+
+                const shouldSkipTimeCalc = dateException && [
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                ].includes(dateException.type);
+
+                // Count attendance
+                if (dayPunches.length > 0) {
+                    presentDays++;
+                } else if (!dateException || !['MANUAL_LATE', 'MANUAL_EARLY_CHECKOUT'].includes(dateException.type)) {
+                    fullAbsenceCount++;
+                } else {
+                    presentDays++;
+                }
+
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+
+                // 1. Calculation phase: Compute from punches if valid shift exists
+                if (shift && dayPunches.length > 0 && !shouldSkipTimeCalc) {
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+
+                        if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
+                            dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                        }
+                        if ((match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') && punchTime < shiftTime) {
+                            dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                        }
+                    }
+                }
+
+                // 2. Override phase: Specific manual adjustments (if provided)
+                if (dateException && !shouldSkipTimeCalc) {
+                    if (dateException.late_minutes > 0) {
+                        dayLateMinutes = dateException.late_minutes;
+                    }
+                    if (dateException.early_checkout_minutes > 0) {
+                        dayEarlyMinutes = dateException.early_checkout_minutes;
+                    }
+                    if (dateException.other_minutes > 0) {
+                        otherMinutes += dateException.other_minutes;
+                    }
+                }
+
+                // 3. Deduction Reduction phase: Apply allowed minutes
+                const rawTotalDayMinutes = dayLateMinutes + dayEarlyMinutes;
+                if (allowedMinutesForDay > 0 && rawTotalDayMinutes > 0) {
+                    const remaining = Math.max(0, rawTotalDayMinutes - allowedMinutesForDay);
+                    const lateRatio = dayLateMinutes / rawTotalDayMinutes;
+                    const earlyRatio = dayEarlyMinutes / rawTotalDayMinutes;
+                    dayLateMinutes = Math.round(remaining * lateRatio);
+                    dayEarlyMinutes = Math.round(remaining * earlyRatio);
+                }
+
+                lateMinutes += dayLateMinutes;
+                earlyCheckoutMinutes += dayEarlyMinutes;
+            }
+
+            // Get grace minutes
+            const dept = emp.department || 'Admin';
+            const baseGrace = (rules?.grace_minutes && rules.grace_minutes[dept]) ? rules.grace_minutes[dept] : 15;
+            const carriedGrace = project.use_carried_grace_minutes ? (emp.carried_grace_minutes || 0) : 0;
+            const graceMinutes = baseGrace + carriedGrace;
+
+            // Calculate annual leave as CALENDAR DAYS (not working days)
+            const annualLeaveExceptions = employeeExceptions.filter(ex => ex.type === 'ANNUAL_LEAVE');
+            const annualLeaveDatesProcessed = new Set();
+
+            for (const alEx of annualLeaveExceptions) {
+                try {
+                    const exFrom = new Date(alEx.date_from);
+                    const exTo = new Date(alEx.date_to);
+
+                    const rangeStart = exFrom < startDate ? new Date(startDate) : new Date(exFrom);
+                    const rangeEnd = exTo > endDate ? new Date(endDate) : new Date(exTo);
+
+                    if (rangeStart <= rangeEnd) {
+                        for (let d = new Date(rangeStart); d <= rangeEnd; d.setDate(d.getDate() + 1)) {
+                            const dateStr = d.toISOString().split('T')[0];
+                            annualLeaveDatesProcessed.add(dateStr);
+                        }
+                    }
+                } catch {
+                    // Skip invalid date ranges
+                }
+            }
+            const totalAnnualLeaveCalendarDays = annualLeaveDatesProcessed.size;
+
+            return {
+                workingDays,
+                presentDays,
+                fullAbsenceCount,
+                halfAbsenceCount,
+                sickLeaveCount,
+                annualLeaveCount: totalAnnualLeaveCalendarDays,
+                lateMinutes,
+                earlyCheckoutMinutes,
+                otherMinutes,
+                approvedMinutes,
+                graceMinutes
+            };
+        };
+
+        // ============================================================
+        // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
+        // - Extra Deduct Min (PM): Sum of (late + early + other) for all days in prev month range
+        // - Grace is applied ONCE for the whole range (not per day)
+        // - Extra LOP Days (PM): Only check the LAST DAY of prev month (e.g., 31/12)
+        // - Divisor: Uses OT Divisor (project.ot_calculation_days)
+        // - IMPORTANT: Uses prevMonthSalaryAmount for calculations (historical salary)
+        // 
+        // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
+        // For this project ONLY:
+        //   - Previous month hours/deductible: 29/12/2025 → 31/12/2025
+        //   - Previous month LOP days: ONLY 31/12/2025 counts
+        //   - This is a one-time exception, NOT a global rule change
+        // ============================================================
+        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
+            if (!isAlMaraghi || !hasExtraPrevMonthRange) {
+                return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
+            }
+
+            const attendanceIdStr = String(emp.attendance_id);
+            const includeSeconds = false; // Al Maraghi doesn't use seconds
+
+            // ============================================================
+            // PROJECT-SPECIFIC OVERRIDE: "January – Al Maraghi Motors"
+            // Override previous month date range for this specific project
+            // ============================================================
+            // Check for both regular hyphen and en-dash variants of the project name
+            const isJanuaryAlMaraghiProject = project.name === 'January - Al Maraghi Motors' ||
+                project.name === 'January – Al Maraghi Motors';
+
+            let effectivePrevMonthFrom = extraPrevMonthFrom;
+            let effectivePrevMonthTo = extraPrevMonthTo;
+            let effectiveLopOnlyDate = extraPrevMonthTo; // Default: last day of prev month range
+
+            if (isJanuaryAlMaraghiProject) {
+                // For "January – Al Maraghi Motors" ONLY:
+                // - Previous month hours: 29/12/2025 → 31/12/2025
+                // - Previous month LOP days: ONLY 31/12/2025
+                effectivePrevMonthFrom = '2025-12-29';
+                effectivePrevMonthTo = '2025-12-31';
+                effectiveLopOnlyDate = '2025-12-31';
+
+                console.log(`[createSalarySnapshots] PROJECT OVERRIDE: "January – Al Maraghi Motors" - Using prev month range 29-31 Dec, LOP only on 31 Dec`);
+            }
+
+            const employeePunches = punches.filter(p =>
+                String(p.attendance_id) === attendanceIdStr &&
+                p.punch_date >= effectivePrevMonthFrom &&
+                p.punch_date <= effectivePrevMonthTo
+            );
+            const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
+            const employeeExceptions = allExceptions.filter(e =>
+                (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
+                e.use_in_analysis !== false &&
+                e.is_custom_type !== true
+            );
+
+            const dayNameToNumber = {
+                'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+                'Thursday': 4, 'Friday': 5, 'Saturday': 6
+            };
+
+            // Accumulate raw time issues for the entire prev month range
+            let totalLateMinutes = 0;
+            let totalEarlyMinutes = 0;
+            let totalOtherMinutes = 0;
+            let totalApprovedMinutes = 0;
+
+            // LOP: Only check the specific LOP day (last day of prev month range)
+            let extraLopDays = 0;
+            const lastDayOfPrevMonth = effectiveLopOnlyDate; // e.g., "2025-12-31"
+
+            const startDate = new Date(effectivePrevMonthFrom);
+            const endDate = new Date(effectivePrevMonthTo);
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDate = new Date(d);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                const dayOfWeek = currentDate.getUTCDay();
+                const isLastDayOfPrevMonth = (dateStr === lastDayOfPrevMonth);
+
+                // Check weekly off
+                let weeklyOffDay = null;
+                if (project.weekly_off_override && project.weekly_off_override !== 'None') {
+                    weeklyOffDay = dayNameToNumber[project.weekly_off_override];
+                } else if (emp.weekly_off) {
+                    weeklyOffDay = dayNameToNumber[emp.weekly_off];
+                }
+
+                if (weeklyOffDay !== null && dayOfWeek === weeklyOffDay) {
+                    continue;
+                }
+
+                // Check exceptions
+                // FIX Issue 3: Use date string comparison to avoid timezone issues
+                const matchingExceptions = employeeExceptions.filter(ex => {
+                    try {
+                        return dateStr >= ex.date_from && dateStr <= ex.date_to;
+                    } catch { return false; }
+                });
+
+                const hasPublicHoliday = matchingExceptions.some(ex =>
+                    ex.type === 'PUBLIC_HOLIDAY' || ex.type === 'OFF'
+                );
+                if (hasPublicHoliday) continue;
+
+                const dateException = matchingExceptions.length > 0
+                    ? matchingExceptions.sort((a, b) => new Date(b.created_date || 0) - new Date(a.created_date || 0))[0]
+                    : null;
+
+                // Handle MANUAL_ABSENT - only count as LOP if it's the last day of prev month
+                if (dateException && dateException.type === 'MANUAL_ABSENT') {
+                    if (isLastDayOfPrevMonth) {
+                        extraLopDays = 1;
+                    }
+                    continue;
+                }
+
+                if (dateException && [
+                    'MANUAL_PRESENT', 'SICK_LEAVE', 'ANNUAL_LEAVE'
+                ].includes(dateException.type)) {
+                    continue;
+                }
+
+                // Get punches for this day
+                const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
+
+                // NO PUNCHES: Only count as LOP if it's the last day of prev month
+                if (rawDayPunches.length === 0) {
+                    if (isLastDayOfPrevMonth) {
+                        extraLopDays = 1;
+                    }
+                    continue;
+                }
+
+                // Get shift for this day
+                const isShiftEffective = (s) => {
+                    if (!s.effective_from || !s.effective_to) return true;
+                    const from = new Date(s.effective_from);
+                    const to = new Date(s.effective_to);
+                    return currentDate >= from && currentDate <= to;
+                };
+
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDayName = dayNames[dayOfWeek];
+
+                let shift = employeeShifts.find(s => s.date === dateStr && isShiftEffective(s));
+                if (!shift) {
+                    const applicableShifts = employeeShifts.filter(s => !s.date && isShiftEffective(s));
+                    for (const s of applicableShifts) {
+                        if (s.applicable_days) {
+                            try {
+                                const applicableDaysArray = JSON.parse(s.applicable_days);
+                                if (Array.isArray(applicableDaysArray) && applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
+                                    shift = s;
+                                    break;
+                                }
+                            } catch { }
+                        }
+                    }
+                    if (!shift) {
+                        if (dayOfWeek === 5) {
+                            shift = employeeShifts.find(s => s.is_friday_shift && !s.date && isShiftEffective(s)) ||
+                                employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        } else {
+                            shift = employeeShifts.find(s => !s.is_friday_shift && !s.date && isShiftEffective(s));
+                        }
+                    }
+                }
+
+                if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                    const isFriday = dayOfWeek === 5;
+                    if (dateException.include_friday || !isFriday) {
+                        shift = {
+                            am_start: dateException.new_am_start,
+                            am_end: dateException.new_am_end,
+                            pm_start: dateException.new_pm_start,
+                            pm_end: dateException.new_pm_end
+                        };
+                    }
+                }
+
+                if (!shift) continue;
+
+                const dayPunches = filterMultiplePunches(rawDayPunches);
+
+                // Track allowed/approved minutes for this day
+                let allowedMinutesForDay = 0;
+                if (dateException && dateException.type === 'ALLOWED_MINUTES' &&
+                    dateException.approval_status === 'approved_dept_head') {
+                    allowedMinutesForDay = dateException.allowed_minutes || 0;
+                    totalApprovedMinutes += allowedMinutesForDay;
+                }
+
+                const hasManualTimeException = dateException && (
+                    dateException.type === 'MANUAL_LATE' ||
+                    dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                    (dateException.late_minutes > 0) ||
+                    (dateException.early_checkout_minutes > 0) ||
+                    (dateException.other_minutes > 0)
+                );
+
+                let dayLateMinutes = 0;
+                let dayEarlyMinutes = 0;
+                let dayOtherMinutes = 0;
+
+                if (hasManualTimeException) {
+                    if (dateException.late_minutes > 0) dayLateMinutes = dateException.late_minutes;
+                    if (dateException.early_checkout_minutes > 0) dayEarlyMinutes = dateException.early_checkout_minutes;
+                    if (dateException.other_minutes > 0) dayOtherMinutes = dateException.other_minutes;
+                } else if (dayPunches.length > 0) {
+                    // SYNC: Pass nextDateStr (calculated from currentDate below) if needed
+                    // For now, simple match is used in recalculatePreviousMonthIssues
+                    const punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
+
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+
+                        if ((match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') && punchTime > shiftTime) {
+                            dayLateMinutes += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                        }
+                        if ((match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') && punchTime < shiftTime) {
+                            dayEarlyMinutes += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                        }
+                    }
+                }
+
+                // Accumulate raw time issues (no grace applied per day)
+                totalLateMinutes += dayLateMinutes;
+                totalEarlyMinutes += dayEarlyMinutes;
+                totalOtherMinutes += dayOtherMinutes;
+            }
+
+            // Calculate deductible minutes for the ENTIRE prev month range
+            // Grace is applied ONCE for the whole range (not per day)
+            // Formula: max(0, totalLate + totalEarly + totalOther - grace - approved)
+            const totalExtraDeductibleMinutes = Math.max(0,
+                totalLateMinutes + totalEarlyMinutes + totalOtherMinutes - graceMinutes - totalApprovedMinutes
+            );
+
+            // Calculate previous month monetary values using OT Divisor
+            // Divisor = project.ot_calculation_days (NOT calendar days)
+            // IMPORTANT: Uses prevMonthSalaryAmount (historical salary for that month)
+            const prevMonthDivisor = otDivisor;
+
+            // Previous month LOP Pay = (Prev Month Total Salary / OT Divisor) * Extra LOP Days
+            const extraLopPay = extraLopDays > 0 ? (prevMonthSalaryAmount / prevMonthDivisor) * extraLopDays : 0;
+
+            // Previous month Deductible Hours Pay = (Prev Month Total Salary / OT Divisor / Working Hours) * (Extra Deductible Minutes / 60)
+            const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
+            const prevMonthHourlyRate = prevMonthSalaryAmount / prevMonthDivisor / workingHours;
+            const extraDeductibleHoursPay = prevMonthHourlyRate * extraDeductibleHours;
+
+            return {
+                extraDeductibleMinutes: totalExtraDeductibleMinutes,
+                extraLopDays: extraLopDays,
+                extraLopPay: Math.round(extraLopPay),
+                extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay),
+                prevMonthDivisor: prevMonthDivisor
+            };
+        };
+
+        // ============================================================
+        // NEW LOGIC: Create salary snapshots for ALL active employees
+        // ============================================================
+        const snapshots = [];
+        let analyzedCount = 0;
+        let noAttendanceCount = 0;
+
+        // ============================================================
+        // COMPANY-SPECIFIC CONFIGURATION: Include All Employees in Salary
+        // ============================================================
+        // Fetch company settings to determine salary inclusion rules
+        const companySettings = await base44.asServiceRole.entities.CompanySettings.filter({
+            company: project.company
+        }, null, 1);
+
+        const includeAllEmployeesInSalary = companySettings.length > 0
+            ? (companySettings[0].include_all_employees_in_salary || false)
+            : false;
+
+        // Al Maraghi Motors & Naser Mohsin: Hardcoded to include all employees (until migrated to settings)
+        const isAlMaraghiOrNaser = project.company === 'Al Maraghi Motors' ||
+            project.company === 'Naser Mohsin Auto Parts';
+
+        const shouldIncludeAllEmployees = isAlMaraghiOrNaser || includeAllEmployeesInSalary;
+
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] COMPANY SALARY MODE: ${project.company}`);
+        console.log(`[createSalarySnapshots]   Include All Employees in Salary: ${shouldIncludeAllEmployees ? 'YES (including non-attendance)' : 'NO (attendance_id required)'}`);
+        console.log(`[createSalarySnapshots]   Config Source: ${isAlMaraghiOrNaser ? 'HARDCODED' : companySettings.length > 0 ? 'CompanySettings' : 'DEFAULT (false)'}`);
+        console.log(`[createSalarySnapshots] ============================================`);
+
+        // Filter employees to project's custom_employee_ids if specified
+        let eligibleEmployees;
+
+        if (project.custom_employee_ids && project.custom_employee_ids.trim()) {
+            const customIds = project.custom_employee_ids.split(',').map(id => id.trim()).filter(id => id);
+
+            if (shouldIncludeAllEmployees) {
+                // Al Maraghi / Include All Mode: ALL employees in custom list, regardless of attendance_id
+                eligibleEmployees = employees.filter(emp => {
+                    return customIds.includes(String(emp.hrms_id)) ||
+                        (emp.attendance_id && customIds.includes(String(emp.attendance_id)));
+                });
+                console.log(`[createSalarySnapshots] [INCLUDE ALL MODE] Filtered to ${eligibleEmployees.length} employees from custom_employee_ids (including non-attendance)`);
+            } else {
+                // Standard Mode: ONLY employees with valid attendance_id
+                eligibleEmployees = employees.filter(emp => {
+                    const hasValidAttendanceId = emp.attendance_id &&
+                        emp.attendance_id !== null &&
+                        emp.attendance_id !== undefined &&
+                        String(emp.attendance_id).trim() !== '';
+
+                    if (!hasValidAttendanceId) {
+                        return false;
+                    }
+
+                    return customIds.includes(String(emp.hrms_id)) ||
+                        customIds.includes(String(emp.attendance_id));
+                });
+                console.log(`[createSalarySnapshots] [STANDARD MODE] Filtered to ${eligibleEmployees.length} employees with attendance_id from custom_employee_ids`);
+            }
+        } else {
+            // No custom_employee_ids - use ALL active employees
+            if (shouldIncludeAllEmployees) {
+                eligibleEmployees = employees;  // All active employees
+                console.log(`[createSalarySnapshots] [INCLUDE ALL MODE] Including ALL ${eligibleEmployees.length} active employees`);
+            } else {
+                eligibleEmployees = employees.filter(emp => {
+                    const hasValidAttendanceId = emp.attendance_id &&
+                        emp.attendance_id !== null &&
+                        emp.attendance_id !== undefined &&
+                        String(emp.attendance_id).trim() !== '';
+                    return hasValidAttendanceId;
+                });
+                console.log(`[createSalarySnapshots] [STANDARD MODE] Filtered to ${eligibleEmployees.length} employees with attendance_id`);
+            }
+        }
+
+        // Calculate statistics for logging transparency
+        const withAttendanceId = eligibleEmployees.filter(e => e.attendance_id && String(e.attendance_id).trim() !== '').length;
+        const withoutAttendanceId = eligibleEmployees.length - withAttendanceId;
+
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] ✅ TOTAL ELIGIBLE EMPLOYEES: ${eligibleEmployees.length}`);
+        console.log(`[createSalarySnapshots]    - With attendance_id: ${withAttendanceId}`);
+        console.log(`[createSalarySnapshots]    - Without attendance_id: ${withoutAttendanceId}`);
+        console.log(`[createSalarySnapshots] ELIGIBLE EMPLOYEE IDs: [${eligibleEmployees.map(e => e.attendance_id || e.hrms_id).slice(0, 20).join(', ')}${eligibleEmployees.length > 20 ? '...' : ''}]`);
+        console.log(`[createSalarySnapshots] ============================================`);
+
+        // BATCH MODE: Process only a subset of employees
+        const employeesToProcess = batch_mode
+            ? eligibleEmployees.slice(batch_start, batch_start + batch_size)
+            : eligibleEmployees;
+
+        console.log(`[createSalarySnapshots] 📦 THIS BATCH: ${employeesToProcess.length} employees (indices ${batch_start} to ${batch_start + employeesToProcess.length - 1})`);
+        console.log(`[createSalarySnapshots] THIS BATCH IDs: [${employeesToProcess.map(e => e.attendance_id || e.hrms_id).join(', ')}]`);
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] 🔄 ENTERING FOR LOOP - Processing ${employeesToProcess.length} employees`);
+        console.log(`[createSalarySnapshots] ============================================`);
+
+        let loopIterationCount = 0;
+        let skippedCount = 0;
+        const holdCreates = [];
+        const holdUpdates = [];
+        for (const emp of employeesToProcess) {
+            loopIterationCount++;
+            console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount}/${employeesToProcess.length}: Processing ${emp.name} (attendance_id: ${emp.attendance_id || 'NULL'}, hrms_id: ${emp.hrms_id})`);
+
+            const employeeKey = String(emp.attendance_id || emp.hrms_id);
+            if (existingSnapshotKeys.has(employeeKey)) {
+                console.log(`[createSalarySnapshots] ⏭️ SKIP: Snapshot already exists for ${emp.name} (${employeeKey})`);
+                continue;
+            }
+
+            // Find matching salary record (REQUIRED for salary snapshot)
+            const baseSalary = salaries.find(s =>
+                String(s.employee_id) === String(emp.hrms_id) ||
+                String(s.attendance_id) === String(emp.attendance_id)
+            );
+
+            // Skip if no salary record - employee is not eligible for salary
+            if (!baseSalary) {
+                console.log(`[createSalarySnapshots] ⚠️ SKIP: ${emp.name} (${emp.attendance_id || emp.hrms_id}) - no salary record found`);
+                console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE (skipped - no salary)`);
+                skippedCount++;
+                continue;
+            }
+
+            console.log(`[createSalarySnapshots] ✅ Salary record found for ${emp.name}`);
+            console.log(`[createSalarySnapshots] 💰 Salary Data: basic_salary=${baseSalary.basic_salary}, allowances=${baseSalary.allowances}, allowances_with_bonus=${baseSalary.allowances_with_bonus}, total_salary=${baseSalary.total_salary}`);
+
+            // ============================================================
+            // AL MARAGHI MOTORS: SALARY INCREMENT RESOLUTION
+            // For current month salary: use increment effective for salary month
+            // For previous month calculations: use increment effective for that month
+            // ============================================================
+            let currentMonthSalary = { ...baseSalary };
+            let prevMonthSalary = { ...baseSalary };
+
+            if (isAlMaraghi && salaryIncrements.length > 0) {
+                // Get increments for this employee
+                const empIncrements = salaryIncrements.filter(inc =>
+                    String(inc.employee_id) === String(emp.hrms_id) ||
+                    String(inc.attendance_id) === String(emp.attendance_id)
+                );
+
+                if (empIncrements.length > 0) {
+                    // Current month salary (use salary month start for resolution)
+                    const currentMonthStr = salaryMonthStartStr; // e.g., "2026-01-01"
+                    // BUG FIX #8: Proper date parsing with error handling
+                    const applicableCurrentIncrements = empIncrements
+                        .filter(inc => {
+                            try {
+                                return new Date(inc.effective_month) <= new Date(currentMonthStr);
+                            } catch (e) {
+                                console.warn(`[createSalarySnapshots] Invalid date format in salary increment effective_month for ${emp.name} (${inc.id}): ${e.message}`);
+                                return false;
+                            }
+                        })
+                        .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
+
+                    if (applicableCurrentIncrements.length > 0) {
+                        const currentInc = applicableCurrentIncrements[0];
+                        currentMonthSalary = {
+                            ...baseSalary,
+                            basic_salary: currentInc.new_basic_salary || baseSalary.basic_salary,
+                            allowances: currentInc.new_allowances || baseSalary.allowances,
+                            allowances_with_bonus: currentInc.new_allowances_with_bonus || baseSalary.allowances_with_bonus,
+                            total_salary: currentInc.new_total_salary || baseSalary.total_salary
+                        };
+                        console.log(`[createSalarySnapshots] ${emp.name}: Using increment effective ${currentInc.effective_month} for current month salary`);
+                    }
+
+                    // Previous month salary (for OT and prev month deductions)
+                    // Previous month is the month BEFORE the salary month
+                    if (hasExtraPrevMonthRange && extraPrevMonthFrom) {
+                        const prevMonthDate = new Date(extraPrevMonthFrom);
+                        const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-01`;
+
+                        // BUG FIX #8: Proper date parsing with error handling
+                        const applicablePrevIncrements = empIncrements
+                            .filter(inc => {
+                                try {
+                                    return new Date(inc.effective_month) <= new Date(prevMonthStr);
+                                } catch (e) {
+                                    console.warn(`[createSalarySnapshots] Invalid date format in salary increment effective_month for ${emp.name} (prev month, ${inc.id}): ${e.message}`);
+                                    return false;
+                                }
+                            })
+                            .sort((a, b) => new Date(b.effective_month) - new Date(a.effective_month));
+
+                        if (applicablePrevIncrements.length > 0) {
+                            const prevInc = applicablePrevIncrements[0];
+                            prevMonthSalary = {
+                                ...baseSalary,
+                                basic_salary: prevInc.new_basic_salary || baseSalary.basic_salary,
+                                allowances: prevInc.new_allowances || baseSalary.allowances,
+                                allowances_with_bonus: prevInc.new_allowances_with_bonus || baseSalary.allowances_with_bonus,
+                                total_salary: prevInc.new_total_salary || baseSalary.total_salary
+                            };
+                            console.log(`[createSalarySnapshots] ${emp.name}: Using increment effective ${prevInc.effective_month} for previous month salary`);
+                        }
+                    }
+                }
+            }
+
+            // Use resolved salaries (currentMonthSalary for current month, prevMonthSalary for previous month)
+            const salary = currentMonthSalary;
+
+            // Check if employee has analysis result
+            // SALARY-ONLY FIX: For employees without attendance_id, they won't have AnalysisResult
+            const analysisResult = emp.attendance_id
+                ? analysisResults.find(r => String(r.attendance_id) === String(emp.attendance_id))
+                : null;
+            const hasAnalysisResult = !!analysisResult;
+
+            let calculated;
+            let attendanceSource;
+
+            // PERMANENT LOCK: For finalized reports, use AnalysisResult values AS-IS (1:1 copy)
+            // CRITICAL: Check manual override fields FIRST, fallback to regular fields
+            // Manual overrides are set when user edits report before finalization
+            // deductible_minutes formula in runAnalysis: ((late + early) - grace) - approved (other_minutes stored separately)
+            if (hasAnalysisResult) {
+                calculated = {
+                    workingDays: analysisResult.working_days || 0,
+                    presentDays: analysisResult.manual_present_days ?? analysisResult.present_days ?? 0,
+                    fullAbsenceCount: analysisResult.manual_full_absence_count ?? analysisResult.full_absence_count ?? 0,
+                    halfAbsenceCount: analysisResult.half_absence_count || 0,
+                    sickLeaveCount: analysisResult.manual_sick_leave_count ?? analysisResult.sick_leave_count ?? 0,
+                    annualLeaveCount: analysisResult.manual_annual_leave_count ?? analysisResult.annual_leave_count ?? 0,
+                    lateMinutes: analysisResult.late_minutes || 0,
+                    earlyCheckoutMinutes: analysisResult.early_checkout_minutes || 0,
+                    otherMinutes: analysisResult.other_minutes || 0,
+                    approvedMinutes: analysisResult.approved_minutes || 0,
+                    deductibleMinutes: analysisResult.manual_deductible_minutes ?? analysisResult.deductible_minutes ?? 0,
+                    ramadanGiftMinutes: Math.max(0, analysisResult.ramadan_gift_minutes || 0),
+                    graceMinutes: analysisResult.grace_minutes ?? 15,
+                    lopAdjacentWeeklyOffCount: analysisResult.lop_adjacent_weekly_off_count || 0
+                };
+                attendanceSource = 'ANALYZED';
+                analyzedCount++;
+                console.log(`[createSalarySnapshots] 1:1 copy from AnalysisResult for ${emp.name} (${emp.attendance_id}): deductible=${calculated.deductibleMinutes}, fullAbsence=${calculated.fullAbsenceCount} (manual override: ${analysisResult.manual_full_absence_count !== null ? 'YES' : 'NO'})`);
+            } else {
+                // NO_ATTENDANCE_DATA: Employee missing from analysis OR salary-only employee
+                // Use zero attendance for salary safety
+                calculated = {
+                    workingDays: 0,
+                    presentDays: 0,
+                    fullAbsenceCount: 0,
+                    halfAbsenceCount: 0,
+                    sickLeaveCount: 0,
+                    annualLeaveCount: 0,
+                    lateMinutes: 0,
+                    earlyCheckoutMinutes: 0,
+                    otherMinutes: 0,
+                    approvedMinutes: 0,
+                    deductibleMinutes: 0,
+                    ramadanGiftMinutes: 0,
+                    graceMinutes: 0,
+                    lopAdjacentWeeklyOffCount: 0
+                };
+                attendanceSource = 'NO_ATTENDANCE_DATA';
+                noAttendanceCount++;
+                console.log(`[createSalarySnapshots] No AnalysisResult for ${emp.name} (${emp.attendance_id || emp.hrms_id}) - using zero attendance (salary-only)`);
+            }
+
+            // ============================================================
+            // SALARY COMPONENTS (Calculated via Shared Helper)
+            // ============================================================
+            const workingHours = salary?.working_hours || baseSalary?.working_hours || 9;
+            const prevMonthTotalSalary = prevMonthSalary?.total_salary || currentMonthSalary.total_salary;
+
+            // BUG FIX #9: Only calculate extraPrevMonthData if Al Maraghi AND extra range exists
+            let extraPrevMonthData = {
+                extraDeductibleMinutes: 0,
+                extraLopDays: 0,
+                extraLopPay: 0,
+                extraDeductibleHoursPay: 0,
+                prevMonthDivisor: otDivisor
+            };
+        // V2: Count previous month LOP days from AnalysisResult
+        // lop_dates contains all LOP dates for the full report range.
+        // We filter to only dates within extraPrevMonthFrom..extraPrevMonthTo.
+        // This is READ-ONLY — no attendance re-analysis is performed.
+        let v2PrevMonthLopDays = 0;
+        if (isAlMaraghi && hasExtraPrevMonthRange) {
+            const ar = analysisResultMap[String(emp.attendance_id)];
+            if (ar) {
+                // Count regular LOP dates in previous month range
+                if (ar.lop_dates) {
+                    const lopList = String(ar.lop_dates)
+                        .split(',')
+                        .map((d: string) => d.trim())
+                        .filter((d: string) => d.length >= 8);
+                    v2PrevMonthLopDays += lopList.filter((d: string) =>
+                        d >= extraPrevMonthFrom && d <= extraPrevMonthTo
+                    ).length;
+                }
+                // Count LOP adjacent weekly off dates in previous month range
+                if (ar.lop_adjacent_weekly_off_dates) {
+                    const lopAdjList = String(ar.lop_adjacent_weekly_off_dates)
+                        .split(',')
+                        .map((d: string) => d.trim())
+                        .filter((d: string) => d.length >= 8);
+                    v2PrevMonthLopDays += lopAdjList.filter((d: string) =>
+                        d >= extraPrevMonthFrom && d <= extraPrevMonthTo
+                    ).length;
+                }
+            }
+        }
+
+        if (isAlMaraghi && hasExtraPrevMonthRange && emp.attendance_id) {
+                // calculateExtraPrevMonthData is still local as it's part of attendance orchestration
+                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
+            }
+
+        // V2: Override LOP days with AnalysisResult-derived count
+        // if v2PrevMonthLopDays found dates in the previous month range.
+        // This is more accurate than the punch-based calculation because
+        // it uses the HR-approved finalized attendance report.
+        // Only overrides if AnalysisResult data was actually found.
+        if (isAlMaraghi && hasExtraPrevMonthRange && v2PrevMonthLopDays > 0) {
+            const prevDivisorForLop = extraPrevMonthData.prevMonthDivisor || otDivisor;
+            // Use the same prevMonthSalaryAmount that calculateExtraPrevMonthData used
+            // It is calculated before the loop in the original code
+            const prevSalaryForCalc = prevMonthTotalSalary;
+            extraPrevMonthData = {
+                ...extraPrevMonthData,
+                extraLopDays: v2PrevMonthLopDays,
+                extraLopPay: Math.round(
+                    (prevSalaryForCalc / prevDivisorForLop) * v2PrevMonthLopDays
+                )
+            };
+            console.log(`[createSalarySnapshotsV2] Employee ${emp.attendance_id}: prev month LOP override — ${v2PrevMonthLopDays} days from AnalysisResult`);
+        }
+
+            const salaryLeaveDaysOverride = calculateSalaryLeaveDaysOverride(emp.attendance_id, allExceptions, project.date_from, project.date_to);
+
+            // Fetch OvertimeData record
+            const otRecord = allOvertimeData.find((ot: any) =>
+                (emp.attendance_id && String(ot.attendance_id) === String(emp.attendance_id)) ||
+                String(ot.hrms_id) === String(emp.hrms_id)
+            );
+
+            // Prepare inputs for the canonical salary calculation helper
+            const salaryInput = {
+                employee: {
+                    department: emp.department
+                },
+                salary: {
+                    basic_salary: currentMonthSalary.basic_salary || 0,
+                    allowances: currentMonthSalary.allowances || 0,
+                    allowances_with_bonus: currentMonthSalary.allowances_with_bonus || 0,
+                    total_salary: currentMonthSalary.total_salary || 0,
+                    working_hours: workingHours
+                },
+                prevMonthSalary: {
+                    total_salary: prevMonthTotalSalary
+                },
+                attendance: {
+                    workingDays: calculated.workingDays,
+                    presentDays: calculated.presentDays,
+                    fullAbsenceCount: (calculated.fullAbsenceCount || 0) + (calculated.lopAdjacentWeeklyOffCount || 0),
+                    halfAbsenceCount: calculated.halfAbsenceCount,
+                    sickLeaveCount: calculated.sickLeaveCount,
+                    annualLeaveCount: calculated.annualLeaveCount,
+                    lateMinutes: calculated.lateMinutes,
+                    earlyCheckoutMinutes: calculated.earlyCheckoutMinutes,
+                    otherMinutes: (calculated.otherMinutes || 0),
+                    approvedMinutes: calculated.approvedMinutes,
+                    deductibleMinutes: (calculated.deductibleMinutes || 0),
+                    ramadanGiftMinutes: (calculated.ramadanGiftMinutes || 0),
+                    graceMinutes: (calculated.graceMinutes || 15),
+                    salaryLeaveDays: (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount),
+                    lopLeaveDays: Math.max(0, (calculated.annualLeaveCount || 0) - (salaryLeaveDaysOverride > 0 ? salaryLeaveDaysOverride : calculated.annualLeaveCount))
+                },
+                adjustments: (() => {
+                    const employeeHolds = allHolds.filter(h =>
+                        String(h.hrms_id) === String(emp.hrms_id) ||
+                        String(h.employee_id) === String(emp.id)
+                    );
+
+                    let releasedHoldAmount = 0;
+                    const activeHolds = employeeHolds.filter(h => h.status === 'ON_HOLD');
+
+                    // 1. RELEASE LOGIC (AUTO only)
+                    // Rule: Release only if current payroll period starts after hold origin end
+                    // AND employee has attendance presence in the current period (rejoin/return check)
+                    const isEmployeePresent = (calculated.presentDays || 0) > 0;
+                    if (isEmployeePresent && activeHolds.length > 0) {
+                        for (const hold of activeHolds) {
+                            const isHoldFromPreviousPeriod = hold.origin_period_end < project.date_from;
+                            const hasPositiveAmount = (hold.amount || 0) > 0;
+
+                            if (isHoldFromPreviousPeriod && hasPositiveAmount && hold.source === 'AUTO') {
+                                releasedHoldAmount += (hold.amount || 0);
+                                holdUpdates.push({
+                                    id: hold.id,
+                                    status: 'RELEASED',
+                                    release_period_start: project.date_from,
+                                    release_period_end: project.date_to,
+                                    release_report_id: report_run_id,
+                                    updated_date: new Date().toISOString()
+                                });
+                            }
+                        }
+                    }
+
+                    let openLeaveSalary = isAlMaraghi ? parseAdjustmentValue(otRecord?.open_leave_salary) : 0;
+
+                    // 2. DEFER LOGIC (< 2 Years Service & Spanning Leave)
+                    const joiningDateStr = emp.joining_date;
+                    const referenceDate = new Date(project.date_to);
+                    const joiningDate = joiningDateStr ? new Date(joiningDateStr) : null;
+                    let serviceYears = null;
+                    if (joiningDate && !isNaN(joiningDate.getTime())) {
+                        serviceYears = (referenceDate.getTime() - joiningDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+                    }
+
+                    const annualLeaveSpansFuture = allExceptions.some(ex =>
+                        ex.type === 'ANNUAL_LEAVE' &&
+                        String(ex.attendance_id) === String(emp.attendance_id) &&
+                        ex.date_to > project.date_to
+                    );
+
+                    if (joiningDateStr && serviceYears !== null && serviceYears < 2.0 && annualLeaveSpansFuture && openLeaveSalary > 0) {
+                        const holdAmount = openLeaveSalary;
+                        const autoKey = `${emp.hrms_id}_LEAVE_DEFERRAL_UNDER_TWO_YEARS_${project.date_from}_${project.date_to}_AUTO`;
+                        const existingAutoHold = activeHolds.find(h => h.auto_key === autoKey);
+
+                        if (!existingAutoHold) {
+                            holdCreates.push({
+                                employee_id: emp.id,
+                                hrms_id: String(emp.hrms_id || ''),
+                                employee_name: emp.name,
+                                company: project.company,
+                                hold_type: 'LEAVE_DEFERRAL',
+                                reason_code: 'UNDER_TWO_YEARS_REJOIN_PENDING',
+                                amount: holdAmount,
+                                source: 'AUTO',
+                                status: 'ON_HOLD',
+                                origin_period_start: project.date_from,
+                                origin_period_end: project.date_to,
+                                auto_key: autoKey,
+                                created_date: new Date().toISOString()
+                            });
+                        } else if (Number(existingAutoHold.amount) !== Number(holdAmount)) {
+                            // Update existing AUTO hold if amount changed (idempotency)
+                            holdUpdates.push({
+                                id: existingAutoHold.id,
+                                amount: holdAmount,
+                                updated_date: new Date().toISOString()
+                            });
+                        }
+                        openLeaveSalary = 0;
+                    }
+
+                    return {
+                        normalOtHours: (otRecord?.normalOtHours || 0),
+                        specialOtHours: (otRecord?.specialOtHours || 0),
+                        bonus: parseAdjustmentValue(otRecord?.bonus),
+                        incentive: parseAdjustmentValue(otRecord?.incentive),
+                        open_leave_salary: openLeaveSalary + releasedHoldAmount,
+                        variable_salary: isAlMaraghi ? parseAdjustmentValue(otRecord?.variable_salary) : 0,
+                        otherDeduction: parseAdjustmentValue(otRecord?.otherDeduction),
+                        advanceSalaryDeduction: parseAdjustmentValue(otRecord?.advanceSalaryDeduction)
+                    };
+                })(),
+                settings: {
+                    isAlMaraghi,
+                    divisor,
+                    otDivisor,
+                    prevMonthDivisor: extraPrevMonthData.prevMonthDivisor || otDivisor,
+                    otNormalRate,
+                    otSpecialRate,
+                    wpsCapEnabled: salary.wps_cap_enabled ?? wpsCapEnabledGlobal,
+                    wpsCapAmount: salary.wps_cap_amount ?? wpsCapAmountGlobal,
+                    balanceRoundingRule,
+                    leavePayFormula,
+                    salaryLeaveFormula
+                }
+            };
+
+            const computed = calculateEmployeeSalary(salaryInput);
+
+            console.log(`[createSalarySnapshots] 💾 Managed calculation via helper for ${emp.name} - Total: ${computed.total}, WPS: ${computed.wpsPay}, OT: ${computed.totalOtSalary}`);
+
+            // SALARY-ONLY FIX: Store attendance_id as null if employee doesn't have one
+            snapshots.push({
+                project_id: String(project_id),
+                report_run_id: String(report_run_id),
+                attendance_id: emp.attendance_id ? String(emp.attendance_id) : null,
+                hrms_id: String(emp.hrms_id),
+                name: emp.name,
+                department: emp.department,
+                basic_salary: computed.basic_salary,
+                allowances: computed.allowances,
+                allowances_with_bonus: computed.allowances_with_bonus,
+                total_salary: computed.total_salary,
+                working_hours: computed.working_hours,
+                working_days: computed.working_days,
+                salary_divisor: computed.salary_divisor,
+                ot_divisor: computed.ot_divisor,
+                prev_month_divisor: computed.prev_month_divisor,
+                present_days: computed.present_days,
+                full_absence_count: computed.full_absence_count,
+                annual_leave_count: computed.annual_leave_count,
+                sick_leave_count: computed.sick_leave_count,
+                late_minutes: computed.late_minutes,
+                early_checkout_minutes: computed.early_checkout_minutes,
+                other_minutes: computed.other_minutes,
+                approved_minutes: computed.approved_minutes,
+                grace_minutes: computed.grace_minutes,
+                deductible_minutes: computed.deductible_minutes,
+                ramadan_gift_minutes: computed.ramadan_gift_minutes,
+                // V2: Previous month fields now populated from AnalysisResult + overflow calculation
+                // Only populated for Al Maraghi Motors projects with a previous month overflow range
+                extra_prev_month_deductible_minutes: (isAlMaraghi && hasExtraPrevMonthRange)
+                    ? (extraPrevMonthData.extraDeductibleMinutes || 0) : 0,
+                extra_prev_month_lop_days: (isAlMaraghi && hasExtraPrevMonthRange)
+                    ? (extraPrevMonthData.extraLopDays || 0) : 0,
+                extra_prev_month_lop_pay: (isAlMaraghi && hasExtraPrevMonthRange)
+                    ? (extraPrevMonthData.extraLopPay || 0) : 0,
+                extra_prev_month_deductible_hours_pay: (isAlMaraghi && hasExtraPrevMonthRange)
+                    ? (extraPrevMonthData.extraDeductibleHoursPay || 0) : 0,
+                salary_month_start: salaryMonthStartStr,
+                salary_month_end: salaryMonthEndStr,
+                salary_leave_days: computed.salary_leave_days,
+                leaveDays: computed.leaveDays,
+                leavePay: computed.leavePay,
+                salaryLeaveAmount: computed.salaryLeaveAmount,
+                deductibleHours: computed.deductibleHours,
+                deductibleHoursPay: computed.deductibleHoursPay,
+                netDeduction: computed.netDeduction,
+                // OT & Adjustment Fields (populated from OvertimeData)
+                normalOtHours: computed.normalOtHours,
+                normalOtSalary: computed.normalOtSalary,
+                specialOtHours: computed.specialOtHours,
+                specialOtSalary: computed.specialOtSalary,
+                totalOtSalary: computed.totalOtSalary,
+                // Adjustment Fields (populated from OvertimeData)
+                otherDeduction: computed.otherDeduction,
+                bonus: computed.bonus,
+                incentive: computed.incentive,
+                open_leave_salary: computed.open_leave_salary,
+                variable_salary: computed.variable_salary,
+                advanceSalaryDeduction: computed.advanceSalaryDeduction,
+                total: computed.total,
+                wpsPay: computed.wpsPay,
+                balance: computed.balance,
+                wps_cap_enabled: computed.wps_cap_enabled,
+                wps_cap_amount: computed.wps_cap_amount,
+                wps_cap_applied: computed.wps_cap_applied,
+                snapshot_created_at: new Date().toISOString(),
+                attendance_source: attendanceSource
+            });
+
+            existingSnapshotKeys.add(employeeKey);
+            console.log(`[createSalarySnapshots] ✅ Snapshot added to array (${snapshots.length} total so far)`);
+            console.log(`[createSalarySnapshots] >>> LOOP ITERATION ${loopIterationCount} COMPLETE`);
+        }
+
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] 🏁 FOR LOOP EXITED`);
+        console.log(`[createSalarySnapshots]    Total iterations completed: ${loopIterationCount}`);
+        console.log(`[createSalarySnapshots]    Snapshots in array: ${snapshots.length}`);
+        console.log(`[createSalarySnapshots] ============================================`);
+
+        // ============================================
+        // PERSIST PAYROLL HOLDS
+        // ============================================
+        if (holdCreates.length > 0) {
+            console.log(`[createSalarySnapshots] 💾 Persisting ${holdCreates.length} new auto holds...`);
+            await base44.asServiceRole.entities.PayrollHold.bulkCreate(holdCreates);
+        }
+        if (holdUpdates.length > 0) {
+            console.log(`[createSalarySnapshots] 💾 Updating ${holdUpdates.length} holds (releases)...`);
+            for (const update of holdUpdates) {
+                await base44.asServiceRole.entities.PayrollHold.update(update.id, update);
+            }
+        }
+
+        // BATCH MODE: Process in chunks for progress tracking
+        if (batch_mode) {
+            console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 🚨 BATCH MODE DETECTED - RETURN PATH #1`);
+            console.log(`[createSalarySnapshots] 💾 BATCH MODE RESPONSE PREPARATION`);
+            console.log(`[createSalarySnapshots] Snapshots created in this batch: ${snapshots.length}`);
+            console.log(`[createSalarySnapshots] Batch start index: ${batch_start}`);
+            console.log(`[createSalarySnapshots] Total eligible employees: ${eligibleEmployees.length}`);
+
+            if (snapshots.length > 0) {
+                console.log(`[createSalarySnapshots] 💾 Calling bulkCreate for ${snapshots.length} snapshots...`);
+                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+                console.log(`[createSalarySnapshots] ✅ bulkCreate completed successfully`);
+            } else {
+                console.log(`[createSalarySnapshots] ⚠️ WARNING: No snapshots to create in this batch`);
+            }
+
+            const currentPosition = batch_start + employeesToProcess.length;
+            const hasMore = currentPosition < eligibleEmployees.length;
+
+            console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 📊 BATCH COMPLETE SUMMARY:`);
+            console.log(`[createSalarySnapshots]    Current position: ${currentPosition}`);
+            console.log(`[createSalarySnapshots]    Total employees: ${eligibleEmployees.length}`);
+            console.log(`[createSalarySnapshots]    HAS_MORE: ${hasMore}`);
+            console.log(`[createSalarySnapshots]    Remaining: ${eligibleEmployees.length - currentPosition} employees`);
+            console.log(`[createSalarySnapshots] ============================================`);
+            console.log(`[createSalarySnapshots] 📤 RETURNING BATCH RESPONSE`);
+
+            return Response.json({
+                success: true,
+                batch_mode: true,
+                batch_completed: snapshots.length,
+                batch_processed: employeesToProcess.length,
+                total_employees: eligibleEmployees.length,
+                current_position: currentPosition,
+                has_more: hasMore,
+                current_batch: snapshots.map(s => ({ attendance_id: s.attendance_id, name: s.name }))
+            });
+        }
+
+        // STANDARD MODE: Bulk create all snapshots at once
+        console.log(`[createSalarySnapshots] ============================================`);
+        console.log(`[createSalarySnapshots] 🚨 STANDARD MODE - RETURN PATH #2`);
+        console.log(`[createSalarySnapshots] ============================================`);
+
+        if (snapshots.length > 0) {
+            console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
+
+            // Chunked persistence to avoid API/body limits on large employee sets.
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < snapshots.length; i += CHUNK_SIZE) {
+                const chunk = snapshots.slice(i, i + CHUNK_SIZE);
+                console.log(`[createSalarySnapshots] 💾 STANDARD MODE chunk ${Math.floor(i / CHUNK_SIZE) + 1}: creating ${chunk.length} snapshots`);
+                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(chunk);
+            }
+
+            console.log(`[createSalarySnapshots] ✅ Successfully created ${snapshots.length} snapshots`);
+        } else {
+            console.warn(`[createSalarySnapshots] ⚠️ WARNING: No snapshots created - no eligible employees found`);
+        }
+
+        const totalSnapshotKeysAfterRun = existingSnapshotKeys.size;
+        console.log(`[createSalarySnapshots] 🎯 FINAL COUNT CHECK: ${snapshots.length} new snapshots created; ${totalSnapshotKeysAfterRun} total keys for ${eligibleEmployees.length} eligible employees`);
+
+        // ============================================================
+        // INVARIANT CHECK: Verify ALL snapshots were created in STANDARD mode
+        // This prevents silent partial completion
+        // ============================================================
+        // INVARIANT: snapshots + skipped (no salary record) must equal total eligible employees
+        if (!batch_mode && (snapshots.length + skippedCount) !== eligibleEmployees.length) {
+            const missingCount = eligibleEmployees.length - snapshots.length - skippedCount;
+            const errorMsg = `INVARIANT VIOLATION: Expected ${eligibleEmployees.length} employees processed, but only ${snapshots.length} snapshots created + ${skippedCount} skipped (${missingCount} unaccounted for)`;
+            console.error(`[createSalarySnapshots] ❌ ${errorMsg}`);
+            throw new Error(errorMsg);
+        }
+
+        console.log(`[createSalarySnapshots] 📤 RETURNING STANDARD MODE SUCCESS RESPONSE`);
+
+        return Response.json({
+            success: true,
+            snapshots_created: snapshots.length,
+            total_snapshots_after_run: totalSnapshotKeysAfterRun,
+            analyzed_count: analyzedCount,
+            no_attendance_count: noAttendanceCount,
+            employees_count: eligibleEmployees.length,
+            message: `Created ${snapshots.length} new salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`
+        });
+
+    } catch (error: any) {
+        console.error('[createSalarySnapshots] ❌ ERROR CAUGHT:', error);
+        console.error('[createSalarySnapshots] 🚨 ERROR RETURN PATH #3');
+        console.error('[createSalarySnapshots] Error message:', error.message);
+        console.error('[createSalarySnapshots] Error stack:', error.stack);
+        return Response.json({
+            error: error.message
+        }, { status: 500 });
+    }
+});

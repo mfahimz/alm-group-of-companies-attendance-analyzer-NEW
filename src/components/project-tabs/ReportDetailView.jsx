@@ -765,7 +765,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             while (hasMore) {
                 try {
-                    const batchResult = await base44.functions.invoke('createSalarySnapshots', {
+                    const batchResult = await base44.functions.invoke('createSalarySnapshotsV2', {
                         project_id: project.id,
                         report_run_id: reportRun.id,
                         batch_mode: true,
