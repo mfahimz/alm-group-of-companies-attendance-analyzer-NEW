@@ -36,6 +36,10 @@
       "type": "number",
       "description": "DIVISOR_OT: Divisor used for OT Hourly Rate calculation (from project.ot_calculation_days at generation time). [MERGE_NOTE: If merging, remove this field]"
     },
+    "prev_month_days": {
+      "type": "number",
+      "description": "Number of days in the previous month used for previous month LOP pay calculation (e.g. 28 for February, 31 for January). Entered manually by finance in the salary report header."
+    },
     "employee_count": {
       "type": "number",
       "description": "Number of employees in report"

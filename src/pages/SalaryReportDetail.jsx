@@ -57,8 +57,9 @@ export default function SalaryReportDetail() {
     // Controls visibility of the stats bar — hidden by default on page open
     const [showStats, setShowStats] = useState(false);
 
-    // Tracks inline edits to divisor fields in the header
+    // Tracks inline edits to divisor fields and prev_month_days in the header
     const [divisorEdits, setDivisorEdits] = useState({});
+    const [prevMonthDaysEdit, setPrevMonthDaysEdit] = useState('');
 
     const navigate = useNavigate();
 
@@ -146,6 +147,21 @@ export default function SalaryReportDetail() {
         } catch (err) {
             console.error('Failed to save divisors:', err);
             toast.error('Failed to save divisors');
+        }
+    };
+
+    const savePrevMonthDays = async () => {
+        if (prevMonthDaysEdit === '') return;
+        try {
+            await base44.entities.SalaryReport.update(report.id, {
+                prev_month_days: Number(prevMonthDaysEdit)
+            });
+            setPrevMonthDaysEdit('');
+            queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+            toast.success('Prev month days updated');
+        } catch (err) {
+            console.error('Failed to save prev_month_days:', err);
+            toast.error('Failed to save prev month days');
         }
     };
 
@@ -988,6 +1004,27 @@ export default function SalaryReportDetail() {
                                             <span>{report.ot_divisor}</span>
                                         )}
                                         {salaryData[0]?.prev_month_divisor > 0 && <span className="opacity-60">/ {salaryData[0].prev_month_divisor}</span>}
+                                    </span>
+
+                                    {/* Prev Month Days — inline editable chip */}
+                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
+                                        Prev month days:&nbsp;
+                                        {isAdmin ? (
+                                            <input
+                                                type="number"
+                                                placeholder="—"
+                                                value={prevMonthDaysEdit !== ''
+                                                    ? prevMonthDaysEdit
+                                                    : (report.prev_month_days ?? '')}
+                                                onChange={e => setPrevMonthDaysEdit(e.target.value)}
+                                                onBlur={savePrevMonthDays}
+                                                onKeyDown={e => e.key === 'Enter' && savePrevMonthDays()}
+                                                className="w-10 bg-white border border-slate-300 rounded px-1 text-xs text-center
+                                                    focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            />
+                                        ) : (
+                                            <span>{report.prev_month_days ?? '—'}</span>
+                                        )}
                                     </span>
                                 </div>
                             </div>
