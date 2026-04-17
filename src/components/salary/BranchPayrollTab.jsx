@@ -99,6 +99,8 @@ export default function BranchPayrollTab({
             acc.advanceSalaryDeduction += asNumber(getValue(row, 'advanceSalaryDeduction'));
             acc.prevMonthLopDays += (row.extra_prev_month_lop_days || 0);
             acc.prevMonthLopPay += (row.extra_prev_month_lop_pay || 0);
+            acc.otherMinutesHours += ((row.other_minutes || 0) / 60);
+            acc.deductMinutesHours += ((row.deductible_minutes || 0) / 60);
             acc.netDeductions += netDeductions;
             acc.total += displayTotal;
             acc.wpsPay += displayWpsPay;
@@ -111,7 +113,8 @@ export default function BranchPayrollTab({
             bonus: 0, normalOtHours: 0, normalOtSalary: 0, specialOtHours: 0, specialOtSalary: 0, 
             totalOtSalary: 0, incentive: 0, open_leave_salary: 0, variable_salary: 0, netAdditions: 0, 
             leavePay: 0, netDeduction: 0, deductibleHours: 0, deductibleHoursPay: 0, 
-            otherDeduction: 0, advanceSalaryDeduction: 0, prevMonthLopDays: 0, prevMonthLopPay: 0, netDeductions: 0, total: 0, wpsPay: 0, balance: 0
+            otherDeduction: 0, advanceSalaryDeduction: 0, prevMonthLopDays: 0, prevMonthLopPay: 0, 
+            otherMinutesHours: 0, deductMinutesHours: 0, netDeductions: 0, total: 0, wpsPay: 0, balance: 0
         });
     }, [branchEmployees, calculateTotals, activeHolds, getValue, isAlMaraghi, asNumber]);
 
@@ -185,7 +188,7 @@ export default function BranchPayrollTab({
                             <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                             <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                            <th colSpan={10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                            <th colSpan={11} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                             <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                             <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                         </tr>
@@ -217,20 +220,17 @@ export default function BranchPayrollTab({
                             {isAlMaraghi && <SortableTableHead sortKey="variable_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Variable Salary</SortableTableHead>}
                             <TableHead className="whitespace-nowrap bg-emerald-200 px-2 font-bold border-r border-slate-300">Net Add.</TableHead>
                             {/* Deductions Group */}
-                            <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Days</SortableTableHead>
-                            <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Pay</SortableTableHead>
-                            <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Ded.</SortableTableHead>
-                            <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Hrs</SortableTableHead>
-                            <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Pay</SortableTableHead>
-                            <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Other</SortableTableHead>
-                            <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Advance</SortableTableHead>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">
-                                Prev LOP Days
-                            </th>
-                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">
-                                Prev LOP Pay
-                            </th>
-                            <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">Net Ded.</TableHead>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Hrs</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Hrs Att.</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Hrs Amt</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Prev</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Amt Prev</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Curr</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Amt Curr</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">Lv Ded.</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">Other Ded.</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">Advance</th>
+                            <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-200 font-bold border-r border-slate-300">Total Ded.</th>
                             {/* Final Group */}
                             <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Total</SortableTableHead>
                             <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">WPS</SortableTableHead>
@@ -246,7 +246,7 @@ export default function BranchPayrollTab({
                     <tbody>
                         {filteredData.length === 0 ? (
                         <tr>
-                            <td colSpan={37} className="text-center py-12">
+                            <td colSpan={38} className="text-center py-12">
                                 <p className="text-slate-500">No employees match your search</p>
                             </td>
                         </tr>
@@ -347,46 +347,50 @@ export default function BranchPayrollTab({
                                     </td>}
                                     <td className={`${cellBase} bg-emerald-100 font-bold border-r border-slate-200`}>{netAdditions.toFixed(2)}</td>
 
-                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                        {adminEditMode && isAdmin ? (
-                                            <Input type="number" step="0.01" value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)} readOnly className="h-6 text-xs w-12 px-1 bg-slate-100" />
-                                        ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}
+                                    {/* J - LOP Hours (other_minutes / 60) */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{((row.other_minutes || 0) / 60).toFixed(2)}</td>
+
+                                    {/* K - LOP Hours Attendance (deductible_minutes / 60) */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{((row.deductible_minutes || 0) / 60).toFixed(2)}</td>
+
+                                    {/* L - LOP Hours Amount */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(row.deductibleHoursPay || 0).toFixed(2)}</td>
+
+                                    {/* M - LOP Days Previous */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(row.extra_prev_month_lop_days || 0).toFixed(0)}</td>
+
+                                    {/* N - LOP Days Prev Amount */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
+
+                                    {/* O - LOP Days Current */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}</td>
+
+                                    {/* P - LOP Days Current Amount */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(asNumber(row.leavePay)).toFixed(2)}</td>
+
+                                    {/* Leave Deduction */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(row.netDeduction || 0).toFixed(2)}</td>
+
+                                    {/* Q - Other Deduction (editable input — same as current) */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50 px-1">
+                                        <Input type="number" step="0.01"
+                                            value={getValue(row, 'otherDeduction')}
+                                            onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
+                                            className="h-6 text-xs w-14 px-1" />
                                     </td>
-                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                        {adminEditMode && isAdmin ? (
-                                            <Input type="number" step="0.01" value={getValue(row, 'leavePay')} onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                        ) : (asNumber(row.leavePay)).toFixed(2)}
+
+                                    {/* Advance (editable input — same as current) */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50 px-1">
+                                        <Input type="number" step="0.01"
+                                            value={getValue(row, 'advanceSalaryDeduction')}
+                                            onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
+                                            className="h-6 text-xs w-14 px-1" />
                                     </td>
-                                    <td className={`${cellBase} bg-rose-50/50 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                        {adminEditMode && isAdmin ? (
-                                            <Input type="number" step="0.01" value={getValue(row, 'netDeduction')} onChange={(e) => handleChange(row.hrms_id, 'netDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                        ) : (row.netDeduction || 0).toFixed(2)}
+
+                                    {/* R - Total Deductions */}
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-100 font-bold border-r border-slate-200">
+                                        {netDeductions.toFixed(2)}
                                     </td>
-                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                        {adminEditMode && isAdmin ? (
-                                            <Input type="number" step="0.01" value={getValue(row, 'deductibleHours')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHours', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                        ) : (row.deductibleHours || 0).toFixed(2)}
-                                    </td>
-                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                        {adminEditMode && isAdmin ? (
-                                            <Input type="number" step="0.01" value={getValue(row, 'deductibleHoursPay')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHoursPay', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                        ) : (row.deductibleHoursPay || 0).toFixed(2)}
-                                    </td>
-                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
-                                        <Input type="number" step="0.01" value={getValue(row, 'otherDeduction')} onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                    </td>
-                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
-                                        <Input type="number" step="0.01" value={getValue(row, 'advanceSalaryDeduction')} onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                    </td>
-                                    {/* Previous month LOP days from AnalysisResult via createSalarySnapshotsV2 */}
-                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">
-                                        {(row.extra_prev_month_lop_days || 0).toFixed(0)}
-                                    </td>
-                                    {/* Previous month LOP pay calculated at previous month salary rate */}
-                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">
-                                        {(row.extra_prev_month_lop_pay || 0).toFixed(2)}
-                                    </td>
-                                    <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
 
                                     <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{displayTotal.toFixed(2)}</td>
                                     <td className={`${cellBase} bg-indigo-50 font-bold text-green-700`}>{displayWpsPay.toFixed(2)}</td>
@@ -460,15 +464,16 @@ export default function BranchPayrollTab({
                             {isAlMaraghi && <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.variable_salary.toFixed(2)}</td>}
                             <td className="px-2 py-1.5 text-right tabular-nums bg-emerald-900 border-r border-slate-600">{grandTotals.netAdditions.toFixed(2)}</td>
                             
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.otherMinutesHours.toFixed(2)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.deductMinutesHours.toFixed(2)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.deductibleHoursPay.toFixed(2)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopDays.toFixed(0)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{(grandTotals.annual_leave_count + grandTotals.full_absence_count).toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.leavePay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.netDeduction.toFixed(2)}</td>
-                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.deductibleHours.toFixed(2)}</td>
-                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.deductibleHoursPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.otherDeduction.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.advanceSalaryDeduction.toFixed(2)}</td>
-                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopDays.toFixed(0)}</td>
-                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-rose-900 border-r border-slate-600">{grandTotals.netDeductions.toFixed(2)}</td>
                             
                             <td className="px-2 py-1.5 text-right tabular-nums bg-indigo-900">{grandTotals.total.toFixed(2)}</td>

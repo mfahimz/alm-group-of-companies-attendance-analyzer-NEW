@@ -1243,7 +1243,7 @@ export default function SalaryReportDetail() {
                                             <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                                             <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                                            <th colSpan={10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                                            <th colSpan={11} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                                             <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                                             <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                                         </tr>
@@ -1275,30 +1275,67 @@ export default function SalaryReportDetail() {
                                             {isAlMaraghi && <SortableTableHead sortKey="variable_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-emerald-50 px-2">Variable Salary</SortableTableHead>}
                                             <TableHead className="whitespace-nowrap bg-emerald-200 px-2 font-bold border-r border-slate-300">Net Add.</TableHead>
                                             {/* Deductions Group */}
-                                            <SortableTableHead sortKey="leaveDays" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Days</SortableTableHead>
-                                            <SortableTableHead sortKey="leavePay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Pay</SortableTableHead>
-                                            <SortableTableHead sortKey="netDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Lv Ded.</SortableTableHead>
-                                            <SortableTableHead sortKey="deductibleHours" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Hrs</SortableTableHead>
-                                            <SortableTableHead sortKey="deductibleHoursPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Ded Pay</SortableTableHead>
-                                            <SortableTableHead sortKey="otherDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Other</SortableTableHead>
-                                            <SortableTableHead sortKey="advanceSalaryDeduction" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Advance</SortableTableHead>
-                                            <SortableTableHead
-                                                sortKey="extra_prev_month_lop_days"
-                                                currentSort={sortColumn}
-                                                onSort={setSortColumn}
-                                                className="whitespace-nowrap bg-rose-50 px-2"
-                                            >
-                                                Prev LOP Days
+                                            <SortableTableHead sortKey="deductibleHours"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Hrs
                                             </SortableTableHead>
-                                            <SortableTableHead
-                                                sortKey="extra_prev_month_lop_pay"
-                                                currentSort={sortColumn}
-                                                onSort={setSortColumn}
-                                                className="whitespace-nowrap bg-rose-50 px-2"
-                                            >
-                                                Prev LOP Pay
+
+                                            <TableHead className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Hrs Att.
+                                            </TableHead>
+
+                                            <SortableTableHead sortKey="deductibleHoursPay"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Hrs Amt
                                             </SortableTableHead>
-                                            <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">Net Ded.</TableHead>
+
+                                            <SortableTableHead sortKey="extra_prev_month_lop_days"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Days Prev
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="extra_prev_month_lop_pay"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Days Amt Prev
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="leaveDays"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Days Curr
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="leavePay"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                LOP Days Amt Curr
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="netDeduction"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                Lv Ded.
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="otherDeduction"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                Other Ded.
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="advanceSalaryDeduction"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                Advance
+                                            </SortableTableHead>
+
+                                            <TableHead className="whitespace-nowrap bg-rose-200 px-2 font-bold border-r border-slate-300">
+                                                Total Ded.
+                                            </TableHead>
                                             {/* Final Group */}
                                             <SortableTableHead sortKey="total" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">Total</SortableTableHead>
                                             <SortableTableHead sortKey="wpsPay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-indigo-50 px-2 font-bold">WPS</SortableTableHead>
@@ -1314,7 +1351,7 @@ export default function SalaryReportDetail() {
                                     <tbody>
                                         {filteredData.length === 0 ? (
                                         <tr>
-                                            <td colSpan={37} className="text-center py-12">
+                                            <td colSpan={38} className="text-center py-12">
                                                     <p className="text-slate-500">No employees match your search</p>
                                                 </td>
                                             </tr>
@@ -1420,46 +1457,84 @@ export default function SalaryReportDetail() {
                                                     <td className={`${cellBase} bg-emerald-100 font-bold border-r border-slate-200`}>{netAdditions.toFixed(2)}</td>
 
                                                     {/* Deductions */}
-                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                        {adminEditMode && isAdmin ? (
-                                                            <Input type="number" step="0.01" value={(((getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count') ?? 0) + (getValue(row, 'full_absence_count') ?? row.full_absence_count ?? 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)} readOnly className="h-6 text-xs w-12 px-1 bg-slate-100" />
-                                                        ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}
+                                                    {/* J - LOP Hours (other_minutes converted to hours) */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}>
+                                                        {((row.other_minutes || 0) / 60).toFixed(2)}
                                                     </td>
-                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                        {adminEditMode && isAdmin ? (
-                                                            <Input type="number" step="0.01" value={getValue(row, 'leavePay')} onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                        ) : (asNumber(row.leavePay)).toFixed(2)}
+
+                                                    {/* K - LOP Hours Attendance (deductible_minutes converted to hours) */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}>
+                                                        {((row.deductible_minutes || 0) / 60).toFixed(2)}
                                                     </td>
-                                                    <td className={`${cellBase} bg-rose-50/50 font-semibold`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                        {adminEditMode && isAdmin ? (
-                                                            <Input type="number" step="0.01" value={getValue(row, 'netDeduction')} onChange={(e) => handleChange(row.hrms_id, 'netDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                        ) : (row.netDeduction || 0).toFixed(2)}
+
+                                                    {/* L - LOP Hours Amount (pay for combined hours) */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}>
+                                                        {(row.deductibleHoursPay || 0).toFixed(2)}
                                                     </td>
-                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                        {adminEditMode && isAdmin ? (
-                                                            <Input type="number" step="0.01" value={getValue(row, 'deductibleHours')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHours', e.target.value)} className="h-6 text-xs w-12 px-1" />
-                                                        ) : (row.deductibleHours || 0).toFixed(2)}
-                                                    </td>
-                                                    <td className={`${cellBase} bg-rose-50/50`} onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
-                                                        {adminEditMode && isAdmin ? (
-                                                            <Input type="number" step="0.01" value={getValue(row, 'deductibleHoursPay')} onChange={(e) => handleChange(row.hrms_id, 'deductibleHoursPay', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                        ) : (row.deductibleHoursPay || 0).toFixed(2)}
-                                                    </td>
-                                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
-                                                        <Input type="number" step="0.01" value={getValue(row, 'otherDeduction')} onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    </td>
-                                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
-                                                        <Input type="number" step="0.01" value={getValue(row, 'advanceSalaryDeduction')} onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)} className="h-6 text-xs w-14 px-1" />
-                                                    </td>
-                                                    {/* Previous month LOP days from AnalysisResult via createSalarySnapshotsV2 */}
+
+                                                    {/* M - LOP Days Previous month */}
                                                     <td className={`${cellBase} bg-rose-50/50`}>
                                                         {(row.extra_prev_month_lop_days || 0).toFixed(0)}
                                                     </td>
-                                                    {/* Previous month LOP pay calculated at previous month salary rate */}
+
+                                                    {/* N - LOP Days Previous month amount */}
                                                     <td className={`${cellBase} bg-rose-50/50`}>
                                                         {(row.extra_prev_month_lop_pay || 0).toFixed(2)}
                                                     </td>
-                                                    <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>{netDeductions.toFixed(2)}</td>
+
+                                                    {/* O - LOP Days Current month */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}
+                                                        onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01"
+                                                                value={getValue(row, 'salary_leave_days') ?? getValue(row, 'salaryLeaveDays') ?? getValue(row, 'annual_leave_count')}
+                                                                onChange={(e) => handleChange(row.hrms_id, 'salary_leave_days', e.target.value)}
+                                                                className="h-6 text-xs w-12 px-1" />
+                                                        ) : (((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}
+                                                    </td>
+
+                                                    {/* P - LOP Days Current month amount */}
+                                                    <td className={`${cellBase} bg-rose-50/50`}
+                                                        onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01"
+                                                                value={getValue(row, 'leavePay')}
+                                                                onChange={(e) => handleChange(row.hrms_id, 'leavePay', e.target.value)}
+                                                                className="h-6 text-xs w-14 px-1" />
+                                                        ) : (asNumber(row.leavePay)).toFixed(2)}
+                                                    </td>
+
+                                                    {/* Leave Deduction (net after leave salary offset) */}
+                                                    <td className={`${cellBase} bg-rose-50/50 font-semibold`}
+                                                        onDoubleClick={() => isAdmin && setAdminEditMode(true)}>
+                                                        {adminEditMode && isAdmin ? (
+                                                            <Input type="number" step="0.01"
+                                                                value={getValue(row, 'netDeduction')}
+                                                                onChange={(e) => handleChange(row.hrms_id, 'netDeduction', e.target.value)}
+                                                                className="h-6 text-xs w-14 px-1" />
+                                                        ) : (row.netDeduction || 0).toFixed(2)}
+                                                    </td>
+
+                                                    {/* Q - Other Deduction (manual editable) */}
+                                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
+                                                        <Input type="number" step="0.01"
+                                                            value={getValue(row, 'otherDeduction')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'otherDeduction', e.target.value)}
+                                                            className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+
+                                                    {/* Advance (manual editable) */}
+                                                    <td className={`${cellBase} bg-rose-50/50 px-1`}>
+                                                        <Input type="number" step="0.01"
+                                                            value={getValue(row, 'advanceSalaryDeduction')}
+                                                            onChange={(e) => handleChange(row.hrms_id, 'advanceSalaryDeduction', e.target.value)}
+                                                            className="h-6 text-xs w-14 px-1" />
+                                                    </td>
+
+                                                    {/* R - Total Deductions */}
+                                                    <td className={`${cellBase} bg-rose-100 font-bold border-r border-slate-200`}>
+                                                        {netDeductions.toFixed(2)}
+                                                    </td>
 
                                                     {/* Final */}
                                                     <td className={`${cellBase} bg-indigo-50 font-bold text-slate-900`}>{displayTotal.toFixed(2)}</td>
