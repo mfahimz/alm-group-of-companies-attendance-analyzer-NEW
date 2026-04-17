@@ -103,6 +103,7 @@ const calculateEmployeeSalary = (input) => {
         fullAbsenceCount = 0,
         annualLeaveCount = 0,
         deductibleMinutes = 0,
+        otherMinutes = 0,
         ramadanGiftMinutes = 0,
         graceMinutes = 15,
         salaryLeaveDays: rawSalaryLeaveDays = 0,
@@ -130,8 +131,14 @@ const calculateEmployeeSalary = (input) => {
     const netDeduction = Math.max(0, Math.round((leavePay - salaryLeaveAmount) * 100) / 100);
 
     // Deductible Hours
-    const effectiveDeductibleMinutes = Math.max(0, (deductibleMinutes || 0) - (ramadanGiftMinutes || 0));
-    const deductibleHours = Math.round((effectiveDeductibleMinutes / 60) * 100) / 100;
+    // V2 FIX: Include both deductible_minutes AND other_minutes in hours
+    // Matches the canonical calculateEmployeeSalary.ts shared helper logic
+    // other_minutes = manual other minutes (Excel Col J - LOP Hours)
+    // deductible_minutes = attendance late/early minutes (Excel Col K - LOP Hrs Att.)
+    const finalizedDeductibleMinutes = Math.max(0, (deductibleMinutes || 0) - (ramadanGiftMinutes || 0));
+    const finalizedOtherMinutes = Math.max(0, otherMinutes || 0);
+    const payrollDeductibleMinutes = finalizedDeductibleMinutes + finalizedOtherMinutes;
+    const deductibleHours = Math.round((payrollDeductibleMinutes / 60) * 100) / 100;
     const hourlyRateDeduction = totalSalary / divisor / workingHours;
     const deductibleHoursPay = Math.round(hourlyRateDeduction * deductibleHours * 100) / 100;
 
@@ -213,7 +220,7 @@ const calculateEmployeeSalary = (input) => {
         other_minutes: attendance?.otherMinutes || 0,
         approved_minutes: attendance?.approvedMinutes || 0,
         grace_minutes: graceMinutes,
-        deductible_minutes: effectiveDeductibleMinutes,
+        deductible_minutes: finalizedDeductibleMinutes,
         ramadan_gift_minutes: ramadanGiftMinutes || 0,
         salary_divisor: divisor,
         ot_divisor: otDivisor,

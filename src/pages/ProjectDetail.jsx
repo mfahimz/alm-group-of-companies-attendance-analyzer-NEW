@@ -266,7 +266,7 @@ export default function ProjectDetail() {
                                 {/* DIVISOR_OT */}
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                                     <Label className="text-sm font-semibold text-orange-900 mb-2 block">
-                                        OT / Previous Month Divisor (Days)
+                                        Prev Month Days
                                     </Label>
                                     <div className="flex items-center gap-2">
                                         <Input
@@ -287,7 +287,7 @@ export default function ProjectDetail() {
                                         </Button>
                                     </div>
                                     <p className="text-xs text-orange-700 mt-2">
-                                        Used for: OT Salary, Prev Month LOP Pay, Prev Month Deductible Hours Pay
+                                        Used for: Previous month LOP pay calculation (e.g. 28 for February)
                                     </p>
                                 </div>
                             </div>
