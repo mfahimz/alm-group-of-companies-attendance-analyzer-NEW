@@ -1007,7 +1007,7 @@ export default function SalaryReportDetail() {
                                     </span>
 
                                     {/* Prev Month Days — inline editable chip */}
-                                    <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
+                                    <span className="hidden text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
                                         Prev month days:&nbsp;
                                         {isAdmin ? (
                                             <input
