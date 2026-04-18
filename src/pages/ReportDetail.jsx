@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Timer } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import ReportDetailView from '../components/project-tabs/ReportDetailView';
 import { formatInUAE } from '@/components/ui/timezone';
+import { useEffect, useRef, useState } from 'react';
 
 export default function ReportDetailPage() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -62,6 +63,69 @@ export default function ReportDetailPage() {
         refetchOnReconnect: false
     });
 
+    // --- Silent report view timer ---
+    const timerRef = useRef(null);
+    const secondsRef = useRef(0);
+    const startTimeRef = useRef(null);
+    const [displayTime, setDisplayTime] = useState('0:00');
+    const reportReadyRef = useRef(false);
+
+    const formatTime = (secs) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const startTicking = () => {
+        if (timerRef.current) return;
+        startTimeRef.current = Date.now();
+        timerRef.current = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+            const total = secondsRef.current + elapsed;
+            setDisplayTime(formatTime(total));
+        }, 1000);
+    };
+
+    const pauseTicking = () => {
+        if (!timerRef.current) return;
+        const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        secondsRef.current += elapsed;
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+    };
+
+    useEffect(() => {
+        if (!reportRun || !project || reportReadyRef.current) return;
+        reportReadyRef.current = true;
+        startTicking();
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'hidden') {
+                pauseTicking();
+            } else {
+                startTicking();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            pauseTicking();
+            const total = secondsRef.current;
+            if (total < 3 || !currentUser) return;
+            // Fire-and-forget — silent, never blocks UI
+            base44.entities.ActivityLog.create({
+                user_email: currentUser.email,
+                user_name: currentUser.full_name || currentUser.email,
+                user_role: currentUser.role || 'user',
+                ip_address: '',
+                user_agent: `REPORT_VIEW | report_id:${reportRun.id} | report_name:${reportRun.report_name || reportRunId} | seconds:${total}`
+            }).catch(() => {});
+        };
+    }, [reportRun, project]);
+    // --- End silent report view timer ---
+
     if (reportLoading || projectLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -106,6 +170,11 @@ export default function ReportDetailPage() {
                             Generated on {formatInUAE(reportRun.created_date, 'MM/dd/yyyy hh:mm a')}
                         </p>
                     </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full select-none">
+                    <Timer className="w-3 h-3" />
+                    <span>{displayTime}</span>
                 </div>
             </div>
 
