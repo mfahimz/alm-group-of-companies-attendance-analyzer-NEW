@@ -74,6 +74,19 @@ export default function ProjectDetail() {
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
   const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
 
+  const prevMonthDaysAuto = (() => {
+    if (!project?.date_from || !project?.date_to) return null;
+    const fromDate = new Date(project.date_from);
+    const toDate = new Date(project.date_to);
+    if (fromDate.getMonth() === toDate.getMonth() &&
+        fromDate.getFullYear() === toDate.getFullYear()) {
+      return null;
+    }
+    const year = fromDate.getFullYear();
+    const month = fromDate.getMonth() + 1;
+    return new Date(year, month, 0).getDate();
+  })();
+
   // CRITICAL: Department heads can only access CLOSED projects
   React.useEffect(() => {
     if (project && isDepartmentHead && project.status !== 'closed') {
@@ -128,20 +141,6 @@ export default function ProjectDetail() {
     }
   });
 
-  // DIVISOR_OT: Used for Normal OT Salary, Special OT Salary calculations
-  // [MERGE_NOTE: If merging divisors in future, remove this mutation entirely]
-  const updateOtCalculationDaysMutation = useMutation({
-    mutationFn: async (days) => {
-      await base44.entities.Project.update(project.id, { ot_calculation_days: days });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['project', projectId]);
-      toast.success('OT divisor updated');
-    },
-    onError: () => {
-      toast.error('Failed to update OT divisor');
-    }
-  });
 
   // DIVISOR_LEAVE_DEDUCTION state
   const [salaryCalcDays, setSalaryCalcDays] = React.useState(project?.salary_calculation_days || 30);
@@ -149,11 +148,6 @@ export default function ProjectDetail() {
     setSalaryCalcDays(project?.salary_calculation_days || 30);
   }, [project?.salary_calculation_days]);
 
-  // DIVISOR_OT state
-  const [otCalcDays, setOtCalcDays] = React.useState(project?.ot_calculation_days || 30);
-  React.useEffect(() => {
-    setOtCalcDays(project?.ot_calculation_days || 30);
-  }, [project?.ot_calculation_days]);
 
   if (isLoading) {
     return (
@@ -263,31 +257,26 @@ export default function ProjectDetail() {
                                     </p>
                                 </div>
 
-                                {/* DIVISOR_OT */}
+                                {/* Prev Month Days — auto-calculated read-only */}
                                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                    <Label className="text-sm font-semibold text-orange-900 mb-2 block">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                                         Prev Month Days
                                     </Label>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="number"
-                                            min="1"
-                                            value={otCalcDays}
-                                            onChange={(e) => setOtCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
-                                            className="w-20"
-                                        />
-                                        <span className="text-sm text-orange-700 font-medium">days</span>
-                                        <Button
-                                            onClick={() => updateOtCalculationDaysMutation.mutate(otCalcDays)}
-                                            disabled={updateOtCalculationDaysMutation.isPending || otCalcDays === (project?.ot_calculation_days || 30)}
-                                            size="sm"
-                                            className="bg-orange-600 hover:bg-orange-700"
-                                        >
-                                            {updateOtCalculationDaysMutation.isPending ? 'Saving...' : 'Update'}
-                                        </Button>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-2xl font-bold text-slate-800">
+                                            {prevMonthDaysAuto !== null ? prevMonthDaysAuto : '—'}
+                                        </span>
+                                        <span className="text-xs text-slate-400">days</span>
+                                        {prevMonthDaysAuto !== null && (
+                                            <span className="text-xs text-emerald-600 font-medium">
+                                                (auto-calculated)
+                                            </span>
+                                        )}
                                     </div>
-                                    <p className="text-xs text-orange-700 mt-2">
-                                        Used for: Previous month LOP pay calculation (e.g. 28 for February)
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {prevMonthDaysAuto !== null
+                                            ? `Days in previous month — used for prev month LOP pay calculation`
+                                            : `No previous month overflow for this project period`}
                                     </p>
                                 </div>
                             </div>

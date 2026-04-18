@@ -59,7 +59,7 @@ export default function SalaryReportDetail() {
 
     // Tracks inline edits to divisor fields and prev_month_days in the header
     const [divisorEdits, setDivisorEdits] = useState({});
-    const [prevMonthDaysEdit, setPrevMonthDaysEdit] = useState('');
+
 
     const navigate = useNavigate();
 
@@ -150,20 +150,6 @@ export default function SalaryReportDetail() {
         }
     };
 
-    const savePrevMonthDays = async () => {
-        if (prevMonthDaysEdit === '') return;
-        try {
-            await base44.entities.SalaryReport.update(report.id, {
-                prev_month_days: Number(prevMonthDaysEdit)
-            });
-            setPrevMonthDaysEdit('');
-            queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
-            toast.success('Prev month days updated');
-        } catch (err) {
-            console.error('Failed to save prev_month_days:', err);
-            toast.error('Failed to save prev month days');
-        }
-    };
 
     // Auto-unlock if already unlocked from SalaryTab - MUST be before any conditional returns
     React.useEffect(() => {
@@ -491,6 +477,24 @@ export default function SalaryReportDetail() {
             onHoldCount
         };
     }, [salaryData, activeHolds, verifiedEmployees, calculateTotals]);
+
+    // Auto-calculate previous month days from report date range
+    // Previous month = the month of report.date_from
+    // Returns null if no overflow (date_from is in same month as date_to)
+    const prevMonthDaysAuto = useMemo(() => {
+        if (!report?.date_from || !report?.date_to) return null;
+        const fromDate = new Date(report.date_from);
+        const toDate = new Date(report.date_to);
+        // Check if there is a previous month overflow
+        if (fromDate.getMonth() === toDate.getMonth() &&
+            fromDate.getFullYear() === toDate.getFullYear()) {
+            return null; // No overflow — same month
+        }
+        // Get total days in the previous month (month of date_from)
+        const year = fromDate.getFullYear();
+        const month = fromDate.getMonth() + 1; // 1-based month
+        return new Date(year, month, 0).getDate();
+    }, [report?.date_from, report?.date_to]);
 
     const handleSave = async () => {
         // Check if there are any changes (edits OR verification changes)
@@ -1006,24 +1010,14 @@ export default function SalaryReportDetail() {
                                         {salaryData[0]?.prev_month_divisor > 0 && <span className="opacity-60">/ {salaryData[0].prev_month_divisor}</span>}
                                     </span>
 
-                                    {/* Prev Month Days — inline editable chip */}
+                                    {/* Prev Month Days — auto-calculated read-only chip */}
                                     <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
                                         Prev month days:&nbsp;
-                                        {isAdmin ? (
-                                            <input
-                                                type="number"
-                                                placeholder="—"
-                                                value={prevMonthDaysEdit !== ''
-                                                    ? prevMonthDaysEdit
-                                                    : (report.prev_month_days ?? '')}
-                                                onChange={e => setPrevMonthDaysEdit(e.target.value)}
-                                                onBlur={savePrevMonthDays}
-                                                onKeyDown={e => e.key === 'Enter' && savePrevMonthDays()}
-                                                className="w-10 bg-white border border-slate-300 rounded px-1 text-xs text-center
-                                                    focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        ) : (
-                                            <span>{report.prev_month_days ?? '—'}</span>
+                                        <span className="font-medium text-slate-700">
+                                            {prevMonthDaysAuto !== null ? prevMonthDaysAuto : '—'}
+                                        </span>
+                                        {prevMonthDaysAuto !== null && (
+                                            <span className="text-slate-400 text-[10px] ml-1">(auto)</span>
                                         )}
                                     </span>
                                 </div>
