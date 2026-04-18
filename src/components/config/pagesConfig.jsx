@@ -97,8 +97,8 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager', 'senior_accountant']
     },
-    SalaryIncrements: {
-        name: 'SalaryIncrements',
+    SalaryModifications: {
+        name: 'SalaryModifications',
         title: 'Salary Modifications',
         icon: DollarSign,
         category: 'HRManagement',
