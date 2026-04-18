@@ -185,7 +185,7 @@ export default function BodyShopPayrollTab({
                     <thead className="sticky top-0 z-10">
                         {/* Group Header Row */}
                         <tr className="border-b border-slate-300">
-                            <th colSpan={3} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
+                            <th colSpan={4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                             <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
                             <th colSpan={11} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
@@ -194,10 +194,11 @@ export default function BodyShopPayrollTab({
                         </tr>
                         {/* Column Header Row */}
                         <tr className="border-b border-slate-300 bg-slate-50">
-                            {/* Sticky Left: Checkbox, ID, Name */}
+                            {/* Sticky Left: Checkbox, #, ID, Name */}
                             <TableHead className="w-8 bg-slate-100 px-1 sticky left-0 z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">✓</TableHead>
-                            <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[32px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">ID</SortableTableHead>
-                            <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[82px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-300">Name</SortableTableHead>
+                            <TableHead className="w-8 bg-slate-100 px-1 text-center sticky left-[32px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">#</TableHead>
+                            <SortableTableHead sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[64px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">ID</SortableTableHead>
+                            <SortableTableHead sortKey="name" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-100 px-2 sticky left-[114px] z-20 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)] border-r border-slate-300">Name</SortableTableHead>
                             <SortableTableHead sortKey="basic_salary" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Basic</SortableTableHead>
                             <SortableTableHead sortKey="allowances" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.</SortableTableHead>
                             <SortableTableHead sortKey="allowances_with_bonus" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-slate-50 px-2">Allow.+B</SortableTableHead>
@@ -275,8 +276,9 @@ export default function BodyShopPayrollTab({
                                             className="h-3.5 w-3.5"
                                         />
                                     </td>
-                                    <td className={`${cellBase} font-medium text-slate-700 sticky left-[32px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
-                                    <td className={`${cellBase} font-medium text-slate-800 sticky left-[82px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
+                                    <td className={`${cellBase} text-center text-slate-400 sticky left-[32px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{idx + 1}</td>
+                                    <td className={`${cellBase} font-medium text-slate-700 sticky left-[64px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
+                                    <td className={`${cellBase} font-medium text-slate-800 sticky left-[114px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)] border-r border-slate-200`}>{row.name?.split(' ').slice(0, 2).join(' ')}</td>
                                     <td className={`${cellBase} text-slate-500`}>{Math.round(row.basic_salary || 0)}</td>
                                     <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances || 0)}</td>
                                     <td className={`${cellBase} text-slate-500`}>{Math.round(row.allowances_with_bonus || 0)}</td>
@@ -440,7 +442,8 @@ export default function BodyShopPayrollTab({
                         <tr className="bg-slate-800 text-white font-bold border-t-2 border-slate-400">
                             <td className="px-2 py-1.5 sticky left-0 z-10 bg-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]"></td>
                             <td className="px-2 py-1.5 sticky left-[32px] z-10 bg-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]"></td>
-                            <td className="px-2 py-1.5 sticky left-[82px] z-10 bg-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)] border-r border-slate-600 whitespace-nowrap">Grand Total</td>
+                            <td className="px-2 py-1.5 sticky left-[64px] z-10 bg-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)]"></td>
+                            <td className="px-2 py-1.5 sticky left-[114px] z-10 bg-slate-800 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.2)] border-r border-slate-600 whitespace-nowrap">Grand Total</td>
                             
                             <td className="px-2 py-1.5 text-right tabular-nums">{grandTotals.basic_salary.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums">{grandTotals.allowances.toFixed(2)}</td>
