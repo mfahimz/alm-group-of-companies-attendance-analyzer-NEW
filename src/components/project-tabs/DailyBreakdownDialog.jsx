@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -30,9 +30,87 @@ export default function DailyBreakdownDialog({
     filterMultiplePunches
 }) {
     const [editingDay, setEditingDay] = useState(null);
+    const [selectedDays, setSelectedDays] = useState(new Set());
+    const [showBulkPanel, setShowBulkPanel] = useState(false);
+    const [bulkType, setBulkType] = useState('');
+    const [bulkAbnormal, setBulkAbnormal] = useState(false);
+    const [bulkShiftOverride, setBulkShiftOverride] = useState({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '' });
+    const [isBulkSaving, setIsBulkSaving] = useState(false);
+
+
     const queryClient = useQueryClient();
     const includeSeconds = true; // Unified
     const isFinalized = reportRun.is_final || project.status === 'closed';
+
+    useEffect(() => {
+        setSelectedDays(new Set());
+        setShowBulkPanel(false);
+    }, [selectedEmployee, open]);
+
+    const handleBulkApply = async () => {
+        if (!selectedEmployee || selectedDays.size === 0) return;
+        if (!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled) return;
+        setIsBulkSaving(true);
+        try {
+            const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+            let overrides = {};
+            if (currentResult.day_overrides) {
+                try { overrides = JSON.parse(currentResult.day_overrides); } catch { overrides = {}; }
+            }
+            for (const dateStr of selectedDays) {
+                const existing = overrides[dateStr] || {};
+                const updated = { ...existing };
+                if (bulkType) {
+                    updated.type = bulkType;
+                    updated.details = '';
+                    if (['MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'WORK_FROM_HOME'].includes(bulkType)) {
+                        updated.lateMinutes = 0;
+                        updated.earlyCheckoutMinutes = 0;
+                        updated.otherMinutes = 0;
+                    }
+                }
+                if (bulkAbnormal) updated.isAbnormal = true;
+                if (bulkShiftOverride.enabled && bulkShiftOverride.am_start && bulkShiftOverride.pm_end) {
+                    updated.shiftOverride = {
+                        am_start: bulkShiftOverride.am_start,
+                        am_end: bulkShiftOverride.am_end,
+                        pm_start: bulkShiftOverride.pm_start,
+                        pm_end: bulkShiftOverride.pm_end
+                    };
+                }
+                overrides[dateStr] = updated;
+            }
+            let totalLate = 0;
+            let totalEarly = 0;
+            let totalOther = 0;
+            for (const [, ov] of Object.entries(overrides)) {
+                totalLate += Math.max(0, Number(ov.lateMinutes) || 0);
+                totalEarly += Math.max(0, Number(ov.earlyCheckoutMinutes) || 0);
+                totalOther += Math.max(0, Number(ov.otherMinutes) || 0);
+            }
+            const deductible = totalLate + totalEarly + totalOther;
+            await base44.entities.AnalysisResult.update(currentResult.id, {
+                day_overrides: JSON.stringify(overrides),
+                late_minutes: totalLate,
+                early_checkout_minutes: totalEarly,
+                other_minutes: totalOther,
+                deductible_minutes: deductible
+            });
+            queryClient.invalidateQueries({ queryKey: ['analysisResults'] });
+            queryClient.invalidateQueries({ queryKey: ['employeeExceptions', project.id] });
+            setSelectedDays(new Set());
+            setShowBulkPanel(false);
+            setBulkType('');
+            setBulkAbnormal(false);
+            setBulkShiftOverride({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '' });
+        } catch (err) {
+            console.error('Bulk apply failed:', err);
+        } finally {
+            setIsBulkSaving(false);
+        }
+    };
+
+
 
     // FAST LOAD: Fetch data for just THIS employee directly, bypassing slow project-wide paginated fetch.
     // Falls back to parent data if available (already cached from a prior load).
@@ -831,6 +909,107 @@ export default function DailyBreakdownDialog({
                         <DialogTitle>
                             Daily Breakdown: {selectedEmployee?.attendance_id} - {selectedEmployee?.name}
                         </DialogTitle>
+                        
+                        {!isFinalized && selectedDays.size >= 2 && (
+                            <div className="flex items-center gap-2 mt-2 px-1">
+                                <span className="text-xs text-slate-500">{selectedDays.size} days selected</span>
+                                <Button size="sm" variant="outline"
+                                    onClick={() => setShowBulkPanel(prev => !prev)}
+                                    className="text-xs h-7">
+                                    {showBulkPanel ? 'Cancel Bulk Edit' : 'Edit Selected'}
+                                </Button>
+                                <Button size="sm" variant="ghost"
+                                    onClick={() => setSelectedDays(new Set())}
+                                    className="text-xs h-7 text-slate-400">
+                                    Clear
+                                </Button>
+                            </div>
+                        )}
+
+                        {showBulkPanel && !isFinalized && (
+                            <div className="mt-3 p-3 border border-indigo-200 rounded-lg bg-indigo-50/50 space-y-3">
+                                <p className="text-xs font-semibold text-indigo-700">Bulk Edit — {selectedDays.size} days</p>
+                                
+                                <div className="flex flex-wrap gap-3 items-end">
+                                    <div className="space-y-1">
+                                        <label className="text-xs text-slate-600">Status Override</label>
+                                        <select value={bulkType} onChange={e => setBulkType(e.target.value)}
+                                            className="text-xs border border-slate-300 rounded px-2 py-1 bg-white h-7">
+                                            <option value="">— no change —</option>
+                                            <option value="MANUAL_PRESENT">Present (Manual)</option>
+                                            <option value="MANUAL_ABSENT">Absent (Manual)</option>
+                                            <option value="SICK_LEAVE">Sick Leave</option>
+                                            <option value="ANNUAL_LEAVE">Annual Leave</option>
+                                            <option value="OFF">Off</option>
+                                            <option value="WORK_FROM_HOME">Work From Home</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5">
+                                        <input type="checkbox" id="bulkAbnormal"
+                                            checked={bulkAbnormal}
+                                            onChange={e => setBulkAbnormal(e.target.checked)}
+                                            className="rounded border-slate-300" />
+                                        <label htmlFor="bulkAbnormal" className="text-xs text-slate-600">Mark Abnormal</label>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <input type="checkbox" id="bulkShiftEnabled"
+                                            checked={bulkShiftOverride.enabled}
+                                            onChange={e => setBulkShiftOverride(prev => ({ ...prev, enabled: e.target.checked }))}
+                                            className="rounded border-slate-300" />
+                                        <label htmlFor="bulkShiftEnabled" className="text-xs font-medium text-rose-600">
+                                            Apply Shift Override (CAUTION — applies to ALL selected days)
+                                        </label>
+                                    </div>
+                                    {bulkShiftOverride.enabled && (
+                                        <div className="flex flex-wrap gap-2 mt-1 pl-5">
+                                            <div className="space-y-0.5">
+                                                <label className="text-[10px] text-slate-500">AM Start</label>
+                                                <input type="text" placeholder="e.g. 8:00 AM" value={bulkShiftOverride.am_start}
+                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, am_start: e.target.value }))}
+                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <label className="text-[10px] text-slate-500">AM End</label>
+                                                <input type="text" placeholder="e.g. 1:00 PM" value={bulkShiftOverride.am_end}
+                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, am_end: e.target.value }))}
+                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <label className="text-[10px] text-slate-500">PM Start</label>
+                                                <input type="text" placeholder="e.g. 2:00 PM" value={bulkShiftOverride.pm_start}
+                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, pm_start: e.target.value }))}
+                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <label className="text-[10px] text-slate-500">PM End</label>
+                                                <input type="text" placeholder="e.g. 6:00 PM" value={bulkShiftOverride.pm_end}
+                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, pm_end: e.target.value }))}
+                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2 pt-1">
+                                    <Button
+                                        size="sm"
+                                        id="bulkApplyBtn"
+                                        onClick={handleBulkApply}
+                                        disabled={(!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled) || isBulkSaving}
+                                        className="text-xs h-7 bg-indigo-600 hover:bg-indigo-700 text-white">
+                                        {isBulkSaving
+                                            ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Saving...</>
+                                            : `Apply to ${selectedDays.size} days`}
+                                    </Button>
+
+                                </div>
+                            </div>
+                        )}
+
                     </DialogHeader>
                     <div className="mt-4">
                         {!dataReady ? (
@@ -842,7 +1021,23 @@ export default function DailyBreakdownDialog({
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-8 px-2">
+                                        {!isFinalized && (
+                                            <input type="checkbox"
+                                                className="rounded border-slate-300"
+                                                checked={selectedDays.size > 0 && selectedDays.size === getDailyBreakdown.filter(d => d.status !== 'Weekly Off' && d.status !== 'Weekly Off (LOP)').length}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedDays(new Set(getDailyBreakdown.filter(d => d.status !== 'Weekly Off' && d.status !== 'Weekly Off (LOP)').map(d => d.dateStr)));
+                                                    } else {
+                                                        setSelectedDays(new Set());
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                    </TableHead>
                                     <TableHead>Date</TableHead>
+
                                     <TableHead>Punches</TableHead>
                                     <TableHead>Punch Times</TableHead>
                                     <TableHead>Shift</TableHead>
@@ -858,7 +1053,22 @@ export default function DailyBreakdownDialog({
                             <TableBody>
                                 {getDailyBreakdown.map((day, idx) => (
                                     <TableRow key={idx} className={`${(day.isLopAdjacent && project.company === 'Al Maraghi Motors') ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacent ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                        <TableCell className="w-8 px-2">
+                                            {!isFinalized && day.status !== 'Weekly Off' && day.status !== 'Weekly Off (LOP)' && (
+                                                <input type="checkbox"
+                                                    className="rounded border-slate-300"
+                                                    checked={selectedDays.has(day.dateStr)}
+                                                    onChange={(e) => {
+                                                        const next = new Set(selectedDays);
+                                                        if (e.target.checked) next.add(day.dateStr);
+                                                        else next.delete(day.dateStr);
+                                                        setSelectedDays(next);
+                                                    }}
+                                                />
+                                            )}
+                                        </TableCell>
                                         <TableCell className="font-medium">
+
                                             <div className="flex items-center gap-1.5">
                                                 <span>{day.date}</span>
                                                 {day.isLopAdjacent && project.company === 'Al Maraghi Motors' && (
@@ -963,12 +1173,13 @@ export default function DailyBreakdownDialog({
                                             {day.abnormal && <span className="text-amber-600 font-medium">Yes</span>}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {project.status !== 'closed' && (
+                                            {!isFinalized && (
                                                 <Button size="sm" variant="ghost" onClick={() => setEditingDay(day)}>
                                                     <Edit className="w-4 h-4 text-indigo-600" />
                                                 </Button>
                                             )}
                                         </TableCell>
+
                                     </TableRow>
                                 ))}
                             </TableBody>
