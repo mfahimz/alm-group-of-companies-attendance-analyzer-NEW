@@ -99,6 +99,7 @@ export default function BodyShopPayrollTab({
             acc.advanceSalaryDeduction += asNumber(getValue(row, 'advanceSalaryDeduction'));
             acc.prevMonthLopDays += (row.extra_prev_month_lop_days || 0);
             acc.prevMonthLopPay += (row.extra_prev_month_lop_pay || 0);
+            acc.prevMonthDeductibleHoursPay += (row.extra_prev_month_deductible_hours_pay || 0);
             acc.otherMinutesHours += ((row.other_minutes || 0) / 60);
             acc.deductMinutesHours += ((row.deductible_minutes || 0) / 60);
             acc.netDeductions += netDeductions;
@@ -113,8 +114,8 @@ export default function BodyShopPayrollTab({
             bonus: 0, normalOtHours: 0, normalOtSalary: 0, specialOtHours: 0, specialOtSalary: 0, 
             totalOtSalary: 0, incentive: 0, open_leave_salary: 0, variable_salary: 0, netAdditions: 0, 
             leavePay: 0, netDeduction: 0, deductibleHours: 0, deductibleHoursPay: 0, 
-            otherDeduction: 0, advanceSalaryDeduction: 0, prevMonthLopDays: 0, prevMonthLopPay: 0, 
-            otherMinutesHours: 0, deductMinutesHours: 0, netDeductions: 0, total: 0, wpsPay: 0, balance: 0
+            otherMinutesHours: 0, deductMinutesHours: 0, netDeductions: 0, total: 0, wpsPay: 0, balance: 0,
+            prevMonthDeductibleHoursPay: 0
         });
     }, [bodyShopEmployees, calculateTotals, activeHolds, getValue, isAlMaraghi, asNumber]);
 
@@ -188,7 +189,7 @@ export default function BodyShopPayrollTab({
                             <th colSpan={4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                             <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                            <th colSpan={11} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                            <th colSpan={12} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                             <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                             <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                         </tr>
@@ -226,6 +227,7 @@ export default function BodyShopPayrollTab({
                             <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Hrs Amt</th>
                             <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Prev</th>
                             <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Amt Prev</th>
+                            <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay" currentSort={sortColumn} onSort={setSortColumn} className="whitespace-nowrap bg-rose-50 px-2">Prev Ded. Hrs Amt</SortableTableHead>
                             <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Curr</th>
                             <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">LOP Days Amt Curr</th>
                             <th className="px-2 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap bg-rose-50">Lv Ded.</th>
@@ -363,6 +365,7 @@ export default function BodyShopPayrollTab({
 
                                     {/* N - LOP Days Prev Amount */}
                                     <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(row.extra_prev_month_lop_pay || 0).toFixed(2)}</td>
+                                    <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(row.extra_prev_month_deductible_hours_pay || 0).toFixed(2)}</td>
 
                                     {/* O - LOP Days Current */}
                                     <td className="px-2 py-1.5 align-middle text-xs tabular-nums bg-rose-50/50">{(((row.salary_leave_days || row.salaryLeaveDays || row.annual_leave_count || 0) + (row.full_absence_count || 0) + (row.lop_adjacent_weekly_off_count || 0) + (row.lop_leave_days || 0))).toFixed(2)}</td>
@@ -472,6 +475,7 @@ export default function BodyShopPayrollTab({
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.deductibleHoursPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopDays.toFixed(0)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthLopPay.toFixed(2)}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.prevMonthDeductibleHoursPay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{(grandTotals.annual_leave_count + grandTotals.full_absence_count).toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.leavePay.toFixed(2)}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums bg-slate-700/50">{grandTotals.netDeduction.toFixed(2)}</td>

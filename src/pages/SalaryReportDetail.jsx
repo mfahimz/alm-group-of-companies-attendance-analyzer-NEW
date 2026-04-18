@@ -857,6 +857,8 @@ export default function SalaryReportDetail() {
                     'Leave Deduction': row.netDeduction || 0,
                     'Ded Hours': row.deductibleHours || 0,
                     'Ded Pay': row.deductibleHoursPay || 0,
+                    'LOP Days Amt Prev': row.extra_prev_month_lop_pay || 0,
+                    'Prev Ded. Hrs Amt': row.extra_prev_month_deductible_hours_pay || 0,
                     'Other Deduction': getValue(row, 'otherDeduction'),
                     'Advance': getValue(row, 'advanceSalaryDeduction'),
                     'Net Deductions': netDeductions,
@@ -1233,7 +1235,7 @@ export default function SalaryReportDetail() {
                                            <th colSpan={4} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300 sticky left-0 z-30"></th>
                                            <th colSpan={8} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 border-r border-slate-300">Employee Info</th>
                                             <th colSpan={isAlMaraghi ? 12 : 10} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border-r border-slate-300">Additions</th>
-                                            <th colSpan={11} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
+                                            <th colSpan={12} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 border-r border-slate-300">Deductions</th>
                                             <th colSpan={5} className="px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 border-r border-slate-300">Final</th>
                                             <th className="px-2 py-1.5 bg-slate-100 sticky right-0 z-30"></th>
                                         </tr>
@@ -1292,6 +1294,12 @@ export default function SalaryReportDetail() {
                                                 currentSort={sortColumn} onSort={setSortColumn}
                                                 className="whitespace-nowrap bg-rose-50 px-2">
                                                 LOP Days Amt Prev
+                                            </SortableTableHead>
+
+                                            <SortableTableHead sortKey="extra_prev_month_deductible_hours_pay"
+                                                currentSort={sortColumn} onSort={setSortColumn}
+                                                className="whitespace-nowrap bg-rose-50 px-2">
+                                                Prev Ded. Hrs Amt
                                             </SortableTableHead>
 
                                             <SortableTableHead sortKey="leaveDays"
@@ -1472,6 +1480,10 @@ export default function SalaryReportDetail() {
                                                     {/* N - LOP Days Previous month amount */}
                                                     <td className={`${cellBase} bg-rose-50/50`}>
                                                         {(row.extra_prev_month_lop_pay || 0).toFixed(2)}
+                                                    </td>
+
+                                                    <td className={`${cellBase} bg-rose-50/50`}>
+                                                        {(asNumber(row.extra_prev_month_deductible_hours_pay)).toFixed(2)}
                                                     </td>
 
                                                     {/* O - LOP Days Current month */}
