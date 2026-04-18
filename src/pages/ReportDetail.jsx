@@ -172,8 +172,8 @@ export default function ReportDetailPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full select-none">
-                    <Timer className="w-3 h-3" />
+                <div className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full select-none shadow-sm">
+                    <Timer className="w-3.5 h-3.5" />
                     <span>{displayTime}</span>
                 </div>
             </div>
