@@ -930,7 +930,9 @@ Deno.serve(async (req) => {
                 totalLateMinutes + totalEarlyMinutes + totalOtherMinutes - graceMinutes - totalApprovedMinutes
             );
 
-            const prevMonthDivisorForCalc = otDivisor;
+            // V2 FIX: Use prevMonthDivisorForCalc (e.g. 28 for Feb) not salary divisor
+            // Matches Excel formula: H / prevMonthDays / workingHours * deductibleHours
+            const prevMonthDivisorForCalc = new Date(effectiveLopOnlyDate).getDate();
 
             const extraLopPay = extraLopDays > 0 ? (prevMonthSalaryAmount / prevMonthDivisorForCalc) * extraLopDays : 0;
 
