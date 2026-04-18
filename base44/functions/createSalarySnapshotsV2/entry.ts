@@ -728,7 +728,7 @@ Deno.serve(async (req) => {
         // ============================================================
         // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
         // ============================================================
-        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours) => {
+        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours, arOtherMinutes) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
                 return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
             }
@@ -927,7 +927,7 @@ Deno.serve(async (req) => {
             }
 
             const totalExtraDeductibleMinutes = Math.max(0,
-                totalLateMinutes + totalEarlyMinutes + totalOtherMinutes - graceMinutes - totalApprovedMinutes
+                totalLateMinutes + totalEarlyMinutes + (arOtherMinutes || 0) - graceMinutes - totalApprovedMinutes
             );
 
             // V2 FIX: Use prevMonthDivisorForCalc (e.g. 28 for Feb) not salary divisor
@@ -947,7 +947,7 @@ Deno.serve(async (req) => {
                 extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay),
                 prevMonthDivisor: prevMonthDivisorForCalc,
                 // V2: Return other_minutes separately so current month can be isolated
-                extraOtherMinutes: totalOtherMinutes
+                extraOtherMinutes: arOtherMinutes || 0
             };
         };
 
@@ -1200,7 +1200,7 @@ Deno.serve(async (req) => {
             }
 
             if (isAlMaraghi && hasExtraPrevMonthRange && emp.attendance_id) {
-                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours);
+                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours, analysisResultMap[String(emp.attendance_id)]?.other_minutes || 0);
             }
 
             // V2: Override LOP days with AnalysisResult-derived count
