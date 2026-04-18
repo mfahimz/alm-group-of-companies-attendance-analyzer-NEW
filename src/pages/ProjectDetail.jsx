@@ -16,7 +16,6 @@ import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
 
 import Breadcrumb from '../components/ui/Breadcrumb';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export default function ProjectDetail() {
@@ -74,6 +73,15 @@ export default function ProjectDetail() {
   const isDeptHeadViewOnly = isDepartmentHead; // Department heads can only view Report tab
   const isAlMaraghiMotors = project?.company === 'Al Maraghi Motors';
 
+  // Auto-calculate salary divisor from project.date_to month
+  const salaryDivisorAuto = (() => {
+    if (!project?.date_to) return 31;
+    const toDate = new Date(project.date_to);
+    const year = toDate.getFullYear();
+    const month = toDate.getMonth() + 1;
+    return new Date(year, month, 0).getDate();
+  })();
+
   const prevMonthDaysAuto = (() => {
     if (!project?.date_from || !project?.date_to) return null;
     const fromDate = new Date(project.date_from);
@@ -126,27 +134,6 @@ export default function ProjectDetail() {
     }
   });
 
-  // DIVISOR_LEAVE_DEDUCTION: Used for Leave Pay, Salary Leave Amount, Hourly Rate (deductions), Deductible Hours Pay
-  // [MERGE_NOTE: If merging divisors in future, keep only this mutation and remove OT mutation]
-  const updateSalaryCalculationDaysMutation = useMutation({
-    mutationFn: async (days) => {
-      await base44.entities.Project.update(project.id, { salary_calculation_days: days });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['project', projectId]);
-      toast.success('Salary/Deduction divisor updated');
-    },
-    onError: () => {
-      toast.error('Failed to update salary/deduction divisor');
-    }
-  });
-
-
-  // DIVISOR_LEAVE_DEDUCTION state
-  const [salaryCalcDays, setSalaryCalcDays] = React.useState(project?.salary_calculation_days || 30);
-  React.useEffect(() => {
-    setSalaryCalcDays(project?.salary_calculation_days || 30);
-  }, [project?.salary_calculation_days]);
 
 
   if (isLoading) {
@@ -229,30 +216,21 @@ export default function ProjectDetail() {
                             {/* [MERGE_NOTE: If merging divisors in future, remove the OT divisor section and update label] */}
                             {isAlMaraghiMotors && isAdmin && (
                             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* DIVISOR_LEAVE_DEDUCTION */}
+                                {/* Salary / Deduction Divisor — auto-calculated read-only */}
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <Label className="text-sm font-semibold text-blue-900 mb-2 block">
-                                        Salary/Deduction Divisor (Days)
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                                        Salary / Deduction Divisor
                                     </Label>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="number"
-                                            min="1"
-                                            value={salaryCalcDays}
-                                            onChange={(e) => setSalaryCalcDays(Math.max(1, parseInt(e.target.value) || 30))}
-                                            className="w-20"
-                                        />
-                                        <span className="text-sm text-blue-700 font-medium">days</span>
-                                        <Button
-                                            onClick={() => updateSalaryCalculationDaysMutation.mutate(salaryCalcDays)}
-                                            disabled={updateSalaryCalculationDaysMutation.isPending || salaryCalcDays === (project?.salary_calculation_days || 30)}
-                                            size="sm"
-                                            className="bg-blue-600 hover:bg-blue-700"
-                                        >
-                                            {updateSalaryCalculationDaysMutation.isPending ? 'Saving...' : 'Update'}
-                                        </Button>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-2xl font-bold text-slate-800">
+                                            {salaryDivisorAuto}
+                                        </span>
+                                        <span className="text-xs text-slate-400">days</span>
+                                        <span className="text-xs text-emerald-600 font-medium">
+                                            (auto-calculated)
+                                        </span>
                                     </div>
-                                    <p className="text-xs text-blue-700 mt-2">
+                                    <p className="text-xs text-muted-foreground mt-1">
                                         Used for: Leave Pay, Salary Leave Amount, Deductible Hours Pay
                                     </p>
                                 </div>

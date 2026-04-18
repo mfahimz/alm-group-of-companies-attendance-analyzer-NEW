@@ -481,6 +481,16 @@ export default function SalaryReportDetail() {
     // Auto-calculate previous month days from report date range
     // Previous month = the month of report.date_from
     // Returns null if no overflow (date_from is in same month as date_to)
+    // Auto-calculate salary divisor from report.date_to month
+    // Salary divisor = total calendar days in the main salary month
+    const salaryDivisorAuto = useMemo(() => {
+        if (!report?.date_to) return 31;
+        const toDate = new Date(report.date_to);
+        const year = toDate.getFullYear();
+        const month = toDate.getMonth() + 1;
+        return new Date(year, month, 0).getDate();
+    }, [report?.date_to]);
+
     const prevMonthDaysAuto = useMemo(() => {
         if (!report?.date_from || !report?.date_to) return null;
         const fromDate = new Date(report.date_from);
@@ -963,27 +973,13 @@ export default function SalaryReportDetail() {
                                         {report.company}
                                     </span>
 
-                                    {/* Salary divisor — inline editable chip */}
+                                    {/* Salary divisor — auto-calculated read-only chip */}
                                     <span className="text-xs bg-slate-100 text-slate-600 rounded-md px-2.5 py-1 border border-slate-200 flex items-center gap-1">
                                         Salary divisor:&nbsp;
-                                        {isAdmin ? (
-                                            <input
-                                                type="number"
-                                                value={divisorEdits.salary_divisor !== undefined
-                                                    ? divisorEdits.salary_divisor
-                                                    : (report.salary_divisor || '')}
-                                                onChange={e => setDivisorEdits(prev => ({
-                                                    ...prev,
-                                                    salary_divisor: e.target.value
-                                                }))}
-                                                onBlur={saveDivisors}
-                                                onKeyDown={e => e.key === 'Enter' && saveDivisors()}
-                                                className="w-10 bg-white border border-slate-300 rounded px-1 text-xs text-center
-                            focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        ) : (
-                                            <span>{report.salary_divisor}</span>
-                                        )}
+                                        <span className="font-medium text-slate-700">
+                                            {salaryDivisorAuto}
+                                        </span>
+                                        <span className="text-slate-400 text-[10px] ml-1">(auto)</span>
                                     </span>
 
                                     {/* OT / Prev Month divisor — inline editable chip */}
