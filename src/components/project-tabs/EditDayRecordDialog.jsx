@@ -24,7 +24,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             am_start: '',
             am_end: '',
             pm_start: '',
-            pm_end: ''
+            pm_end: '',
+            is_single_shift: false
         }
     });
     const queryClient = useQueryClient();
@@ -355,7 +356,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         am_start: existingOverride.shiftOverride?.am_start || shiftTimes[0] || '',
                         am_end: existingOverride.shiftOverride?.am_end || shiftTimes[1] || '',
                         pm_start: existingOverride.shiftOverride?.pm_start || shiftTimes[2] || '',
-                        pm_end: existingOverride.shiftOverride?.pm_end || shiftTimes[3] || ''
+                        pm_end: existingOverride.shiftOverride?.pm_end || shiftTimes[3] || '',
+                        is_single_shift: existingOverride.shiftOverride?.is_single_shift === true
                     }
                 });
             } else {
@@ -429,7 +431,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         am_start: shiftTimes[0] || '',
                         am_end: shiftTimes[1] || '',
                         pm_start: shiftTimes[2] || '',
-                        pm_end: shiftTimes[3] || ''
+                        pm_end: shiftTimes[3] || '',
+                        is_single_shift: false
                     }
                 });
             }
@@ -451,7 +454,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         };
 
         // Check if all shift times are provided
-        if (!overriddenShift.am_start || !overriddenShift.pm_end) return;
+        if (!overriddenShift.am_start) return;
+        if (!formData.shiftOverride.is_single_shift && !overriddenShift.pm_end) return;
 
         const punchMatches = matchPunchesToShiftPoints(dayPunches, overriddenShift);
 
@@ -543,8 +547,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 shiftOverride: data.shiftOverride?.enabled ? {
                     am_start: data.shiftOverride.am_start || '',
                     am_end: data.shiftOverride.am_end || '',
-                    pm_start: data.shiftOverride.pm_start || '',
-                    pm_end: data.shiftOverride.pm_end || ''
+                    pm_start: data.shiftOverride.is_single_shift ? '' : (data.shiftOverride.pm_start || ''),
+                    pm_end: data.shiftOverride.is_single_shift ? '' : (data.shiftOverride.pm_end || ''),
+                    is_single_shift: data.shiftOverride.is_single_shift === true
                 } : null
             };
 
@@ -749,7 +754,8 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 am_start: '',
                 am_end: '',
                 pm_start: '',
-                pm_end: ''
+                pm_end: '',
+                is_single_shift: false
             }
         }));
     };
@@ -1094,54 +1100,84 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         </div>
 
                         {formData.shiftOverride.enabled && (
-                            <div className="grid grid-cols-2 gap-3 pt-3 border-t">
-                                <div>
-                                    <Label className="text-xs">AM Start</Label>
-                                    <TimePicker
-                                        value={formData.shiftOverride.am_start}
-                                        onChange={(value) => setFormData({
+                            <div className="space-y-3 pt-3 border-t">
+                                {/* Single shift toggle */}
+                                <div className="flex items-center gap-2">
+                                    <Checkbox 
+                                        id="singleShiftToggle"
+                                        checked={formData.shiftOverride.is_single_shift}
+                                        onCheckedChange={(checked) => setFormData({
                                             ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, am_start: value }
+                                            shiftOverride: {
+                                                ...formData.shiftOverride,
+                                                is_single_shift: checked === true,
+                                                pm_start: checked ? '' : formData.shiftOverride.pm_start,
+                                                pm_end: checked ? '' : formData.shiftOverride.pm_end
+                                            }
                                         })}
-                                        placeholder="8:00 AM"
-                                        className="h-8"
                                     />
+                                    <label htmlFor="singleShiftToggle" className="text-xs text-slate-600 cursor-pointer">
+                                        Single shift (no break — punch in/out only)
+                                    </label>
                                 </div>
-                                <div>
-                                    <Label className="text-xs">AM End</Label>
-                                    <TimePicker
-                                        value={formData.shiftOverride.am_end}
-                                        onChange={(value) => setFormData({
-                                            ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, am_end: value }
-                                        })}
-                                        placeholder="12:00 PM"
-                                        className="h-8"
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-xs">PM Start</Label>
-                                    <TimePicker
-                                        value={formData.shiftOverride.pm_start}
-                                        onChange={(value) => setFormData({
-                                            ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, pm_start: value }
-                                        })}
-                                        placeholder="1:00 PM"
-                                        className="h-8"
-                                    />
-                                </div>
-                                <div>
-                                    <Label className="text-xs">PM End</Label>
-                                    <TimePicker
-                                        value={formData.shiftOverride.pm_end}
-                                        onChange={(value) => setFormData({
-                                            ...formData,
-                                            shiftOverride: { ...formData.shiftOverride, pm_end: value }
-                                        })}
-                                        placeholder="5:00 PM"
-                                        className="h-8"
-                                    />
+                                {/* Time pickers */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label className="text-xs">
+                                            {formData.shiftOverride.is_single_shift ? 'Punch In' : 'AM Start'}
+                                        </Label>
+                                        <TimePicker
+                                            value={formData.shiftOverride.am_start}
+                                            onChange={(value) => setFormData({
+                                                ...formData,
+                                                shiftOverride: { ...formData.shiftOverride, am_start: value }
+                                            })}
+                                            placeholder="8:00 AM"
+                                            className="h-8"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">
+                                            {formData.shiftOverride.is_single_shift ? 'Punch Out' : 'AM End'}
+                                        </Label>
+                                        <TimePicker
+                                            value={formData.shiftOverride.am_end}
+                                            onChange={(value) => setFormData({
+                                                ...formData,
+                                                shiftOverride: { ...formData.shiftOverride, am_end: value }
+                                            })}
+                                            placeholder={formData.shiftOverride.is_single_shift ? '5:00 PM' : '12:00 PM'}
+                                            className="h-8"
+                                        />
+                                    </div>
+                                    {!formData.shiftOverride.is_single_shift && (
+                                        <>
+                                            <div>
+                                                <Label className="text-xs">PM Start</Label>
+                                                <TimePicker
+                                                    value={formData.shiftOverride.pm_start}
+                                                    onChange={(value) => setFormData({
+                                                        ...formData,
+                                                        shiftOverride: { ...formData.shiftOverride, pm_start: value }
+                                                    })}
+                                                    placeholder="1:00 PM"
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">PM End</Label>
+                                                <TimePicker
+                                                    value={formData.shiftOverride.pm_end}
+                                                    onChange={(value) => setFormData({
+                                                        ...formData,
+                                                        shiftOverride: { ...formData.shiftOverride, pm_end: value }
+                                                    })}
+                                                    placeholder="5:00 PM"
+                                                    className="h-8"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}

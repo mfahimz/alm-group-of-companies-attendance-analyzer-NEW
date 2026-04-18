@@ -6,6 +6,8 @@ import { Edit, Loader2 } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
+import TimePicker from '../ui/TimePicker';
+import { Checkbox } from '@/components/ui/checkbox';
 
 /**
  * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
@@ -34,7 +36,7 @@ export default function DailyBreakdownDialog({
     const [showBulkPanel, setShowBulkPanel] = useState(false);
     const [bulkType, setBulkType] = useState('');
     const [bulkAbnormal, setBulkAbnormal] = useState(false);
-    const [bulkShiftOverride, setBulkShiftOverride] = useState({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '' });
+    const [bulkShiftOverride, setBulkShiftOverride] = useState({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '', is_single_shift: false });
     const [isBulkSaving, setIsBulkSaving] = useState(false);
 
 
@@ -70,12 +72,13 @@ export default function DailyBreakdownDialog({
                     }
                 }
                 if (bulkAbnormal) updated.isAbnormal = true;
-                if (bulkShiftOverride.enabled && bulkShiftOverride.am_start && bulkShiftOverride.pm_end) {
+                if (bulkShiftOverride.enabled && bulkShiftOverride.am_start && (bulkShiftOverride.is_single_shift || bulkShiftOverride.pm_end)) {
                     updated.shiftOverride = {
                         am_start: bulkShiftOverride.am_start,
                         am_end: bulkShiftOverride.am_end,
-                        pm_start: bulkShiftOverride.pm_start,
-                        pm_end: bulkShiftOverride.pm_end
+                        pm_start: bulkShiftOverride.is_single_shift ? '' : bulkShiftOverride.pm_start,
+                        pm_end: bulkShiftOverride.is_single_shift ? '' : bulkShiftOverride.pm_end,
+                        is_single_shift: bulkShiftOverride.is_single_shift === true
                     };
                 }
                 overrides[dateStr] = updated;
@@ -102,7 +105,7 @@ export default function DailyBreakdownDialog({
             setShowBulkPanel(false);
             setBulkType('');
             setBulkAbnormal(false);
-            setBulkShiftOverride({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '' });
+            setBulkShiftOverride({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '', is_single_shift: false });
         } catch (err) {
             console.error('Bulk apply failed:', err);
         } finally {
@@ -965,30 +968,67 @@ export default function DailyBreakdownDialog({
                                         </label>
                                     </div>
                                     {bulkShiftOverride.enabled && (
-                                        <div className="flex flex-wrap gap-2 mt-1 pl-5">
-                                            <div className="space-y-0.5">
-                                                <label className="text-[10px] text-slate-500">AM Start</label>
-                                                <input type="text" placeholder="e.g. 8:00 AM" value={bulkShiftOverride.am_start}
-                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, am_start: e.target.value }))}
-                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
+                                        <div className="mt-2 pl-5 space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    id="bulkSingleShift"
+                                                    checked={bulkShiftOverride.is_single_shift}
+                                                    onCheckedChange={(checked) => setBulkShiftOverride(prev => ({
+                                                        ...prev,
+                                                        is_single_shift: checked === true,
+                                                        pm_start: checked ? '' : prev.pm_start,
+                                                        pm_end: checked ? '' : prev.pm_end
+                                                    }))}
+                                                />
+                                                <label htmlFor="bulkSingleShift" className="text-xs text-slate-600 cursor-pointer">
+                                                    Single shift (no break — punch in/out only)
+                                                </label>
                                             </div>
-                                            <div className="space-y-0.5">
-                                                <label className="text-[10px] text-slate-500">AM End</label>
-                                                <input type="text" placeholder="e.g. 1:00 PM" value={bulkShiftOverride.am_end}
-                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, am_end: e.target.value }))}
-                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
-                                            </div>
-                                            <div className="space-y-0.5">
-                                                <label className="text-[10px] text-slate-500">PM Start</label>
-                                                <input type="text" placeholder="e.g. 2:00 PM" value={bulkShiftOverride.pm_start}
-                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, pm_start: e.target.value }))}
-                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
-                                            </div>
-                                            <div className="space-y-0.5">
-                                                <label className="text-[10px] text-slate-500">PM End</label>
-                                                <input type="text" placeholder="e.g. 6:00 PM" value={bulkShiftOverride.pm_end}
-                                                    onChange={e => setBulkShiftOverride(prev => ({ ...prev, pm_end: e.target.value }))}
-                                                    className="text-xs border border-slate-300 rounded px-2 py-0.5 w-24 h-6" />
+                                            <div className="flex flex-wrap gap-3">
+                                                <div className="space-y-0.5">
+                                                    <label className="text-[10px] text-slate-500">
+                                                        {bulkShiftOverride.is_single_shift ? 'Punch In' : 'AM Start'}
+                                                    </label>
+                                                    <TimePicker
+                                                        value={bulkShiftOverride.am_start}
+                                                        onChange={(v) => setBulkShiftOverride(prev => ({ ...prev, am_start: v }))}
+                                                        placeholder="8:00 AM"
+                                                        className="text-xs h-7 w-32"
+                                                    />
+                                                </div>
+                                                <div className="space-y-0.5">
+                                                    <label className="text-[10px] text-slate-500">
+                                                        {bulkShiftOverride.is_single_shift ? 'Punch Out' : 'AM End'}
+                                                    </label>
+                                                    <TimePicker
+                                                        value={bulkShiftOverride.am_end}
+                                                        onChange={(v) => setBulkShiftOverride(prev => ({ ...prev, am_end: v }))}
+                                                        placeholder={bulkShiftOverride.is_single_shift ? '5:00 PM' : '1:00 PM'}
+                                                        className="text-xs h-7 w-32"
+                                                    />
+                                                </div>
+                                                {!bulkShiftOverride.is_single_shift && (
+                                                    <>
+                                                        <div className="space-y-0.5">
+                                                            <label className="text-[10px] text-slate-500">PM Start</label>
+                                                            <TimePicker
+                                                                value={bulkShiftOverride.pm_start}
+                                                                onChange={(v) => setBulkShiftOverride(prev => ({ ...prev, pm_start: v }))}
+                                                                placeholder="2:00 PM"
+                                                                className="text-xs h-7 w-32"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-0.5">
+                                                            <label className="text-[10px] text-slate-500">PM End</label>
+                                                            <TimePicker
+                                                                value={bulkShiftOverride.pm_end}
+                                                                onChange={(v) => setBulkShiftOverride(prev => ({ ...prev, pm_end: v }))}
+                                                                placeholder="6:00 PM"
+                                                                className="text-xs h-7 w-32"
+                                                            />
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     )}
