@@ -96,8 +96,8 @@ export default function DailyBreakdownDialog({
                 other_minutes: totalOther,
                 deductible_minutes: deductible
             });
-            queryClient.invalidateQueries({ queryKey: ['analysisResults'] });
-            queryClient.invalidateQueries({ queryKey: ['employeeExceptions', project.id] });
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+            queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
             setSelectedDays(new Set());
             setShowBulkPanel(false);
             setBulkType('');
