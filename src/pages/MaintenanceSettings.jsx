@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -6,8 +6,131 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Wrench, AlertTriangle, CheckCircle, Key } from 'lucide-react';
+import { Wrench, AlertTriangle, CheckCircle, Key, Timer, Eye, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+
+function formatDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return '—';
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m === 0) return `${s}s`;
+    return `${m}m ${s}s`;
+}
+
+function ReportViewSessions() {
+    const { data: logs = [], isLoading } = useQuery({
+        queryKey: ['reportViewSessions'],
+        queryFn: () => base44.entities.ActivityLog.list('-created_date', 200),
+        staleTime: 2 * 60 * 1000
+    });
+
+    const sessions = React.useMemo(() => {
+        return logs
+            .filter(l => l.user_agent?.includes('REPORT_VIEW'))
+            .map(l => {
+                const ua = l.user_agent || '';
+                const reportIdMatch = ua.match(/report_id:([^\s|]+)/);
+                const reportNameMatch = ua.match(/report_name:([^|]+)/);
+                const secondsMatch = ua.match(/seconds:(\d+)/);
+                return {
+                    id: l.id,
+                    user_name: l.user_name || l.user_email || '—',
+                    user_email: l.user_email || '—',
+                    report_name: reportNameMatch ? reportNameMatch[1].trim() : '—',
+                    report_id: reportIdMatch ? reportIdMatch[1].trim() : '—',
+                    seconds: secondsMatch ? parseInt(secondsMatch[1]) : 0,
+                    created_date: l.created_date
+                };
+            })
+            .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    }, [logs]);
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center py-8 text-slate-400">
+                <Timer className="w-4 h-4 animate-spin mr-2" />
+                Loading sessions...
+            </div>
+        );
+    }
+
+    if (sessions.length === 0) {
+        return (
+            <div className="text-center py-8 text-slate-400">
+                <Eye className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No report view sessions recorded yet</p>
+                <p className="text-xs mt-1">Sessions are logged when users open and close attendance reports</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{sessions.length} session{sessions.length !== 1 ? 's' : ''} recorded</span>
+            </div>
+            <div className="rounded-lg border overflow-hidden">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-slate-50">
+                            <TableHead className="text-xs font-semibold">User</TableHead>
+                            <TableHead className="text-xs font-semibold">Report</TableHead>
+                            <TableHead className="text-xs font-semibold">Duration</TableHead>
+                            <TableHead className="text-xs font-semibold">When</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {sessions.slice(0, 50).map(session => (
+                            <TableRow key={session.id} className="hover:bg-slate-50">
+                                <TableCell>
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-800">{session.user_name}</p>
+                                        <p className="text-xs text-slate-400">{session.user_email}</p>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <p className="text-sm text-slate-700 max-w-[200px] truncate">{session.report_name}</p>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge
+                                        variant="outline"
+                                        className={`text-xs font-medium ${
+                                            session.seconds >= 300
+                                                ? 'border-green-200 text-green-700 bg-green-50'
+                                                : session.seconds >= 60
+                                                ? 'border-indigo-200 text-indigo-700 bg-indigo-50'
+                                                : 'border-slate-200 text-slate-600 bg-slate-50'
+                                        }`}
+                                    >
+                                        <Timer className="w-3 h-3 mr-1" />
+                                        {formatDuration(session.seconds)}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <p className="text-xs text-slate-400">
+                                        {session.created_date
+                                            ? new Date(session.created_date).toLocaleString('en-AE', {
+                                                day: '2-digit', month: 'short', year: 'numeric',
+                                                hour: '2-digit', minute: '2-digit', hour12: true,
+                                                timeZone: 'Asia/Dubai'
+                                              })
+                                            : '—'}
+                                    </p>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+            {sessions.length > 50 && (
+                <p className="text-xs text-slate-400 text-center">Showing 50 most recent of {sessions.length} sessions</p>
+            )}
+        </div>
+    );
+}
 
 export default function MaintenanceSettingsPage() {
     const queryClient = useQueryClient();
@@ -285,6 +408,21 @@ export default function MaintenanceSettingsPage() {
                             <li>• All attempts are tracked and limited to 3 incorrect tries</li>
                         </ul>
                     </div>
+                </CardContent>
+            </Card>
+            {/* Report View Sessions */}
+            <Card className="border-0 shadow-lg mt-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Eye className="w-5 h-5 text-indigo-600" />
+                        Report View Sessions
+                    </CardTitle>
+                    <CardDescription>
+                        Track who viewed which attendance reports and for how long
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ReportViewSessions />
                 </CardContent>
             </Card>
         </div>
