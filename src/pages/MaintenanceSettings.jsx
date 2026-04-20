@@ -10,6 +10,7 @@ import { Wrench, AlertTriangle, CheckCircle, Key, Timer, Eye, Clock } from 'luci
 import { toast } from 'sonner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
 
 function formatDuration(seconds) {
     if (!seconds || isNaN(seconds)) return '—';
@@ -112,11 +113,7 @@ function ReportViewSessions() {
                                 <TableCell>
                                     <p className="text-xs text-slate-400">
                                         {session.created_date
-                                            ? new Date(session.created_date).toLocaleString('en-AE', {
-                                                day: '2-digit', month: 'short', year: 'numeric',
-                                                hour: '2-digit', minute: '2-digit', hour12: true,
-                                                timeZone: 'Asia/Dubai'
-                                              })
+                                            ? formatInUAE(parseDateInUAE(session.created_date), 'dd MMM yyyy, hh:mm a')
                                             : '—'}
                                     </p>
                                 </TableCell>
