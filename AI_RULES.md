@@ -83,6 +83,17 @@ These arrive as ISO 8601 UTC strings: "2026-04-20T17:15:00.000Z"
 ✅ CORRECT: formatInUAE(entity.created_date, 'dd/MM/yyyy hh:mm a')
 ❌ WRONG:   formatInUAE(parseDateInUAE(entity.created_date), ...)
 
+### Defensive Z-suffix normalization
+Base44 may return created_date/updated_date without the Z UTC suffix.
+Always normalize before passing to formatInUAE:
+
+    const safeDate = d?.endsWith('Z') ? d : d + 'Z';
+    formatInUAE(safeDate, 'format')
+
+Apply this anywhere ActivityLog, AuditLog, or any entity's 
+created_date/updated_date is rendered as a display timestamp.
+
+
 ### Custom date fields from date pickers (date_from, date_to, etc.)
 These arrive as YYYY-MM-DD strings: "2026-04-20"
 ✅ CORRECT: formatInUAE(parseDateInUAE(entity.date_from), 'dd/MM/yyyy')
