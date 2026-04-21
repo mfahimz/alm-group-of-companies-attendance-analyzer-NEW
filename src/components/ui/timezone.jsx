@@ -1,6 +1,24 @@
 import { parseISO } from 'date-fns';
 import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
 
+/**
+ * TIMEZONE USAGE RULES — read before using these functions.
+ *
+ * formatInUAE(value, formatStr)
+ *   Use for ISO 8601 UTC strings from backend auto-fields (created_date, updated_date).
+ *   value can be "2026-04-20T17:15:00.000Z" or a Date object.
+ *   Example: formatInUAE(entity.created_date, 'dd/MM/yyyy hh:mm a')
+ *
+ * parseDateInUAE(dateStr)
+ *   Use ONLY for YYYY-MM-DD strings from date pickers (date_from, date_to).
+ *   NEVER pass a full ISO timestamp into this function — it will misparse.
+ *   Example: formatInUAE(parseDateInUAE(entity.date_from), 'dd/MM/yyyy')
+ *
+ * Quick reference:
+ *   Backend timestamp → formatInUAE(entity.created_date, 'format')
+ *   Date picker value → formatInUAE(parseDateInUAE(entity.date_from), 'format')
+ */
+
 // UAE timezone
 export const UAE_TIMEZONE = 'Asia/Dubai';
 

@@ -73,3 +73,25 @@ After completing any task confirm the following:
 If any instruction is unclear or conflicts with these rules, stop and ask for clarification before proceeding. Never make assumptions that require touching a protected file.
 ---
 *This file is maintained by the project owner. Do not modify AI_RULES.md itself unless explicitly instructed.*
+
+## Date/Time Rendering Rules (CRITICAL — enforce on every task)
+
+Base44 returns two different date formats. Use the correct handler for each.
+
+### Backend auto-timestamps (created_date, updated_date)
+These arrive as ISO 8601 UTC strings: "2026-04-20T17:15:00.000Z"
+✅ CORRECT: formatInUAE(entity.created_date, 'dd/MM/yyyy hh:mm a')
+❌ WRONG:   formatInUAE(parseDateInUAE(entity.created_date), ...)
+
+### Custom date fields from date pickers (date_from, date_to, etc.)
+These arrive as YYYY-MM-DD strings: "2026-04-20"
+✅ CORRECT: formatInUAE(parseDateInUAE(entity.date_from), 'dd/MM/yyyy')
+❌ WRONG:   formatInUAE(entity.date_from, ...)
+
+### Never use native JS date formatting
+❌ NEVER: new Date().toLocaleString()
+❌ NEVER: new Date().toLocaleDateString()
+❌ NEVER: new Date().toLocaleTimeString()
+
+Always import from: '@/components/ui/timezone'
+

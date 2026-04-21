@@ -113,7 +113,7 @@ function ReportViewSessions() {
                                 <TableCell>
                                     <p className="text-xs text-slate-400">
                                         {session.created_date
-                                            ? formatInUAE(parseDateInUAE(session.created_date), 'dd MMM yyyy, hh:mm a')
+                                            ? formatInUAE(session.created_date, 'dd MMM yyyy, hh:mm a')
                                             : '—'}
                                     </p>
                                 </TableCell>
