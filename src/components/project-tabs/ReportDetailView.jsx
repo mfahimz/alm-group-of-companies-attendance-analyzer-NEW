@@ -70,6 +70,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const canModifyAttendance = (isAdmin || isSupervisor || isCEO || isHRManager) && !isSeniorAccountant;
     const canEditGiftMinutes = (isAdmin || isCEO || isHRManager) && !isSeniorAccountant;
     const isAlMaraghiMotors = project.company === 'Al Maraghi Motors';
+    const isAstra = project.company === 'Astra Auto Parts';
 
     // LAZY LOADING: Raw data (punches/shifts/exceptions) only loaded on-demand
     // when user opens daily breakdown, detection panel, or edits a day.
@@ -490,8 +491,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const approvedMin = result.approved_minutes || 0;
             const storedDeductible = result.manual_deductible_minutes ?? result.deductible_minutes ?? null;
             const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
-            const effectiveDeductible = storedDeductible !== null ? storedDeductible : computedDeductible;
             const giftMins = giftMinutesOverrides[result.id] || Math.max(0, result.ramadan_gift_minutes || 0);
+
+            const skipEarlyCheckout = result.skip_early_checkout === true;
+            const adjustedEarlyMin = skipEarlyCheckout ? 0 : earlyMin;
+            const finalComputedDeductible = Math.max(0, lateMin + adjustedEarlyMin - graceMin - approvedMin);
+            const effectiveDeductible = storedDeductible !== null 
+                ? (skipEarlyCheckout ? Math.max(0, storedDeductible - earlyMin) : storedDeductible)
+                : finalComputedDeductible;
 
             return {
                 ...result,
@@ -510,6 +517,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 ramadan_gift_minutes: giftMins,
                 effective_deductible_minutes: Math.max(0, effectiveDeductible - giftMins),
                 grace_minutes: graceMin,
+                skip_early_checkout: skipEarlyCheckout,
                 has_no_punches: false // Will be determined when raw data is loaded
             };
         });
@@ -1814,6 +1822,28 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         toast.success('Gift minutes saved and synced with exceptions');
     };
 
+    const skipEarlyCheckoutMutation = useMutation({
+        mutationFn: async ({ id, skip }) => {
+            await base44.entities.AnalysisResult.update(id, { skip_early_checkout: skip });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+            toast.success('Early checkout updated');
+        },
+        onError: () => toast.error('Failed to update')
+    });
+
+    const handleBulkSkipEarlyCheckout = async (skip, employeeIds = null) => {
+        const targets = employeeIds 
+            ? filteredResults.filter(r => employeeIds.includes(r.attendance_id))
+            : filteredResults;
+        for (const r of targets) {
+            await base44.entities.AnalysisResult.update(r.id, { skip_early_checkout: skip });
+        }
+        queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+        toast.success(`Early checkout ${skip ? 'skipped' : 'restored'} for ${targets.length} employee(s)`);
+    };
+
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
     const verifiedCount = verifiedEmployees.length;
 
@@ -2029,6 +2059,27 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 <SelectItem value="unverified">Unverified Only</SelectItem>
                             </SelectContent>
                         </Select>
+                        {isAstra && (
+                            <div className="flex items-center gap-2 border-l pl-3 ml-1">
+                                <span className="text-xs text-slate-500 font-medium">Early Checkout:</span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs border-amber-200 text-amber-700 hover:bg-amber-50"
+                                    onClick={() => handleBulkSkipEarlyCheckout(true)}
+                                >
+                                    Skip All
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
+                                    onClick={() => handleBulkSkipEarlyCheckout(false)}
+                                >
+                                    Restore All
+                                </Button>
+                            </div>
+                        )}
                         {canModifyAttendance && (
                             <Button
                                 onClick={verifyAllClean}
@@ -2200,6 +2251,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         onShowBreakdown={showDailyBreakdown}
                                         onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
                                         onSaveGiftMinutes={onSaveGiftMinutes}
+                                        skipEarlyCheckout={result.skip_early_checkout}
+                                        onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ id: result.id, skip }) : null}
                                     />
                                 ))}
                             </tbody>

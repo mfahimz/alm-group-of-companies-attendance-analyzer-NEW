@@ -20,7 +20,9 @@ export default function ReportTableRow({
     onUpdateManualOverride,
     onSaveGiftMinutes,
     // Change 2 - Receive role-based permission for gift minutes editing
-    canEditGiftMinutes
+    canEditGiftMinutes,
+    skipEarlyCheckout = false,
+    onSkipEarlyCheckout = null
 }) {
     return (
         <tr className="border-b transition-colors hover:bg-muted/50">
@@ -161,14 +163,36 @@ export default function ReportTableRow({
                 {result.notes || '-'}
             </td>
             <td className="p-2 align-middle text-right">
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onShowBreakdown(result)}
-                    title="View daily breakdown"
-                >
-                    <Eye className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                    {onSkipEarlyCheckout && (
+                        <button
+                            type="button"
+                            title={skipEarlyCheckout ? 'Restore early checkout deduction' : 'Skip early checkout deduction'}
+                            onClick={() => onSkipEarlyCheckout(!skipEarlyCheckout)}
+                            className={`p-1 rounded transition-colors ${
+                                skipEarlyCheckout 
+                                    ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' 
+                                    : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                            }`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" 
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+                                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                                {skipEarlyCheckout && <line x1="4" y1="4" x2="20" y2="20"/>}
+                            </svg>
+                        </button>
+                    )}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onShowBreakdown(result)}
+                        title="View daily breakdown"
+                    >
+                        <Eye className="w-4 h-4" />
+                    </Button>
+                </div>
             </td>
         </tr>
     );
