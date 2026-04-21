@@ -42,7 +42,9 @@ function ReportViewSessions() {
                     report_name: reportNameMatch ? reportNameMatch[1].trim() : '—',
                     report_id: reportIdMatch ? reportIdMatch[1].trim() : '—',
                     seconds: secondsMatch ? parseInt(secondsMatch[1]) : 0,
-                    created_date: l.created_date
+                    created_date: l.created_date 
+                        ? (l.created_date.endsWith('Z') ? l.created_date : l.created_date + 'Z') 
+                        : null
                 };
             })
             .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
