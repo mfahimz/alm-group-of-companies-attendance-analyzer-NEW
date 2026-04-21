@@ -545,13 +545,13 @@ export default function EmployeeProfile() {
                             <div>
                                 <label className="text-sm text-slate-500">Created On</label>
                                 <p className="font-medium text-slate-900">
-                                    {formatInUAE(employee.created_date, 'dd/MM/yyyy hh:mm a')}
+                                    {formatInUAE(employee.created_date?.endsWith('Z') ? employee.created_date : (employee.created_date + 'Z'), 'dd/MM/yyyy hh:mm a')}
                                 </p>
                             </div>
                             <div>
                                 <label className="text-sm text-slate-500">Last Updated</label>
                                 <p className="font-medium text-slate-900">
-                                    {formatInUAE(employee.updated_date, 'dd/MM/yyyy hh:mm a')}
+                                    {formatInUAE(employee.updated_date?.endsWith('Z') ? employee.updated_date : (employee.updated_date + 'Z'), 'dd/MM/yyyy hh:mm a')}
                                 </p>
                             </div>
                         </div>

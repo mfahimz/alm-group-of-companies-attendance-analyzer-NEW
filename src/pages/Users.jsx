@@ -14,6 +14,8 @@ import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import TablePagination from '../components/ui/TablePagination';
+import { formatInUAE } from '@/components/ui/timezone';
+
 
 const PAGE_DISPLAY_NAMES = {
     // Main
@@ -432,7 +434,7 @@ export default function Users() {
                                                 );
                                             })()}
                                         </TableCell>
-                                        <TableCell>{new Date(user.created_date).toLocaleDateString('en-GB')}</TableCell>
+                                        <TableCell>{formatInUAE(user.created_date?.endsWith('Z') ? user.created_date : (user.created_date + 'Z'), 'dd/MM/yyyy')}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button

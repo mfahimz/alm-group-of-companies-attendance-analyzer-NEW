@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User as UserIcon, Mail, Shield, Calendar } from 'lucide-react';
+import { formatInUAE } from '@/components/ui/timezone';
+
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 export default function UserProfile() {
@@ -85,7 +87,7 @@ export default function UserProfile() {
                             <div>
                                 <p className="text-sm text-slate-600">Member Since</p>
                                 <p className="font-medium text-slate-900">
-                                    {user?.created_date ? new Date(user.created_date).toLocaleDateString('en-GB') : '-'}
+                                    {user?.created_date ? formatInUAE(user.created_date?.endsWith('Z') ? user.created_date : (user.created_date + 'Z'), 'dd/MM/yyyy') : '-'}
                                 </p>
                             </div>
                         </div>
