@@ -493,7 +493,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
             const giftMins = giftMinutesOverrides[result.id] || Math.max(0, result.ramadan_gift_minutes || 0);
 
-            const skipEarlyCheckout = earlyMin > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined && result.manual_deductible_minutes <= (result.late_minutes || 0);
+            const skipEarlyCheckout = earlyMin > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined;
             const adjustedEarlyMin = skipEarlyCheckout ? 0 : earlyMin;
             const finalComputedDeductible = Math.max(0, lateMin + adjustedEarlyMin - graceMin - approvedMin);
             const effectiveDeductible = storedDeductible !== null 
@@ -1846,9 +1846,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
     const handleBulkSkipEarlyCheckout = async (skip, employeeIds = null) => {
         const targets = employeeIds 
-            ? filteredResults.filter(r => employeeIds.includes(r.attendance_id))
-            : filteredResults;
+            ? results.filter(r => employeeIds.includes(r.attendance_id))
+            : results;
         
+        const toastId = toast.loading(`${skip ? 'Skipping' : 'Restoring'} early checkout for ${targets.length} employee(s)...`);
         for (const r of targets) {
             if (skip) {
                 // Calculate deductible WITHOUT early checkout
@@ -1867,6 +1868,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             }
         }
         queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+        toast.dismiss(toastId);
         toast.success(`Early checkout ${skip ? 'skipped' : 'restored'} for ${targets.length} employee(s)`);
     };
 
@@ -2277,7 +2279,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         onShowBreakdown={showDailyBreakdown}
                                         onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
                                         onSaveGiftMinutes={onSaveGiftMinutes}
-                                        skipEarlyCheckout={result.early_checkout_minutes > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined && result.manual_deductible_minutes <= (result.late_minutes || 0)}
+                                        skipEarlyCheckout={result.early_checkout_minutes > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined}
                                         onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ id: result.id, skip, result }) : null}
                                     />
                                 ))}
