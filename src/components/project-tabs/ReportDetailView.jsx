@@ -493,11 +493,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
             const giftMins = giftMinutesOverrides[result.id] || Math.max(0, result.ramadan_gift_minutes || 0);
 
-            const skipEarlyCheckout = result.skip_early_checkout === true;
+            const skipEarlyCheckout = earlyMin > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined && result.manual_deductible_minutes <= (result.late_minutes || 0);
             const adjustedEarlyMin = skipEarlyCheckout ? 0 : earlyMin;
             const finalComputedDeductible = Math.max(0, lateMin + adjustedEarlyMin - graceMin - approvedMin);
             const effectiveDeductible = storedDeductible !== null 
-                ? (skipEarlyCheckout ? Math.max(0, storedDeductible - earlyMin) : storedDeductible)
+                ? storedDeductible
                 : finalComputedDeductible;
 
             return {
@@ -517,7 +517,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 ramadan_gift_minutes: giftMins,
                 effective_deductible_minutes: Math.max(0, effectiveDeductible - giftMins),
                 grace_minutes: graceMin,
-                skip_early_checkout: skipEarlyCheckout,
                 has_no_punches: false // Will be determined when raw data is loaded
             };
         });
@@ -1823,8 +1822,20 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const skipEarlyCheckoutMutation = useMutation({
-        mutationFn: async ({ id, skip }) => {
-            await base44.entities.AnalysisResult.update(id, { skip_early_checkout: skip });
+        mutationFn: async ({ id, skip, result }) => {
+            if (skip) {
+                const lateMin = result.late_minutes || 0;
+                const graceMin = result.grace_minutes ?? 15;
+                const approvedMin = result.approved_minutes || 0;
+                const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                await base44.entities.AnalysisResult.update(id, { 
+                    manual_deductible_minutes: newDeductible 
+                });
+            } else {
+                await base44.entities.AnalysisResult.update(id, { 
+                    manual_deductible_minutes: null 
+                });
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
@@ -1837,8 +1848,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const targets = employeeIds 
             ? filteredResults.filter(r => employeeIds.includes(r.attendance_id))
             : filteredResults;
+        
         for (const r of targets) {
-            await base44.entities.AnalysisResult.update(r.id, { skip_early_checkout: skip });
+            if (skip) {
+                // Calculate deductible WITHOUT early checkout
+                const lateMin = r.late_minutes || 0;
+                const graceMin = r.grace_minutes ?? 15;
+                const approvedMin = r.approved_minutes || 0;
+                const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                await base44.entities.AnalysisResult.update(r.id, { 
+                    manual_deductible_minutes: newDeductible 
+                });
+            } else {
+                // Restore — clear manual override so computed value takes over
+                await base44.entities.AnalysisResult.update(r.id, { 
+                    manual_deductible_minutes: null 
+                });
+            }
         }
         queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
         toast.success(`Early checkout ${skip ? 'skipped' : 'restored'} for ${targets.length} employee(s)`);
@@ -2251,8 +2277,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         onShowBreakdown={showDailyBreakdown}
                                         onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
                                         onSaveGiftMinutes={onSaveGiftMinutes}
-                                        skipEarlyCheckout={result.skip_early_checkout}
-                                        onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ id: result.id, skip }) : null}
+                                        skipEarlyCheckout={result.early_checkout_minutes > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined && result.manual_deductible_minutes <= (result.late_minutes || 0)}
+                                        onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ id: result.id, skip, result }) : null}
                                     />
                                 ))}
                             </tbody>
