@@ -402,10 +402,10 @@ export default function ShiftTimingsTab({ project }) {
         mutationFn: async () => {
             if (!astraFile || !selectedBlock) throw new Error("Missing file or block");
             return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
+                const fileExtension = astraFile.name.split('.').pop().toLowerCase();
+                
+                const processCSVText = async (text) => {
                     try {
-                        const text = e.target.result;
                         const lines = text.split('\n').filter(line => line.trim());
                         const blockRange = blockDateRanges[selectedBlock];
                         let count = 0;
@@ -452,8 +452,31 @@ export default function ShiftTimingsTab({ project }) {
                         reject(err);
                     }
                 };
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                        try {
+                            const data = e.target.result;
+                            const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
+                            const firstSheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[firstSheetName];
+                            const csvData = XLSX.utils.sheet_to_csv(worksheet);
+                            await processCSVText(csvData);
+                        } catch (err) {
+                            reject(new Error("Failed to parse Excel file"));
+                        }
+                    } else {
+                        await processCSVText(e.target.result);
+                    }
+                };
                 reader.onerror = () => reject(new Error("Failed to read file"));
-                reader.readAsText(astraFile);
+                
+                if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                    reader.readAsArrayBuffer(astraFile);
+                } else {
+                    reader.readAsText(astraFile);
+                }
             });
         },
         onSuccess: (count) => {
@@ -1681,20 +1704,19 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
 
                     {isAstra ? (
                         <div className="space-y-3">
-                            <Label>Upload Astra Shift Timings (.csv) *</Label>
+                            <Label>Upload Astra Shift Timings *</Label>
                             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                                 <div className="flex-1 w-full">
                                     <Input
                                         id="astra-shift-file"
                                         type="file"
-                                        accept=".csv"
+                                        accept=".csv,.xlsx,.xls,.txt"
                                         onChange={(e) => {
                                             const file = e.target.files[0];
-                                            if (file && file.name.toLowerCase().endsWith('.csv')) {
+                                            if (file) {
                                                 setAstraFile(file);
                                             } else {
                                                 setAstraFile(null);
-                                                if (file) toast.error('Please select a valid .csv file');
                                                 e.target.value = '';
                                             }
                                         }}
