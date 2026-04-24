@@ -55,6 +55,9 @@ export default function ShiftTimingsTab({ project }) {
     const [showCopyDialog, setShowCopyDialog] = useState(false);
     const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '', sourceProjectBlockId: 'block1' });
 
+    const isAstra = project.company === 'Astra Auto Parts';
+    const [astraFile, setAstraFile] = useState(null);
+
     const [formData, setFormData] = useState({
         attendance_id: '',
         am_start: '',
@@ -394,6 +397,76 @@ export default function ShiftTimingsTab({ project }) {
         };
         reader.readAsText(file);
     };
+
+    const astraUploadMutation = useMutation({
+        mutationFn: async () => {
+            if (!astraFile || !selectedBlock) throw new Error("Missing file or block");
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const text = e.target.result;
+                        const lines = text.split('\n').filter(line => line.trim());
+                        const blockRange = blockDateRanges[selectedBlock];
+                        let count = 0;
+                        for (let i = 1; i < lines.length; i++) {
+                            const values = lines[i].split(',').map(v => v.trim());
+                            if (values.length >= 9) {
+                                const attendance_id = String(values[0]);
+                                const am_start = normalizeTime(values[3]);
+                                const am_end = normalizeTime(values[4]);
+                                const pm_start = normalizeTime(values[5]);
+                                const pm_end = normalizeTime(values[6]);
+                                const shiftType = values[8] ? values[8].trim().toLowerCase() : '';
+                                const is_single_shift = shiftType === 'single shift';
+
+                                let applicableDays = values[9] ? values[9].trim() : '';
+                                let is_friday_shift = false;
+
+                                if (applicableDays) {
+                                    const daysArray = applicableDays.split(',').map(d => d.trim()).filter(d => d.length > 0);
+                                    is_friday_shift = daysArray.some(d => d.toLowerCase() === 'friday') && daysArray.length === 1;
+                                    applicableDays = JSON.stringify(daysArray);
+                                }
+
+                                await base44.entities.ShiftTiming.create({
+                                    project_id: project.id,
+                                    attendance_id,
+                                    date: null,
+                                    is_friday_shift,
+                                    is_single_shift,
+                                    applicable_days: applicableDays,
+                                    am_start,
+                                    am_end,
+                                    pm_start,
+                                    pm_end,
+                                    effective_from: blockRange.from,
+                                    effective_to: blockRange.to,
+                                    shift_block: selectedBlock
+                                });
+                                count++;
+                            }
+                        }
+                        resolve(count);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                reader.onerror = () => reject(new Error("Failed to read file"));
+                reader.readAsText(astraFile);
+            });
+        },
+        onSuccess: (count) => {
+            queryClient.invalidateQueries(['shifts', project.id]);
+            toast.success(`Successfully uploaded ${count} shift timings for Astra Auto Parts`);
+            setAstraFile(null);
+            const fileInput = document.getElementById('astra-shift-file');
+            if (fileInput) fileInput.value = '';
+        },
+        onError: (err) => {
+            toast.error('Failed to upload shift timings: ' + err.message);
+        }
+    });
 
     const uploadMutation = useMutation({
         mutationFn: async () => {
@@ -1606,27 +1679,78 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                         </Select>
                     </div>
 
-                    <div>
-                        <Label>Upload Shift Timings CSV *</Label>
-                        <div className="mt-2">
-                            <Input
-                                type="file"
-                                accept=".csv, .xlsx, .xls"
-                                onChange={handleFileChange}
-                                className="hidden"
-                                id="shift-file-upload"
-                            />
+                    {isAstra ? (
+                        <div className="space-y-3">
+                            <Label>Upload Astra Shift Timings (.csv) *</Label>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <div className="flex-1 w-full">
+                                    <Input
+                                        id="astra-shift-file"
+                                        type="file"
+                                        accept=".csv"
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file && file.name.toLowerCase().endsWith('.csv')) {
+                                                setAstraFile(file);
+                                            } else {
+                                                setAstraFile(null);
+                                                if (file) toast.error('Please select a valid .csv file');
+                                                e.target.value = '';
+                                            }
+                                        }}
+                                        className="cursor-pointer"
+                                    />
+                                    {astraFile && (
+                                        <p className="text-sm text-slate-600 mt-2">
+                                            Selected file: <span className="font-medium">{astraFile.name}</span>
+                                        </p>
+                                    )}
+                                </div>
+                                <Button 
+                                    onClick={() => astraUploadMutation.mutate()} 
+                                    disabled={!astraFile || !selectedBlock || astraUploadMutation.isPending}
+                                    className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
+                                >
+                                    {astraUploadMutation.isPending ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                                            Uploading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="w-4 h-4 mr-2" />
+                                            Upload Shifts
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Shifts will be uploaded to {selectedBlock === 'block1' ? 'Block 1' : 'Block 2'} with date range {new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')}
+                            </p>
                         </div>
-                        <p className="text-sm text-slate-500 mt-2">
-                            CSV format: Attendance ID, Employee Name, Department, AM Start, AM End, PM Start, PM End, Weekly Off, Shift Type, Applicable Days
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                            Shift Type: "Regular" or "Single Shift" | Applicable Days: comma-separated (e.g., "Monday, Tuesday, Friday")
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                            Shifts will be uploaded to {selectedBlock === 'block1' ? 'Block 1' : 'Block 2'} with date range {new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')}
-                        </p>
-                    </div>
+                    ) : (
+                        <div>
+                            <Label>Upload Shift Timings CSV *</Label>
+                            <div className="mt-2">
+                                <Input
+                                    type="file"
+                                    accept=".csv, .xlsx, .xls"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                    id="shift-file-upload"
+                                />
+                            </div>
+                            <p className="text-sm text-slate-500 mt-2">
+                                CSV format: Attendance ID, Employee Name, Department, AM Start, AM End, PM Start, PM End, Weekly Off, Shift Type, Applicable Days
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Shift Type: "Regular" or "Single Shift" | Applicable Days: comma-separated (e.g., "Monday, Tuesday, Friday")
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Shifts will be uploaded to {selectedBlock === 'block1' ? 'Block 1' : 'Block 2'} with date range {new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')}
+                            </p>
+                        </div>
+                    )}
 
                     {warnings.length > 0 && (
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
