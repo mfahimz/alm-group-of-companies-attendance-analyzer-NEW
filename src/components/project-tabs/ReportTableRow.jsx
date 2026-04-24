@@ -21,11 +21,24 @@ export default function ReportTableRow({
     onSaveGiftMinutes,
     // Change 2 - Receive role-based permission for gift minutes editing
     canEditGiftMinutes,
+    isAstra = false,
+    isSelected = false,
+    onToggleSelect = null,
     skipEarlyCheckout = false,
     onSkipEarlyCheckout = null
 }) {
     return (
-        <tr className="border-b transition-colors hover:bg-muted/50">
+        <tr className={`border-b transition-colors hover:bg-muted/50 ${isSelected ? 'bg-amber-50/40' : ''}`}>
+            {isAstra && (
+                <td className="w-8 px-2" onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-amber-500 focus:ring-amber-400 cursor-pointer"
+                        checked={isSelected}
+                        onChange={onToggleSelect}
+                    />
+                </td>
+            )}
             <td className="p-2 align-middle sticky left-0 bg-white z-10">
                 <Checkbox
                     checked={result.isVerified}

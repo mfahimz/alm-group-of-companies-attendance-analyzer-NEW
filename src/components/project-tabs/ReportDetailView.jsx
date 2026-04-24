@@ -49,6 +49,34 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     });
     const [giftMinutesOverrides, setGiftMinutesOverrides] = useState({});
     
+    const [selectedRowIds, setSelectedRowIds] = useState([]);
+
+    const toggleRowSelection = (id) => {
+        setSelectedRowIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+        );
+    };
+
+    const getOriginalEarlyMin = (result) => {
+        const match = (result.notes || '').match(/\[eco:(\d+)\]/);
+        return match ? parseInt(match[1]) : (result.early_checkout_minutes || 0);
+    };
+
+    const buildSkipNotes = (result) => {
+        const notes = result.notes || '';
+        if (/\[eco:\d+\]/.test(notes)) return notes; // already tagged
+        const originalMin = result.early_checkout_minutes || 0;
+        return notes ? `${notes} [eco:${originalMin}]` : `[eco:${originalMin}]`;
+    };
+
+    const buildRestoreNotes = (result) => {
+        return (result.notes || '').replace(/\s?\[eco:\d+\]/, '').trim();
+    };
+
+    const isSkipped = (result) => {
+        return /\[eco:\d+\]/.test(result.notes || '');
+    };
+
     // Detection panel state managed in DetectionPanel component
 
     const queryClient = useQueryClient();
@@ -493,12 +521,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             const computedDeductible = Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
             const giftMins = giftMinutesOverrides[result.id] || Math.max(0, result.ramadan_gift_minutes || 0);
 
-            const skipEarlyCheckout = earlyMin > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined;
+            const skipEarlyCheckout = isSkipped(result);
             const adjustedEarlyMin = skipEarlyCheckout ? 0 : earlyMin;
-            const finalComputedDeductible = Math.max(0, lateMin + adjustedEarlyMin - graceMin - approvedMin);
-            const effectiveDeductible = storedDeductible !== null 
-                ? storedDeductible
-                : finalComputedDeductible;
+            const effectiveDeductible = result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined
+                ? result.manual_deductible_minutes
+                : Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
 
             return {
                 ...result,
@@ -510,7 +537,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 sick_leave_count: result.manual_sick_leave_count ?? result.sick_leave_count ?? 0,
                 annual_leave_count: result.manual_annual_leave_count ?? result.annual_leave_count ?? 0,
                 late_minutes: lateMin,
-                early_checkout_minutes: earlyMin,
+                early_checkout_minutes: adjustedEarlyMin,
                 other_minutes: result.other_minutes || 0,
                 approved_minutes: approvedMin,
                 deductible_minutes: effectiveDeductible,
@@ -580,6 +607,16 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 return 0;
             });
     }, [enrichedResults, searchTerm, riskFilter, sort]);
+
+    const toggleSelectAll = () => {
+        if (selectedRowIds.length === filteredResults.length) {
+            setSelectedRowIds([]);
+        } else {
+            setSelectedRowIds(filteredResults.map(r => r.id));
+        }
+    };
+
+    const selectedResults = results.filter(r => selectedRowIds.includes(r.id));
 
     // ==========================================================================================
     // DETECTION LOGIC: SHIFT MISMATCH & NO MATCH (Isolated Feature)
@@ -1822,18 +1859,23 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const skipEarlyCheckoutMutation = useMutation({
-        mutationFn: async ({ id, skip, result }) => {
+        mutationFn: async ({ result, skip }) => {
             if (skip) {
                 const lateMin = result.late_minutes || 0;
                 const graceMin = result.grace_minutes ?? 15;
                 const approvedMin = result.approved_minutes || 0;
                 const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
-                await base44.entities.AnalysisResult.update(id, { 
-                    manual_deductible_minutes: newDeductible 
+                await base44.entities.AnalysisResult.update(result.id, {
+                    early_checkout_minutes: 0,
+                    manual_deductible_minutes: newDeductible,
+                    notes: buildSkipNotes(result)
                 });
             } else {
-                await base44.entities.AnalysisResult.update(id, { 
-                    manual_deductible_minutes: null 
+                const originalMin = getOriginalEarlyMin(result);
+                await base44.entities.AnalysisResult.update(result.id, {
+                    early_checkout_minutes: originalMin,
+                    manual_deductible_minutes: null,
+                    notes: buildRestoreNotes(result)
                 });
             }
         },
@@ -1844,32 +1886,39 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         onError: () => toast.error('Failed to update')
     });
 
-    const handleBulkSkipEarlyCheckout = async (skip, employeeIds = null) => {
-        const targets = employeeIds 
-            ? results.filter(r => employeeIds.includes(r.attendance_id))
-            : results;
-        
+    const handleBulkSkipEarlyCheckout = async (skip, targetResults = null) => {
+        const targets = targetResults || results;
+        if (targets.length === 0) return;
         const toastId = toast.loading(`${skip ? 'Skipping' : 'Restoring'} early checkout for ${targets.length} employee(s)...`);
-        for (const r of targets) {
-            if (skip) {
-                // Calculate deductible WITHOUT early checkout
-                const lateMin = r.late_minutes || 0;
-                const graceMin = r.grace_minutes ?? 15;
-                const approvedMin = r.approved_minutes || 0;
-                const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
-                await base44.entities.AnalysisResult.update(r.id, { 
-                    manual_deductible_minutes: newDeductible 
-                });
-            } else {
-                // Restore — clear manual override so computed value takes over
-                await base44.entities.AnalysisResult.update(r.id, { 
-                    manual_deductible_minutes: null 
-                });
+        try {
+            for (const r of targets) {
+                if (skip) {
+                    const lateMin = r.late_minutes || 0;
+                    const graceMin = r.grace_minutes ?? 15;
+                    const approvedMin = r.approved_minutes || 0;
+                    const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                    await base44.entities.AnalysisResult.update(r.id, {
+                        early_checkout_minutes: 0,
+                        manual_deductible_minutes: newDeductible,
+                        notes: buildSkipNotes(r)
+                    });
+                } else {
+                    const originalMin = getOriginalEarlyMin(r);
+                    await base44.entities.AnalysisResult.update(r.id, {
+                        early_checkout_minutes: originalMin,
+                        manual_deductible_minutes: null,
+                        notes: buildRestoreNotes(r)
+                    });
+                }
             }
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+            toast.dismiss(toastId);
+            toast.success(`Early checkout ${skip ? 'skipped' : 'restored'} for ${targets.length} employee(s)`);
+            setSelectedRowIds([]);
+        } catch (err) {
+            toast.dismiss(toastId);
+            toast.error('Bulk operation failed: ' + err.message);
         }
-        queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
-        toast.dismiss(toastId);
-        toast.success(`Early checkout ${skip ? 'skipped' : 'restored'} for ${targets.length} employee(s)`);
     };
 
     const hasEdits = results.some(r => r.day_overrides && r.day_overrides !== '{}');
@@ -2090,6 +2139,26 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         {isAstra && (
                             <div className="flex items-center gap-2 border-l pl-3 ml-1">
                                 <span className="text-xs text-slate-500 font-medium">Early Checkout:</span>
+                                {selectedRowIds.length > 0 && (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs border-amber-200 text-amber-700 hover:bg-amber-50"
+                                            onClick={() => handleBulkSkipEarlyCheckout(true, selectedResults)}
+                                        >
+                                            Skip Selected ({selectedRowIds.length})
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
+                                            onClick={() => handleBulkSkipEarlyCheckout(false, selectedResults)}
+                                        >
+                                            Restore Selected ({selectedRowIds.length})
+                                        </Button>
+                                    </>
+                                )}
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -2208,6 +2277,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <table className="w-full min-w-max caption-bottom text-sm">
                             <thead className="sticky top-0 z-10 bg-slate-50">
                                 <tr className="border-b">
+                                    {isAstra && (
+                                        <th className="w-8 px-2 py-3 bg-slate-50">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-slate-300 text-amber-500 focus:ring-amber-400 cursor-pointer"
+                                                checked={filteredResults.length > 0 && selectedRowIds.length === filteredResults.length}
+                                                onChange={toggleSelectAll}
+                                                title="Select all visible rows"
+                                            />
+                                        </th>
+                                    )}
                                     {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>}
                                     <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[48px] z-20">
                                         ID
@@ -2279,8 +2359,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                         onShowBreakdown={showDailyBreakdown}
                                         onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
                                         onSaveGiftMinutes={onSaveGiftMinutes}
-                                        skipEarlyCheckout={result.early_checkout_minutes > 0 && result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined}
-                                        onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ id: result.id, skip, result }) : null}
+                                        isAstra={isAstra}
+                                        isSelected={selectedRowIds.includes(result.id)}
+                                        onToggleSelect={() => toggleRowSelection(result.id)}
+                                        skipEarlyCheckout={isSkipped(result)}
+                                        onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ result, skip }) : null}
                                     />
                                 ))}
                             </tbody>
