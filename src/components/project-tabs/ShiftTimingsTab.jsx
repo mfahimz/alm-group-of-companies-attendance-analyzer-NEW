@@ -1640,30 +1640,46 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                             <div>
                                 <Label>Applicable Days (Optional)</Label>
                                 <p className="text-xs text-slate-500 mb-2">Leave empty for all working days</p>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                                        <div key={day} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`day-${day}`}
-                                                checked={formData.applicable_days.includes(day)}
-                                                onCheckedChange={(checked) => {
-                                                    if (checked) {
-                                                        setFormData({ 
-                                                            ...formData, 
-                                                            applicable_days: [...formData.applicable_days, day]
-                                                        });
-                                                    } else {
-                                                        setFormData({ 
-                                                            ...formData, 
-                                                            applicable_days: formData.applicable_days.filter(d => d !== day)
-                                                        });
-                                                    }
-                                                }}
-                                            />
-                                            <Label htmlFor={`day-${day}`} className="cursor-pointer text-sm">{day.substring(0, 3)}</Label>
-                                        </div>
-                                    ))}
-                                </div>
+                                {project?.company === 'Naser Mohsin Auto Parts' ? (
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                            <div key={day} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`day-${day}`}
+                                                    checked={formData.applicable_days.includes(day)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setFormData({ 
+                                                                ...formData, 
+                                                                applicable_days: [...formData.applicable_days, day]
+                                                            });
+                                                        } else {
+                                                            setFormData({ 
+                                                                ...formData, 
+                                                                applicable_days: formData.applicable_days.filter(d => d !== day)
+                                                            });
+                                                        }
+                                                    }}
+                                                />
+                                                <Label htmlFor={`day-${day}`} className="cursor-pointer text-sm">{day.substring(0, 3)}</Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <Select 
+                                        value={formData.applicable_days.length > 0 ? JSON.stringify(formData.applicable_days) : ""} 
+                                        onValueChange={(val) => setFormData({ ...formData, applicable_days: JSON.parse(val) })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select working days" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value={JSON.stringify(["Monday","Tuesday","Wednesday","Thursday","Saturday"])}>Monday to Thursday and Saturday</SelectItem>
+                                            <SelectItem value={JSON.stringify(["Friday"])}>Friday</SelectItem>
+                                            <SelectItem value={JSON.stringify(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"])}>Monday to Saturday</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}
                                 {formData.applicable_days.length > 0 && (
                                     <p className="text-xs text-green-600 mt-2">
                                         ✓ Shift applies to: {formData.applicable_days.join(', ')}

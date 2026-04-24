@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
 export default function BulkEditShiftDialog({ open, onClose, selectedShifts, projectId, company }) {
@@ -206,21 +207,66 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                             />
                             <div className="flex-1">
                                 <Label>Applicable Days</Label>
-                                <div className="grid grid-cols-2 gap-2 mt-2 p-3 border rounded-lg">
-                                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                                        <div key={day} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`bulk-${day}`}
-                                                checked={updates.applicable_days.value.includes(day)}
-                                                onCheckedChange={() => toggleDay(day)}
-                                                disabled={!updates.applicable_days.enabled}
-                                            />
-                                            <Label htmlFor={`bulk-${day}`} className="font-normal cursor-pointer">
-                                                {day}
-                                            </Label>
-                                        </div>
-                                    ))}
-                                </div>
+                                {company === 'Naser Mohsin Auto Parts' ? (
+                                    <div className="grid grid-cols-2 gap-2 mt-2 p-3 border rounded-lg">
+                                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                            <div key={day} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`bulk-${day}`}
+                                                    checked={updates.applicable_days.value.includes(day)}
+                                                    onCheckedChange={() => toggleDay(day)}
+                                                    disabled={!updates.applicable_days.enabled}
+                                                />
+                                                <Label htmlFor={`bulk-${day}`} className="font-normal cursor-pointer">
+                                                    {day}
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="mt-2">
+                                        <Select
+                                            disabled={!updates.applicable_days.enabled}
+                                            value={
+                                                updates.applicable_days.value.length > 0 
+                                                ? (
+                                                    updates.applicable_days.value.length === 1 && updates.applicable_days.value.includes('Friday') 
+                                                        ? 'Friday' 
+                                                        : updates.applicable_days.value.length === 6 
+                                                            ? 'Monday to Saturday' 
+                                                            : 'Monday to Thursday and Saturday'
+                                                ) 
+                                                : ''
+                                            }
+                                            onValueChange={(value) => {
+                                                let newArray = [];
+                                                if (value === 'Monday to Thursday and Saturday') {
+                                                    newArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+                                                } else if (value === 'Friday') {
+                                                    newArray = ['Friday'];
+                                                } else if (value === 'Monday to Saturday') {
+                                                    newArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                                }
+                                                setUpdates(prev => ({
+                                                    ...prev,
+                                                    applicable_days: {
+                                                        ...prev.applicable_days,
+                                                        value: newArray
+                                                    }
+                                                }));
+                                            }}
+                                        >
+                                            <SelectTrigger className="border-slate-200 hover:bg-slate-50 transition-all duration-200 focus:ring-indigo-100">
+                                                <SelectValue placeholder="Select working days" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Monday to Thursday and Saturday">Monday to Thursday and Saturday</SelectItem>
+                                                <SelectItem value="Friday">Friday</SelectItem>
+                                                <SelectItem value="Monday to Saturday">Monday to Saturday</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
