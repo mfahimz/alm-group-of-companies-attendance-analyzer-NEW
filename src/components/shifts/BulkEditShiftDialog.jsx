@@ -27,9 +27,7 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
             if (updates.pm_start.enabled && updates.pm_start.value) updateData.pm_start = updates.pm_start.value;
             if (updates.pm_end.enabled && updates.pm_end.value) updateData.pm_end = updates.pm_end.value;
             if (updates.applicable_days.enabled) {
-                updateData.applicable_days = company === 'Naser Mohsin Auto Parts' 
-                    ? JSON.stringify(updates.applicable_days.value)
-                    : updates.applicable_days.value.join(', ');
+                updateData.applicable_days = JSON.stringify(updates.applicable_days.value);
             }
 
             // Check if there's anything to update
@@ -197,36 +195,34 @@ export default function BulkEditShiftDialog({ open, onClose, selectedShifts, pro
                             </div>
                         </div>
 
-                        {company === 'Naser Mohsin Auto Parts' && (
-                            <div className="flex items-start space-x-3">
-                                <Checkbox
-                                    checked={updates.applicable_days.enabled}
-                                    onCheckedChange={(checked) => setUpdates(prev => ({
-                                        ...prev,
-                                        applicable_days: { ...prev.applicable_days, enabled: checked }
-                                    }))}
-                                    className="mt-2"
-                                />
-                                <div className="flex-1">
-                                    <Label>Applicable Days</Label>
-                                    <div className="grid grid-cols-2 gap-2 mt-2 p-3 border rounded-lg">
-                                        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                                            <div key={day} className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`bulk-${day}`}
-                                                    checked={updates.applicable_days.value.includes(day)}
-                                                    onCheckedChange={() => toggleDay(day)}
-                                                    disabled={!updates.applicable_days.enabled}
-                                                />
-                                                <Label htmlFor={`bulk-${day}`} className="font-normal cursor-pointer">
-                                                    {day}
-                                                </Label>
-                                            </div>
-                                        ))}
-                                    </div>
+                        <div className="flex items-start space-x-3">
+                            <Checkbox
+                                checked={updates.applicable_days.enabled}
+                                onCheckedChange={(checked) => setUpdates(prev => ({
+                                    ...prev,
+                                    applicable_days: { ...prev.applicable_days, enabled: checked }
+                                }))}
+                                className="mt-2"
+                            />
+                            <div className="flex-1">
+                                <Label>Applicable Days</Label>
+                                <div className="grid grid-cols-2 gap-2 mt-2 p-3 border rounded-lg">
+                                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+                                        <div key={day} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`bulk-${day}`}
+                                                checked={updates.applicable_days.value.includes(day)}
+                                                onCheckedChange={() => toggleDay(day)}
+                                                disabled={!updates.applicable_days.enabled}
+                                            />
+                                            <Label htmlFor={`bulk-${day}`} className="font-normal cursor-pointer">
+                                                {day}
+                                            </Label>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     <div className="flex gap-3 pt-4">

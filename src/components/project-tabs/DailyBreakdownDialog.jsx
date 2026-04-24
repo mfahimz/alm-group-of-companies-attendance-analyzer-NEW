@@ -15,6 +15,25 @@ import { Checkbox } from '@/components/ui/checkbox';
  */
 const MIDNIGHT_BUFFER_MINUTES = 180;
 
+const normalizeApplicableDaysToArray = (value) => {
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    // Handle comma-separated
+    if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
+    // Handle known phrases
+    const str = value.trim().toLowerCase();
+    if (str === 'friday') return ['Friday'];
+    if (str === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
+    if (str === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    if (str === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    if (str === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+    // Single day name fallback
+    return [value.trim()];
+};
+
 export default function DailyBreakdownDialog({
     open,
     onOpenChange,
@@ -301,15 +320,11 @@ export default function DailyBreakdownDialog({
                     const applicableShifts = employeeShifts.filter(sh => !sh.date && checkShiftEffective(sh, targetDateObj));
                     for (const sh of applicableShifts) {
                         if (sh.applicable_days) {
-                            try {
-                                const arr = JSON.parse(sh.applicable_days);
-                                if (Array.isArray(arr) && arr.some(day => day.toLowerCase().trim() === dayName.toLowerCase())) {
-                                    s = sh; break;
-                                }
-                            } catch {
-                                if (sh.applicable_days.toLowerCase().includes(dayName.toLowerCase())) {
-                                    s = sh; break;
-                                }
+                            const appDaysArray = normalizeApplicableDaysToArray(sh.applicable_days);
+                            if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
+                                day.toLowerCase().trim() === dayName.toLowerCase()
+                            )) {
+                                s = sh; break;
                             }
                         }
                     }
@@ -474,15 +489,11 @@ export default function DailyBreakdownDialog({
                 const applicableShifts = employeeShifts.filter(s => !s.date && checkShiftEffective(s, currentDate));
                 for (const s of applicableShifts) {
                     if (s.applicable_days) {
-                        try {
-                            const arr = JSON.parse(s.applicable_days);
-                            if (Array.isArray(arr) && arr.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
-                                shift = s; break;
-                            }
-                        } catch {
-                            if (s.applicable_days.toLowerCase().includes(currentDayName.toLowerCase())) {
-                                shift = s; break;
-                            }
+                        const appDaysArray = normalizeApplicableDaysToArray(s.applicable_days);
+                        if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
+                            day.toLowerCase().trim() === currentDayName.toLowerCase()
+                        )) {
+                            shift = s; break;
                         }
                     }
                 }

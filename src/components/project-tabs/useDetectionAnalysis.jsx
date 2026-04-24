@@ -69,6 +69,25 @@ const localIsFridayShift = (shiftRow) =>
     shiftRow?.is_friday_shift === 1 ||
     shiftRow?.is_friday_shift === '1';
 
+const normalizeApplicableDaysToArray = (value) => {
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    // Handle comma-separated
+    if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
+    // Handle known phrases
+    const str = value.trim().toLowerCase();
+    if (str === 'friday') return ['Friday'];
+    if (str === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
+    if (str === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    if (str === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    if (str === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+    // Single day name fallback
+    return [value.trim()];
+};
+
 /**
  * Resolve the effective weekly off day number (0=Sun..6=Sat) for an employee,
  * accounting for project-level override, employee-level setting, and DAY_SWAP / WEEKLY_OFF_OVERRIDE exceptions.
@@ -105,15 +124,12 @@ const resolveShift = (dateStr, currentDay, employeeShifts, employeeExceptions) =
     const applicableShifts = employeeShifts.filter(s => !s.date);
     for (const s of applicableShifts) {
         if (s.applicable_days) {
-            const appDays = s.applicable_days;
-            try {
-                const arr = JSON.parse(appDays);
-                if (Array.isArray(arr) && arr.length > 0) {
-                    if (arr.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) return s;
-                    continue;
-                }
-            } catch {}
-            if (appDays.toLowerCase().includes(currentDayName.toLowerCase())) return s;
+            const appDaysArray = normalizeApplicableDaysToArray(s.applicable_days);
+            if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
+                day.toLowerCase().trim() === currentDayName.toLowerCase()
+            )) {
+                return s;
+            }
         }
     }
 

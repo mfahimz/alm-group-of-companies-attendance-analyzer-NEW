@@ -167,6 +167,25 @@ export default function RunAnalysisTab({ project }) {
         }
     };
 
+    const normalizeApplicableDaysToArray = (value) => {
+        if (!value) return [];
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return parsed;
+        } catch {}
+        // Handle comma-separated
+        if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
+        // Handle known phrases
+        const str = value.trim().toLowerCase();
+        if (str === 'friday') return ['Friday'];
+        if (str === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
+        if (str === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        if (str === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+        if (str === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+        // Single day name fallback
+        return [value.trim()];
+    };
+
     const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr, includeSeconds = false) => {
         if (!shift || dayPunches.length === 0) return [];
 
@@ -458,17 +477,12 @@ export default function RunAnalysisTab({ project }) {
                 for (const s of applicableShifts) {
                     // Check if shift has applicable_days specified
                     if (s.applicable_days) {
-                        try {
-                            const applicableDaysArray = JSON.parse(s.applicable_days);
-                            if (Array.isArray(applicableDaysArray) && applicableDaysArray.length > 0) {
-                                // Check if current day is in the applicable days list
-                                if (applicableDaysArray.some(day => day.toLowerCase().trim() === currentDayName.toLowerCase())) {
-                                    shift = s;
-                                    break;
-                                }
-                            }
-                        } catch (e) {
-                            // If parsing fails, continue to next shift
+                        const appDaysArray = normalizeApplicableDaysToArray(s.applicable_days);
+                        if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
+                            day.toLowerCase().trim() === currentDayName.toLowerCase()
+                        )) {
+                            shift = s;
+                            break;
                         }
                     }
                 }
