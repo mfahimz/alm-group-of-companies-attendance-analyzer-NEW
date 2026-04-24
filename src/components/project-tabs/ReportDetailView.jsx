@@ -50,6 +50,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [giftMinutesOverrides, setGiftMinutesOverrides] = useState({});
     
     const [selectedRowIds, setSelectedRowIds] = useState([]);
+    const [isZeroingEarlyMin, setIsZeroingEarlyMin] = useState(false);
 
     const toggleRowSelection = (id) => {
         setSelectedRowIds(prev =>
@@ -1576,6 +1577,54 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         retry: 2, retryDelay: (i) => Math.min(2000 * Math.pow(2, i), 10000)
     });
 
+    const zeroEarlyMinutesMutation = useMutation({
+        mutationFn: async (targetResults) => {
+            setIsZeroingEarlyMin(true);
+            const toastId = toast.loading(`Zeroing early minutes for ${targetResults.length} employee(s)...`);
+            let done = 0;
+            for (const r of targetResults) {
+                const originalEarly = getOriginalEarlyMin(r);
+                const newNotes = buildSkipNotes(r);
+                const lateMin = r.late_minutes || 0;
+                const graceMin = r.grace_minutes ?? 15;
+                const approvedMin = r.approved_minutes || 0;
+                const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                await base44.entities.AnalysisResult.update(r.id, {
+                    notes: newNotes,
+                    manual_deductible_minutes: newDeductible,
+                    early_checkout_minutes: 0
+                });
+                done++;
+            }
+            toast.dismiss(toastId);
+            return done;
+        },
+        onSuccess: (count) => {
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+            toast.success(`Early minutes zeroed for ${count} employee(s)`);
+            setSelectedRowIds([]);
+            setIsZeroingEarlyMin(false);
+        },
+        onError: (err) => {
+            toast.error('Failed to zero early minutes: ' + err.message);
+            setIsZeroingEarlyMin(false);
+        }
+    });
+
+    const handleZeroEarlyMinutes = () => {
+        if (!isAstra) return;
+        const targets = selectedRowIds.length > 0
+            ? results.filter(r => selectedRowIds.includes(r.id) && !isSkipped(r) && (r.early_checkout_minutes || 0) > 0)
+            : results.filter(r => !isSkipped(r) && (r.early_checkout_minutes || 0) > 0);
+        if (targets.length === 0) {
+            toast.info('No employees with early checkout minutes to zero out');
+            return;
+        }
+        const label = selectedRowIds.length > 0 ? `${targets.length} selected employee(s)` : `all ${targets.length} employee(s)`;
+        if (!window.confirm(`Zero out early checkout minutes for ${label}?`)) return;
+        zeroEarlyMinutesMutation.mutate(targets);
+    };
+
     /**
      * PHASES RESTRUCTURE: Separates primary AnalysisResult updates from secondary Exception sync.
      * Phase 1 is blocking (UI awaits it), Phase 2 is background non-blocking.
@@ -2028,6 +2077,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             )}
                         </div>
                         <div className="flex gap-2">
+                            {isAstra && !isDepartmentHead && canModifyAttendance && (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleZeroEarlyMinutes}
+                                    disabled={isZeroingEarlyMin || resultsLoading}
+                                    className="text-xs h-8 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                    title={selectedRowIds.length > 0 ? `Zero early minutes for ${selectedRowIds.length} selected` : 'Zero early minutes for all employees'}
+                                >
+                                    {isZeroingEarlyMin
+                                        ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Zeroing...</>
+                                        : <>{selectedRowIds.length > 0 ? `Zero Early (${selectedRowIds.length})` : 'Zero Early Min'}</>
+                                    }
+                                </Button>
+                            )}
                             <Button
                                 onClick={exportToExcel}
                                 variant="outline"

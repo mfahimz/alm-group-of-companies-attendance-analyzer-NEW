@@ -38,6 +38,8 @@ export default function DailyBreakdownDialog({
     const [bulkAbnormal, setBulkAbnormal] = useState(false);
     const [bulkShiftOverride, setBulkShiftOverride] = useState({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '', is_single_shift: false });
     const [isBulkSaving, setIsBulkSaving] = useState(false);
+    const [bulkZeroEarly, setBulkZeroEarly] = useState(false);
+    const [bulkZeroLate, setBulkZeroLate] = useState(false);
 
 
     const queryClient = useQueryClient();
@@ -47,11 +49,13 @@ export default function DailyBreakdownDialog({
     useEffect(() => {
         setSelectedDays(new Set());
         setShowBulkPanel(false);
+        setBulkZeroEarly(false);
+        setBulkZeroLate(false);
     }, [selectedEmployee, open]);
 
     const handleBulkApply = async () => {
         if (!selectedEmployee || selectedDays.size === 0) return;
-        if (!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled) return;
+        if (!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled && !bulkZeroEarly && !bulkZeroLate) return;
         setIsBulkSaving(true);
         try {
             const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
@@ -72,6 +76,12 @@ export default function DailyBreakdownDialog({
                     }
                 }
                 if (bulkAbnormal) updated.isAbnormal = true;
+                if (bulkZeroEarly) {
+                    updated.earlyCheckoutMinutes = 0;
+                }
+                if (bulkZeroLate) {
+                    updated.lateMinutes = 0;
+                }
                 if (bulkShiftOverride.enabled && bulkShiftOverride.am_start && (bulkShiftOverride.is_single_shift || bulkShiftOverride.pm_end)) {
                     updated.shiftOverride = {
                         am_start: bulkShiftOverride.am_start,
@@ -105,6 +115,8 @@ export default function DailyBreakdownDialog({
             setShowBulkPanel(false);
             setBulkType('');
             setBulkAbnormal(false);
+            setBulkZeroEarly(false);
+            setBulkZeroLate(false);
             setBulkShiftOverride({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '', is_single_shift: false });
         } catch (err) {
             console.error('Bulk apply failed:', err);
@@ -955,6 +967,26 @@ export default function DailyBreakdownDialog({
                                             className="rounded border-slate-300" />
                                         <label htmlFor="bulkAbnormal" className="text-xs text-slate-600">Mark Abnormal</label>
                                     </div>
+
+                                    <div className="flex items-center gap-1.5">
+                                        <input type="checkbox" id="bulkZeroEarly"
+                                            checked={bulkZeroEarly}
+                                            onChange={e => setBulkZeroEarly(e.target.checked)}
+                                            className="rounded border-slate-300" />
+                                        <label htmlFor="bulkZeroEarly" className="text-xs text-blue-700 font-medium">
+                                            Zero out Early Minutes
+                                        </label>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5">
+                                        <input type="checkbox" id="bulkZeroLate"
+                                            checked={bulkZeroLate}
+                                            onChange={e => setBulkZeroLate(e.target.checked)}
+                                            className="rounded border-slate-300" />
+                                        <label htmlFor="bulkZeroLate" className="text-xs text-orange-700 font-medium">
+                                            Zero out Late Minutes
+                                        </label>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1">
@@ -1037,9 +1069,8 @@ export default function DailyBreakdownDialog({
                                 <div className="flex gap-2 pt-1">
                                     <Button
                                         size="sm"
-                                        id="bulkApplyBtn"
                                         onClick={handleBulkApply}
-                                        disabled={(!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled) || isBulkSaving}
+                                        disabled={(!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled && !bulkZeroEarly && !bulkZeroLate) || isBulkSaving}
                                         className="text-xs h-7 bg-indigo-600 hover:bg-indigo-700 text-white">
                                         {isBulkSaving
                                             ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Saving...</>
