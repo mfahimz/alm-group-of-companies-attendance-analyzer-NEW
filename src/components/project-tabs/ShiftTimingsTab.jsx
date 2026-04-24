@@ -309,6 +309,41 @@ export default function ShiftTimingsTab({ project }) {
         return { valid: false, error: 'Invalid time format' };
     };
 
+    const normalizeApplicableDays = (value) => {
+        if (!value) return null;
+        // Already a JSON array string
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return value; // already correct format
+        } catch {}
+        // Map known human-readable strings
+        const str = String(value).trim().toLowerCase();
+        if (str === 'friday') return JSON.stringify(['Friday']);
+        if (str === 'monday to thursday and saturday' || str === 'mon to thu and sat')
+            return JSON.stringify(['Monday','Tuesday','Wednesday','Thursday','Saturday']);
+        if (str === 'monday to saturday' || str === 'mon to sat')
+            return JSON.stringify(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']);
+        if (str === 'monday to friday' || str === 'mon to fri')
+            return JSON.stringify(['Monday','Tuesday','Wednesday','Thursday','Friday']);
+        if (str === 'sunday to thursday' || str === 'sun to thu')
+            return JSON.stringify(['Sunday','Monday','Tuesday','Wednesday','Thursday']);
+        // Try comma-separated day names
+        const dayMap = {
+            'sunday':'Sunday','sun':'Sunday',
+            'monday':'Monday','mon':'Monday',
+            'tuesday':'Tuesday','tue':'Tuesday',
+            'wednesday':'Wednesday','wed':'Wednesday',
+            'thursday':'Thursday','thu':'Thursday',
+            'friday':'Friday','fri':'Friday',
+            'saturday':'Saturday','sat':'Saturday'
+        };
+        const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+        const mapped = parts.map(p => dayMap[p]).filter(Boolean);
+        if (mapped.length > 0) return JSON.stringify(mapped);
+        // Fallback: wrap raw value in array
+        return JSON.stringify([String(value).trim()]);
+    };
+
     const parseCSV = (file) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -335,17 +370,17 @@ export default function ShiftTimingsTab({ project }) {
                     let applicableDaysArray = [];
                     let is_friday_shift = false;
 
-                    // Parse comma-separated day names from CSV
                     if (applicableDays) {
-                        // Split by comma and clean up each day name
-                        applicableDaysArray = applicableDays.split(',').map(day => day.trim()).filter(day => day.length > 0);
+                        applicableDays = normalizeApplicableDays(applicableDays);
+                        try {
+                            applicableDaysArray = JSON.parse(applicableDays);
+                        } catch {
+                            applicableDaysArray = [];
+                        }
                         
                         // Check if it's a Friday-only shift or if Friday is in the list
-                        const hasFriday = applicableDaysArray.some(day => day.toLowerCase() === 'friday');
+                        const hasFriday = applicableDaysArray.some(day => String(day).toLowerCase() === 'friday');
                         is_friday_shift = hasFriday && applicableDaysArray.length === 1;
-                        
-                        // Store as JSON array
-                        applicableDays = JSON.stringify(applicableDaysArray);
                     } else {
                         // Default: empty applicable days
                         applicableDays = '';
@@ -424,9 +459,10 @@ export default function ShiftTimingsTab({ project }) {
                                 let is_friday_shift = false;
 
                                 if (applicableDays) {
-                                    const daysArray = applicableDays.split(',').map(d => d.trim()).filter(d => d.length > 0);
-                                    is_friday_shift = daysArray.some(d => d.toLowerCase() === 'friday') && daysArray.length === 1;
-                                    applicableDays = JSON.stringify(daysArray);
+                                    applicableDays = normalizeApplicableDays(applicableDays);
+                                    let daysArray = [];
+                                    try { daysArray = JSON.parse(applicableDays); } catch {}
+                                    is_friday_shift = daysArray.some(d => String(d).toLowerCase() === 'friday') && daysArray.length === 1;
                                 }
 
                                 await base44.entities.ShiftTiming.create({
