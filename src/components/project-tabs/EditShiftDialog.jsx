@@ -35,22 +35,24 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
         if (shift && project) {
             let daysArray = [];
             
-            if (project.company === 'Naser Mohsin Auto Parts') {
-                try {
-                    daysArray = JSON.parse(shift.applicable_days || '[]');
-                } catch {
+            try {
+                daysArray = JSON.parse(shift.applicable_days || '[]');
+            } catch {
+                if (shift.applicable_days && typeof shift.applicable_days === 'string' && shift.applicable_days.includes(',')) {
+                    daysArray = shift.applicable_days.split(',').map(d => d.trim()).filter(Boolean);
+                } else {
                     daysArray = [];
                 }
-                
-                // If empty or invalid, set default based on shift type
-                if (!Array.isArray(daysArray) || daysArray.length === 0) {
-                    // Check if it's a Friday shift
-                    if (shift.is_friday_shift) {
-                        daysArray = ['Friday'];
-                    } else {
-                        // Regular shift: all days except Sunday and Friday
-                        daysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
-                    }
+            }
+            
+            // If empty or invalid, set default based on shift type
+            if (!Array.isArray(daysArray) || daysArray.length === 0) {
+                // Check if it's a Friday shift
+                if (shift.is_friday_shift) {
+                    daysArray = ['Friday'];
+                } else {
+                    // Regular shift: all days except Sunday and Friday
+                    daysArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
                 }
             }
             
@@ -81,13 +83,9 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        const applicableDaysToSave = project?.company === 'Naser Mohsin Auto Parts' 
-            ? JSON.stringify(formData.applicable_days_array)
-            : formData.applicable_days;
+        const applicableDaysToSave = JSON.stringify(formData.applicable_days_array);
         
-        const is_friday_shift = project?.company === 'Naser Mohsin Auto Parts'
-            ? formData.applicable_days_array.includes('Friday') && formData.applicable_days_array.length === 1
-            : formData.applicable_days.toLowerCase().includes('friday');
+        const is_friday_shift = formData.applicable_days_array.includes('Friday') && formData.applicable_days_array.length === 1;
         
         updateMutation.mutate({
             attendance_id: String(shift.attendance_id),
@@ -251,8 +249,24 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             </div>
                         ) : (
                             <Select
-                                value={formData.applicable_days}
-                                onValueChange={(value) => setFormData({ ...formData, applicable_days: value })}
+                                value={
+                                    formData.applicable_days_array.length === 1 && formData.applicable_days_array.includes('Friday') 
+                                        ? 'Friday' 
+                                        : formData.applicable_days_array.length === 6 
+                                            ? 'Monday to Saturday' 
+                                            : 'Monday to Thursday and Saturday'
+                                }
+                                onValueChange={(value) => {
+                                    let newArray = [];
+                                    if (value === 'Monday to Thursday and Saturday') {
+                                        newArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+                                    } else if (value === 'Friday') {
+                                        newArray = ['Friday'];
+                                    } else if (value === 'Monday to Saturday') {
+                                        newArray = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                    }
+                                    setFormData({ ...formData, applicable_days_array: newArray });
+                                }}
                             >
                                 <SelectTrigger className="border-slate-200 hover:bg-slate-50 transition-all duration-200 focus:ring-indigo-100">
                                     <SelectValue />
