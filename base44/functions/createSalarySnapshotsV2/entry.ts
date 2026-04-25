@@ -728,7 +728,7 @@ Deno.serve(async (req) => {
         // ============================================================
         // AL MARAGHI MOTORS: Calculate extra prev month deductible minutes
         // ============================================================
-        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours, arOtherMinutes) => {
+        const calculateExtraPrevMonthData = (emp, graceMinutes, prevMonthSalaryAmount, workingHours, ar) => {
             if (!isAlMaraghi || !hasExtraPrevMonthRange) {
                 return { extraDeductibleMinutes: 0, extraLopDays: 0, extraLopPay: 0, extraDeductibleHoursPay: 0, prevMonthDivisor: otDivisor };
             }
@@ -771,7 +771,6 @@ Deno.serve(async (req) => {
             let totalOtherMinutes = 0;
             let totalApprovedMinutes = 0;
 
-            let extraLopDays = 0;
             const lastDayOfPrevMonth = effectiveLopOnlyDate;
 
             const startDate = new Date(effectivePrevMonthFrom);
@@ -810,9 +809,6 @@ Deno.serve(async (req) => {
                     : null;
 
                 if (dateException && dateException.type === 'MANUAL_ABSENT') {
-                    if (isLastDayOfPrevMonth) {
-                        extraLopDays = 1;
-                    }
                     continue;
                 }
 
@@ -825,9 +821,6 @@ Deno.serve(async (req) => {
                 const rawDayPunches = employeePunches.filter(p => p.punch_date === dateStr);
 
                 if (rawDayPunches.length === 0) {
-                    if (isLastDayOfPrevMonth) {
-                        extraLopDays = 1;
-                    }
                     continue;
                 }
 
@@ -927,14 +920,33 @@ Deno.serve(async (req) => {
             }
 
             const totalExtraDeductibleMinutes = Math.max(0,
-                totalLateMinutes + totalEarlyMinutes + (arOtherMinutes || 0) - graceMinutes - totalApprovedMinutes
+                totalLateMinutes + totalEarlyMinutes + (totalOtherMinutes || 0) - graceMinutes - totalApprovedMinutes
             );
 
             // V2 FIX: Use prevMonthDivisorForCalc (e.g. 28 for Feb) not salary divisor
             // Matches Excel formula: H / prevMonthDays / workingHours * deductibleHours
             const prevMonthDivisorForCalc = new Date(effectiveLopOnlyDate).getDate();
 
-            const extraLopPay = extraLopDays > 0 ? (prevMonthSalaryAmount / prevMonthDivisorForCalc) * extraLopDays : 0;
+            // Use lop_dates string from AnalysisResult — authoritative list of exact LOP dates
+            let extraLopDaysFromDates = 0;
+            if (ar && ar.lop_dates) {
+                const lopDateList = String(ar.lop_dates)
+                    .split(',')
+                    .map((d: string) => d.trim())
+                    .filter((d: string) => d.length >= 8);
+                const prevFrom = new Date(effectivePrevMonthFrom);
+                const prevTo = new Date(effectivePrevMonthTo);
+                prevFrom.setHours(0, 0, 0, 0);
+                prevTo.setHours(23, 59, 59, 999);
+                extraLopDaysFromDates = lopDateList.filter((dateStr: string) => {
+                    const d = new Date(dateStr);
+                    return d >= prevFrom && d <= prevTo;
+                }).length;
+            }
+
+            console.log(`[calculateExtraPrevMonthData] attendance_id=${ar?.attendance_id}: extraLopDays(from lop_dates)=${extraLopDaysFromDates}, extraOtherMinutes(from day scan)=${totalOtherMinutes}, prevFrom=${effectivePrevMonthFrom}, prevTo=${effectivePrevMonthTo}`);
+
+            const extraLopPay = extraLopDaysFromDates > 0 ? (prevMonthSalaryAmount / prevMonthDivisorForCalc) * extraLopDaysFromDates : 0;
 
             const extraDeductibleHours = totalExtraDeductibleMinutes / 60;
             const prevMonthHourlyRate = prevMonthSalaryAmount / prevMonthDivisorForCalc / workingHours;
@@ -942,12 +954,12 @@ Deno.serve(async (req) => {
 
             return {
                 extraDeductibleMinutes: totalExtraDeductibleMinutes,
-                extraLopDays: extraLopDays,
+                extraLopDays: extraLopDaysFromDates,
                 extraLopPay: Math.round(extraLopPay),
                 extraDeductibleHoursPay: Math.round(extraDeductibleHoursPay),
                 prevMonthDivisor: prevMonthDivisorForCalc,
                 // V2: Return other_minutes separately so current month can be isolated
-                extraOtherMinutes: arOtherMinutes || 0
+                extraOtherMinutes: totalOtherMinutes || 0
             };
         };
 
@@ -1200,7 +1212,7 @@ Deno.serve(async (req) => {
             }
 
             if (isAlMaraghi && hasExtraPrevMonthRange && emp.attendance_id) {
-                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours, analysisResultMap[String(emp.attendance_id)]?.other_minutes || 0);
+                extraPrevMonthData = calculateExtraPrevMonthData(emp, calculated.graceMinutes, prevMonthTotalSalary, workingHours, analysisResultMap[String(emp.attendance_id)]);
             }
 
             // V2: Override LOP days with AnalysisResult-derived count
