@@ -755,11 +755,24 @@ Deno.serve(async (req) => {
                 p.punch_date <= effectivePrevMonthTo
             );
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attendanceIdStr);
-            const employeeExceptions = allExceptions.filter(e =>
-                (String(e.attendance_id) === 'ALL' || String(e.attendance_id) === attendanceIdStr) &&
-                e.use_in_analysis !== false &&
-                e.is_custom_type !== true
-            );
+            // Important: restrict overflow calculations to current-report or timeless exceptions.
+            // Otherwise older report-created exceptions can leak into prev-month carry-over.
+            const employeeExceptions = allExceptions.filter(e => {
+                const attendanceMatch =
+                    String(e.attendance_id) === 'ALL' ||
+                    String(e.attendance_id) === attendanceIdStr;
+
+                const analysisEligible =
+                    e.use_in_analysis !== false &&
+                    e.is_custom_type !== true;
+
+                const reportRelevant =
+                    !e.report_run_id ||
+                    String(e.report_run_id) === String(report_run_id) ||
+                    e.created_from_report !== true;
+
+                return attendanceMatch && analysisEligible && reportRelevant;
+            });
 
             const dayNameToNumber = {
                 'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -919,9 +932,9 @@ Deno.serve(async (req) => {
                 totalOtherMinutes += dayOtherMinutes;
             }
 
-            const totalExtraDeductibleMinutes = Math.max(0,
-                totalLateMinutes + totalEarlyMinutes + (totalOtherMinutes || 0) - graceMinutes - totalApprovedMinutes
-            );
+            // Business rule: prev-month carry-over minutes should reflect date-based MANUAL_OTHER_MINUTES,
+            // not recomputed late/early attendance penalties from overflow days.
+            const totalExtraDeductibleMinutes = Math.max(0, totalOtherMinutes || 0);
 
             // V2 FIX: Use prevMonthDivisorForCalc (e.g. 28 for Feb) not salary divisor
             // Matches Excel formula: H / prevMonthDays / workingHours * deductibleHours
@@ -944,7 +957,13 @@ Deno.serve(async (req) => {
                 }).length;
             }
 
-            console.log(`[calculateExtraPrevMonthData] attendance_id=${ar?.attendance_id}: extraLopDays(from lop_dates)=${extraLopDaysFromDates}, extraOtherMinutes(from day scan)=${totalOtherMinutes}, prevFrom=${effectivePrevMonthFrom}, prevTo=${effectivePrevMonthTo}`);
+            console.log(
+                `[calculateExtraPrevMonthData] attendance_id=${ar?.attendance_id}: ` +
+                `extraLopDays(from lop_dates)=${extraLopDaysFromDates}, ` +
+                `extraOtherMinutes(from overflow dates)=${totalOtherMinutes}, ` +
+                `extraPrevMonthDeductibleMinutes(final)=${totalExtraDeductibleMinutes}, ` +
+                `prevFrom=${extraPrevMonthFrom}, prevTo=${extraPrevMonthTo}`
+            );
 
             const extraLopPay = extraLopDaysFromDates > 0 ? (prevMonthSalaryAmount / prevMonthDivisorForCalc) * extraLopDaysFromDates : 0;
 
@@ -1415,6 +1434,8 @@ Deno.serve(async (req) => {
                 deductible_minutes: computed.deductible_minutes,
                 ramadan_gift_minutes: computed.ramadan_gift_minutes,
                 // V2: Previous month fields populated from AnalysisResult + overflow calculation
+                // Business rule: this field is date-carried previous-month OTHER MINUTES only.
+                // It must NOT reintroduce late/early attendance deductions from overflow days.
                 extra_prev_month_deductible_minutes: (isAlMaraghi && hasExtraPrevMonthRange)
                     ? (extraPrevMonthData.extraDeductibleMinutes || 0) : 0,
                 extra_prev_month_lop_days: (isAlMaraghi && hasExtraPrevMonthRange)
