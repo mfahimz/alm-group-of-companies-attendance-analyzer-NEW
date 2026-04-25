@@ -800,72 +800,74 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 throw new Error(markResult.data?.error || 'Finalization failed');
             }
 
-            // STEP 2: Create all salary snapshots using batch mode
-            const BATCH_SIZE = 10;
-            let batchStart = 0;
-            let hasMore = true;
-            let totalEmployees = 0;
-            let batchRetries = 0;
-            const MAX_BATCH_RETRIES = 3;
+            // STEP 2: Create all salary snapshots using batch mode (Al Maraghi Motors only)
+            if (isAlMaraghiMotors) {
+                const BATCH_SIZE = 10;
+                let batchStart = 0;
+                let hasMore = true;
+                let totalEmployees = 0;
+                let batchRetries = 0;
+                const MAX_BATCH_RETRIES = 3;
 
-            while (hasMore) {
-                try {
-                    const batchResult = await base44.functions.invoke('createSalarySnapshotsV2', {
-                        project_id: project.id,
-                        report_run_id: reportRun.id,
-                        batch_mode: true,
-                        batch_start: batchStart,
-                        batch_size: BATCH_SIZE
-                    });
+                while (hasMore) {
+                    try {
+                        const batchResult = await base44.functions.invoke('createSalarySnapshotsV2', {
+                            project_id: project.id,
+                            report_run_id: reportRun.id,
+                            batch_mode: true,
+                            batch_start: batchStart,
+                            batch_size: BATCH_SIZE
+                        });
 
-                    batchRetries = 0; // Reset retries on success
+                        batchRetries = 0; // Reset retries on success
 
-                    if (batchResult.data?.batch_mode) {
-                        totalEmployees = batchResult.data.total_employees;
-                        const currentPos = batchResult.data.current_position;
-                        const currentBatch = batchResult.data.current_batch || [];
-                        hasMore = batchResult.data.has_more;
+                        if (batchResult.data?.batch_mode) {
+                            totalEmployees = batchResult.data.total_employees;
+                            const currentPos = batchResult.data.current_position;
+                            const currentBatch = batchResult.data.current_batch || [];
+                            hasMore = batchResult.data.has_more;
 
-                        const percentage = totalEmployees > 0 ? Math.round(currentPos / totalEmployees * 100) : 0;
+                            const percentage = totalEmployees > 0 ? Math.round(currentPos / totalEmployees * 100) : 0;
 
-                        setFinalizationProgress(prev => ({
-                            open: true,
-                            current: currentPos,
-                            total: totalEmployees,
-                            currentEmployee: currentBatch.length > 0
-                                ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
-                                : 'Processing...',
-                            status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
-                        }));
+                            setFinalizationProgress(prev => ({
+                                open: true,
+                                current: currentPos,
+                                total: totalEmployees,
+                                currentEmployee: currentBatch.length > 0
+                                    ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
+                                    : 'Processing...',
+                                status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
+                            }));
 
-                        batchStart = currentPos;
+                            batchStart = currentPos;
 
-                        if (hasMore) {
-                            // Longer delay between batches to avoid rate limiting
-                            await new Promise(resolve => setTimeout(resolve, 1500));
+                            if (hasMore) {
+                                // Longer delay between batches to avoid rate limiting
+                                await new Promise(resolve => setTimeout(resolve, 1500));
+                            }
+                        } else {
+                            hasMore = false;
                         }
-                    } else {
-                        hasMore = false;
-                    }
-                } catch (batchError) {
-                    const isRateLimit = batchError?.response?.status === 429 || batchError?.message?.includes('429');
-                    const isServerError = batchError?.response?.status === 500;
+                    } catch (batchError) {
+                        const isRateLimit = batchError?.response?.status === 429 || batchError?.message?.includes('429');
+                        const isServerError = batchError?.response?.status === 500;
 
-                    if ((isRateLimit || isServerError) && batchRetries < MAX_BATCH_RETRIES) {
-                        batchRetries++;
-                        const backoffDelay = Math.min(3000 * Math.pow(2, batchRetries - 1), 15000);
-                        if (import.meta.env.DEV) {
-                            console.warn(`[ReportDetailView] Batch at position ${batchStart} failed (attempt ${batchRetries}/${MAX_BATCH_RETRIES}), retrying in ${backoffDelay}ms...`);
+                        if ((isRateLimit || isServerError) && batchRetries < MAX_BATCH_RETRIES) {
+                            batchRetries++;
+                            const backoffDelay = Math.min(3000 * Math.pow(2, batchRetries - 1), 15000);
+                            if (import.meta.env.DEV) {
+                                console.warn(`[ReportDetailView] Batch at position ${batchStart} failed (attempt ${batchRetries}/${MAX_BATCH_RETRIES}), retrying in ${backoffDelay}ms...`);
+                            }
+                            setFinalizationProgress(prev => ({
+                                ...prev,
+                                status: `Rate limited - waiting ${Math.round(backoffDelay / 1000)}s before retry (attempt ${batchRetries}/${MAX_BATCH_RETRIES})...`
+                            }));
+                            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                            // Don't increment batchStart - retry the same batch
+                        } else {
+                            console.error('[ReportDetailView] Batch failed permanently:', batchError);
+                            throw batchError;
                         }
-                        setFinalizationProgress(prev => ({
-                            ...prev,
-                            status: `Rate limited - waiting ${Math.round(backoffDelay / 1000)}s before retry (attempt ${batchRetries}/${MAX_BATCH_RETRIES})...`
-                        }));
-                        await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                        // Don't increment batchStart - retry the same batch
-                    } else {
-                        console.error('[ReportDetailView] Batch failed permanently:', batchError);
-                        throw batchError;
                     }
                 }
             }
