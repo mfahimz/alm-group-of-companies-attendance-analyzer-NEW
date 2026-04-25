@@ -1543,7 +1543,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                     </DialogHeader>
                         <form onSubmit={handleSubmitShift} className="space-y-4">
                             {/* Block Selector */}
-                            {(project.shiftblockscount || 1) > 1 && (
+                            {(project.shift_blocks_count || 2) > 1 && (
                             <div>
                                 <Label>Add to Block *</Label>
                                 <Select value={selectedBlock || undefined} onValueChange={setSelectedBlock}>
@@ -1551,7 +1551,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                         <SelectValue placeholder="Select block" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Array.from({ length: project.shiftblockscount || 1 }, (_, i) => {
+                                        {Array.from({ length: project.shift_blocks_count || 2 }, (_, i) => {
                                             const blockId = `block${i + 1}`;
                                             const range = blockDateRanges[blockId];
                                             return (
