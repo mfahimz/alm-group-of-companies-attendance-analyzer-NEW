@@ -17,7 +17,7 @@ import EditShiftDialog from './EditShiftDialog';
 import TablePagination from '../ui/TablePagination';
 import BulkEditShiftDialog from '../shifts/BulkEditShiftDialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import TimePicker from '../ui/TimePicker';
+import TimePicker from '../ui/QuickTimePicker';
 import RamadanShiftSection from './RamadanShiftSection';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
