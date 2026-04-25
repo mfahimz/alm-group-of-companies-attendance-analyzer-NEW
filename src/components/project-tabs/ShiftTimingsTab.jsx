@@ -1543,6 +1543,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                     </DialogHeader>
                         <form onSubmit={handleSubmitShift} className="space-y-4">
                             {/* Block Selector */}
+                            {(project.shiftblockscount || 1) > 1 && (
                             <div>
                                 <Label>Add to Block *</Label>
                                 <Select value={selectedBlock || undefined} onValueChange={setSelectedBlock}>
@@ -1562,6 +1563,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                     </SelectContent>
                                 </Select>
                             </div>
+                            )}
                             {/* Quick Entry with NLP */}
                             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
                                 <div className="flex items-center gap-2 mb-2">
