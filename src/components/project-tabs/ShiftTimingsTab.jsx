@@ -1542,6 +1542,28 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                         <DialogTitle>Add Shift Timing</DialogTitle>
                     </DialogHeader>
                         <form onSubmit={handleSubmitShift} className="space-y-4">
+                            {/* Block Selector */}
+                            {project.shiftblockscount > 1 && (
+                                <div>
+                                    <Label>Add to Block *</Label>
+                                    <Select value={selectedBlock || undefined} onValueChange={setSelectedBlock}>
+                                        <SelectTrigger className="border-slate-200 focus:ring-indigo-100 mt-1">
+                                            <SelectValue placeholder="Select block" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: project.shiftblockscount }, (_, i) => {
+                                                const blockId = `block${i + 1}`;
+                                                const range = blockDateRanges[blockId];
+                                                return (
+                                                    <SelectItem key={blockId} value={blockId}>
+                                                        Block {i + 1}{range ? ` (${new Date(range.from).toLocaleDateString('en-GB')} – ${new Date(range.to).toLocaleDateString('en-GB')})` : ''}
+                                                    </SelectItem>
+                                                );
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                             {/* Quick Entry with NLP */}
                             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
                                 <div className="flex items-center gap-2 mb-2">
@@ -1746,9 +1768,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                 )}
                             </div>
 
-                            <p className="text-sm text-slate-500">
-                                This shift will be added to <strong>{selectedBlock === 'block1' ? 'Block 1' : 'Block 2'}</strong> ({new Date(blockDateRanges[selectedBlock].from).toLocaleDateString('en-GB')} - {new Date(blockDateRanges[selectedBlock].to).toLocaleDateString('en-GB')})
-                            </p>
+
 
                             <div className="flex gap-3">
                                 <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createShiftMutation.isPending}>
