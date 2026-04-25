@@ -50,6 +50,20 @@ Deno.serve(async (req) => {
             await base44.asServiceRole.entities.SalarySnapshot.delete(snapshot.id);
         }
 
+        // Delete salary reports associated with this report run
+        // SalaryReport records are generated from snapshots and become stale when snapshots are deleted
+        const salaryReports = await base44.asServiceRole.entities.SalaryReport.filter(
+            { report_run_id },
+            null,
+            1000
+        );
+
+        console.log(`[unfinalizeReport] Deleting ${salaryReports.length} salary reports`);
+
+        for (const salaryReport of salaryReports) {
+            await base44.asServiceRole.entities.SalaryReport.delete(salaryReport.id);
+        }
+
         // Un-mark report as final
         await base44.asServiceRole.entities.ReportRun.update(report_run_id, {
             is_final: false,
@@ -73,7 +87,8 @@ Deno.serve(async (req) => {
         return Response.json({
             success: true,
             message: 'Report un-finalized successfully',
-            deleted_snapshots: salarySnapshots.length
+            deleted_snapshots: salarySnapshots.length,
+            deleted_salary_reports: salaryReports.length
         });
 
     } catch (error) {
