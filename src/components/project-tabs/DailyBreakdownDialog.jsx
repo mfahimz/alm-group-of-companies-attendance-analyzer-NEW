@@ -579,9 +579,14 @@ export default function DailyBreakdownDialog({
             let hasUnmatchedPunch = false;
             let hasFarExtendedMatch = false;
             if (shift && dayPunches.length > 0) {
+                // Determine skipped shift point from SKIP_PUNCH exception (needed before matching)
+                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                const skipLeaveOrHoliday = dateException && ['SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF'].includes(dateException.type);
+                const activeSkipValue = (skipPunchException && !skipLeaveOrHoliday) ? skipPunchException.punch_to_skip : null;
+
                 // For midnight shifts, adjust PM_END and punch times in matching
                 // We use a wrapper that handles midnight crossover
-                punchMatches = matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr);
+                punchMatches = matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr, activeSkipValue);
                 hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                 hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
             }
@@ -622,6 +627,11 @@ export default function DailyBreakdownDialog({
                 if (!shouldSkipTimeCalc && shift && punchMatches.length > 0) {
                     for (const match of punchMatches) {
                         if (!match.matchedTo) continue;
+                        // Skip late/early calculation for the forgiven punch point
+                        if (activeSkipValue === 'FULL_SKIP') continue;
+                        const skipTypeMap2 = { 'AM_PUNCH_IN': 'AM_START', 'AM_PUNCH_OUT': 'AM_END', 'PM_PUNCH_IN': 'PM_START', 'PM_PUNCH_OUT': 'PM_END' };
+                        if (activeSkipValue && match.matchedTo === skipTypeMap2[activeSkipValue]) continue;
+
                         const punchTime = match.punch.time;
                         const shiftTime = match.shiftTime;
 
@@ -852,7 +862,7 @@ export default function DailyBreakdownDialog({
      * For shifts ending at midnight (00:00), adjust PM_END to 24:00
      * and adjust next-day punches to sort correctly
      */
-    function matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr) {
+    function matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr, skipPunchValue = null) {
         if (!shift || dayPunches.length === 0) return [];
 
         const punchesWithTime = dayPunches.map(p => {
@@ -873,12 +883,22 @@ export default function DailyBreakdownDialog({
             adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
         }
 
+        // Map punch_to_skip value to which shift point type to exclude
+        const skipTypeMap = {
+            'AM_PUNCH_IN':  'AM_START',
+            'AM_PUNCH_OUT': 'AM_END',
+            'PM_PUNCH_IN':  'PM_START',
+            'PM_PUNCH_OUT': 'PM_END',
+        };
+        const skippedShiftPointType = skipPunchValue === 'FULL_SKIP' ? 'ALL' : (skipTypeMap[skipPunchValue] || null);
+
         const shiftPoints = [
             { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
             { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
             { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
-        ].filter(sp => sp.time);
+        ].filter(sp => sp.time)
+         .filter(sp => skippedShiftPointType !== 'ALL' && sp.type !== skippedShiftPointType);
 
         const matches = [];
         const usedShiftPoints = new Set();

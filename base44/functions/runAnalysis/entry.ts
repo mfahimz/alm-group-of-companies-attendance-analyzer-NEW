@@ -1311,16 +1311,22 @@ Deno.serve(async (req: Request) => {
                             }
                         }
 
-                        // SKIP_PUNCH: Zero out specific minutes based on skip type
+                        // SKIP_PUNCH: Zero out minutes for the forgiven punch point
+                        // Applies regardless of whether the punch was present or missing
                         if (hasSkipPunchApplied && skipType) {
-                            const amStartMissing = !matchedShiftPoints.has('AM_START');
-                            const pmEndMissing = !matchedShiftPoints.has('PM_END');
-
-                            if (skipType === 'AM_PUNCH_IN' || skipType === 'FULL_SKIP') {
-                                if (amStartMissing) dayLateMinutes = 0;
-                            }
-                            if (skipType === 'PM_PUNCH_OUT' || skipType === 'FULL_SKIP') {
-                                if (pmEndMissing) dayEarlyMinutes = 0;
+                            const skipTypeToShiftPoint: Record<string, string> = {
+                                'AM_PUNCH_IN':  'AM_START',
+                                'AM_PUNCH_OUT': 'AM_END',
+                                'PM_PUNCH_IN':  'PM_START',
+                                'PM_PUNCH_OUT': 'PM_END',
+                            };
+                            if (skipType === 'FULL_SKIP') {
+                                dayLateMinutes = 0;
+                                dayEarlyMinutes = 0;
+                            } else {
+                                const forgiven = skipTypeToShiftPoint[skipType];
+                                if (forgiven === 'AM_START' || forgiven === 'PM_START') dayLateMinutes = 0;
+                                if (forgiven === 'AM_END' || forgiven === 'PM_END') dayEarlyMinutes = 0;
                             }
                         }
                     }
