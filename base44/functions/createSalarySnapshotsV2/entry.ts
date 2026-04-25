@@ -766,7 +766,13 @@ Deno.serve(async (req) => {
                     e.use_in_analysis !== false &&
                     e.is_custom_type !== true;
 
+                // MANUAL_OTHER_MINUTES exceptions are permanent manual corrections.
+                // They must always be included in overflow calculations regardless of which report created them.
+                const isManualOtherMinutes =
+                    e.type === 'MANUAL_OTHER_MINUTES' && (e.other_minutes || 0) > 0;
+
                 const reportRelevant =
+                    isManualOtherMinutes ||
                     !e.report_run_id ||
                     String(e.report_run_id) === String(report_run_id) ||
                     e.created_from_report !== true;
