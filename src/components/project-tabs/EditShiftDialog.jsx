@@ -152,14 +152,14 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                             onCheckedChange={(checked) => setFormData({ ...formData, is_single_shift: checked })}
                         />
                         <Label htmlFor="edit-single-shift" className="cursor-pointer">
-                            Single Shift (No break - only Punch In and Punch Out)
+                            Single Shift (Punch In/Out only)
                         </Label>
                     </div>
 
                     {formData.is_single_shift ? (
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <Label>Punch In *</Label>
+                                <Label>Shift 1 In *</Label>
                                 <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="8:00 AM"
                                     value={formData.am_start}
@@ -168,7 +168,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                                 />
                             </div>
                             <div>
-                                <Label>Punch Out *</Label>
+                                <Label>Shift 1 Out *</Label>
                                 <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="5:00 PM"
                                     value={formData.pm_end}
@@ -180,7 +180,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                     ) : (
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <Label>AM Start *</Label>
+                                <Label>Shift 1 In *</Label>
                                 <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="8:00 AM"
                                     value={formData.am_start}
@@ -189,7 +189,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                                 />
                             </div>
                             <div>
-                                <Label>AM End *</Label>
+                                <Label>Shift 1 Out</Label>
                                 <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="12:00 PM"
                                     value={formData.am_end}
@@ -198,7 +198,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                                 />
                             </div>
                             <div>
-                                <Label>PM Start *</Label>
+                                <Label>Shift 2 In</Label>
                                 <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="1:00 PM"
                                     value={formData.pm_start}
@@ -207,7 +207,7 @@ export default function EditShiftDialog({ open, onClose, shift, projectId }) {
                                 />
                             </div>
                             <div>
-                                <Label>PM End *</Label>
+                                <Label>Shift 2 Out *</Label>
                                 <Input className="border-slate-200 focus:ring-indigo-100"
                                     placeholder="5:00 PM"
                                     value={formData.pm_end}

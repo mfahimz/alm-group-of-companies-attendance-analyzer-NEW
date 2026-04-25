@@ -915,6 +915,10 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
             toast.error('Please fill in shift start and end times');
             return;
         }
+        if (!formData.applicable_days || formData.applicable_days.length === 0) {
+            toast.error('Please select applicable days');
+            return;
+        }
         createShiftMutation.mutate(formData);
     };
 
@@ -1641,7 +1645,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                             {formData.is_single_shift ? (
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label>Punch In *</Label>
+                                        <Label>Shift 1 In *</Label>
                                         <TimePicker
                                             placeholder="8:00 AM"
                                             value={formData.am_start}
@@ -1649,7 +1653,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                         />
                                     </div>
                                     <div>
-                                        <Label>Punch Out *</Label>
+                                        <Label>Shift 1 Out *</Label>
                                         <TimePicker
                                             placeholder="5:00 PM"
                                             value={formData.pm_end}
@@ -1660,7 +1664,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                             ) : (
                                 <div className="grid grid-cols-4 gap-4">
                                     <div>
-                                        <Label>AM Start *</Label>
+                                        <Label>Shift 1 In *</Label>
                                         <TimePicker
                                             placeholder="8:00 AM"
                                             value={formData.am_start}
@@ -1668,7 +1672,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                         />
                                     </div>
                                     <div>
-                                        <Label>AM End</Label>
+                                        <Label>Shift 1 Out</Label>
                                         <TimePicker
                                             placeholder="12:00 PM"
                                             value={formData.am_end}
@@ -1676,7 +1680,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                         />
                                     </div>
                                     <div>
-                                        <Label>PM Start</Label>
+                                        <Label>Shift 2 In</Label>
                                         <TimePicker
                                             placeholder="1:00 PM"
                                             value={formData.pm_start}
@@ -1684,7 +1688,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                         />
                                     </div>
                                     <div>
-                                        <Label>PM End *</Label>
+                                        <Label>Shift 2 Out *</Label>
                                         <TimePicker
                                             placeholder="5:00 PM"
                                             value={formData.pm_end}
@@ -1695,8 +1699,7 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                             )}
 
                             <div>
-                                <Label>Applicable Days (Optional)</Label>
-                                <p className="text-xs text-slate-500 mb-2">Leave empty for all working days</p>
+                                <Label>Applicable Days *</Label>
                                 {project?.company === 'Naser Mohsin Auto Parts' ? (
                                     <div className="grid grid-cols-4 gap-2">
                                         {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
