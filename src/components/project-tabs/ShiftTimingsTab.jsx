@@ -1879,16 +1879,35 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                             </p>
                         </div>
                     ) : (
-                        <div>
+                        <div className="space-y-3">
                             <Label>Upload Shift Timings CSV *</Label>
-                            <div className="mt-2">
-                                <Input
-                                    type="file"
-                                    accept=".csv, .xlsx, .xls"
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                    id="shift-file-upload"
-                                />
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <div className="flex-1 w-full">
+                                    <Input
+                                        type="file"
+                                        accept=".csv, .xlsx, .xls"
+                                        onChange={handleFileChange}
+                                        className="cursor-pointer"
+                                        id="shift-file-upload"
+                                    />
+                                </div>
+                                <Button
+                                    onClick={() => uploadMutation.mutate()}
+                                    disabled={!file || !selectedBlock || uploadMutation.isPending}
+                                    className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto"
+                                >
+                                    {uploadMutation.isPending ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                                            Uploading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload className="w-4 h-4 mr-2" />
+                                            Upload Shifts
+                                        </>
+                                    )}
+                                </Button>
                             </div>
                             <p className="text-sm text-slate-500 mt-2">
                                 CSV format: Attendance ID, Employee Name, Department, AM Start, AM End, PM Start, PM End, Weekly Off, Shift Type, Applicable Days
