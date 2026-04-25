@@ -6,7 +6,7 @@ import { Edit, Loader2 } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import TimePicker from '../ui/TimePicker';
+import TimePicker from '../ui/QuickTimePicker';
 import { Checkbox } from '@/components/ui/checkbox';
 
 /**

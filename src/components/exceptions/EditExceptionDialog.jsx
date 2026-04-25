@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
-import TimePicker from '../ui/TimePicker';
+import TimePicker from '../ui/QuickTimePicker';
 import { useQuery } from '@tanstack/react-query';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 

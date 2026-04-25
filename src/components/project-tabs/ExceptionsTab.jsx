@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Plus, Trash2, Search, Download, Edit, Eye, Filter, Sparkles, Calendar, Loader2 } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
 import TablePagination from '../ui/TablePagination';
-import TimePicker from '../ui/TimePicker';
+import TimePicker from '../ui/QuickTimePicker';
 import { toast } from 'sonner';
 import BulkEditExceptionDialog from '../exceptions/BulkEditExceptionDialog';
 import EditExceptionDialog from '../exceptions/EditExceptionDialog';

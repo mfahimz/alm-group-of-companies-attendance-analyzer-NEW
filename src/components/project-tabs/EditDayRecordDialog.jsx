@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import TimePicker from '../ui/TimePicker';
+import TimePicker from '../ui/QuickTimePicker';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 
 export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData }) {
