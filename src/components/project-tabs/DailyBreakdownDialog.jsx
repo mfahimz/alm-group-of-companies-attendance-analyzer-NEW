@@ -578,12 +578,12 @@ export default function DailyBreakdownDialog({
             let punchMatches = [];
             let hasUnmatchedPunch = false;
             let hasFarExtendedMatch = false;
-            if (shift && dayPunches.length > 0) {
-                // Determine skipped shift point from SKIP_PUNCH exception (needed before matching)
-                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-                const skipLeaveOrHoliday = dateException && ['SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF'].includes(dateException.type);
-                const activeSkipValue = (skipPunchException && !skipLeaveOrHoliday) ? skipPunchException.punch_to_skip : null;
+            // Determine skipped shift point from SKIP_PUNCH exception (must be outside if block for scope)
+            const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+            const skipLeaveOrHoliday = dateException && ['SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF'].includes(dateException.type);
+            const activeSkipValue = (skipPunchException && !skipLeaveOrHoliday) ? skipPunchException.punch_to_skip : null;
 
+            if (shift && dayPunches.length > 0) {
                 // For midnight shifts, adjust PM_END and punch times in matching
                 // We use a wrapper that handles midnight crossover
                 punchMatches = matchPunchesToShiftPointsWithMidnight(dayPunches, shift, nextDateStr, activeSkipValue);
