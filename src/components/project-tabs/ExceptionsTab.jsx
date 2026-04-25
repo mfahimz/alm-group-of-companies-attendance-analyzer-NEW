@@ -165,6 +165,19 @@ export default function ExceptionsTab({ project }) {
         refetchOnWindowFocus: false
     });
 
+    // Query shifts for the selected employee (for SKIP_PUNCH option filtering)
+    const selectedEmployeeAttId = formData.attendance_id && formData.attendance_id !== 'ALL' ? formData.attendance_id : null;
+    const { data: employeeShifts = [] } = useQuery({
+        queryKey: ['shiftsForEmployee', project.id, selectedEmployeeAttId],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id, attendance_id: selectedEmployeeAttId }),
+        enabled: !!selectedEmployeeAttId && formData.type === 'SKIP_PUNCH',
+    });
+    const selectedEmployeeIsSingleShift = employeeShifts.length > 0
+        ? (employeeShifts[0].is_single_shift === true || !employeeShifts[0].am_end || !employeeShifts[0].pm_start ||
+           String(employeeShifts[0].am_end).trim() === '' || String(employeeShifts[0].pm_start).trim() === '' ||
+           employeeShifts[0].am_end === '-' || employeeShifts[0].pm_start === '-')
+        : null; // null = unknown (ALL employees or no shift found)
+
     // Hierarchical Sorting Logic for Checklist Items: Type Name (A-Z) -> Description/Name
     const sortedChecklistItems = useMemo(() => {
         if (!checklistItems) return [];
@@ -1153,7 +1166,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                     ) : formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'SKIP_DOUBLE_DEDUCTION' ? (
                                         <Select
                                             value={formData.attendance_id || undefined}
-                                            onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}
+                                            onValueChange={(value) => setFormData({ ...formData, attendance_id: value, punch_to_skip: 'AM_PUNCH_IN' })}
                                         >
                                             <SelectTrigger className="border-slate-200 focus:ring-indigo-100">
                                                 <SelectValue placeholder="Select employee or all..." />
@@ -1471,12 +1484,25 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="AM_PUNCH_IN">AM Punch In (Shift Start)</SelectItem>
-                                                        <SelectItem value="AM_PUNCH_OUT">AM Punch Out (Morning End)</SelectItem>
-                                                        <SelectItem value="PM_PUNCH_IN">PM Punch In (Afternoon Start)</SelectItem>
+                                                        {/* AM_PUNCH_OUT = split shift only (mid-day punch out) — hide for single shift */}
+                                                        {selectedEmployeeIsSingleShift !== true && (
+                                                            <SelectItem value="AM_PUNCH_OUT">AM Punch Out (Morning End)</SelectItem>
+                                                        )}
+                                                        {/* PM_PUNCH_IN = split shift only (afternoon punch in) — hide for single shift */}
+                                                        {selectedEmployeeIsSingleShift !== true && (
+                                                            <SelectItem value="PM_PUNCH_IN">PM Punch In (Afternoon Start)</SelectItem>
+                                                        )}
                                                         <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Shift End)</SelectItem>
                                                         <SelectItem value="FULL_SKIP">Full Skip (Ignore All Punches)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
+                                                {formData.attendance_id && formData.attendance_id !== 'ALL' && (
+                                                    <p className="text-xs text-slate-500 mt-1">
+                                                        {selectedEmployeeIsSingleShift === true && '⚡ Single shift detected — AM/PM mid-day options hidden'}
+                                                        {selectedEmployeeIsSingleShift === false && '⚡ Split shift detected — all punch options available'}
+                                                        {selectedEmployeeIsSingleShift === null && ''}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

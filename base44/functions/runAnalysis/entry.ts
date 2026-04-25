@@ -1111,7 +1111,7 @@ Deno.serve(async (req: Request) => {
                     dateException.type === 'ANNUAL_LEAVE' ||
                     dateException.type === 'PUBLIC_HOLIDAY'
                 );
-                const isNonWorkingStatus = isOnLeave || (dateException && dateException.type === 'OFF');
+                const isNonWorkingStatus = isOnLeave || (dateException && (dateException.type === 'OFF' || dateException.type === 'MANUAL_ABSENT'));
 
                 let hasSkipPunchApplied = false;
                 let skipType = null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | 'FULL_SKIP'

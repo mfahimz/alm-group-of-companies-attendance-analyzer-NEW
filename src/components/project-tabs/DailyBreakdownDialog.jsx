@@ -580,7 +580,7 @@ export default function DailyBreakdownDialog({
             let hasFarExtendedMatch = false;
             // Determine skipped shift point from SKIP_PUNCH exception (must be outside if block for scope)
             const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-            const skipLeaveOrHoliday = dateException && ['SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF'].includes(dateException.type);
+            const skipLeaveOrHoliday = dateException && ['SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF', 'MANUAL_ABSENT'].includes(dateException.type);
             const activeSkipValue = (skipPunchException && !skipLeaveOrHoliday) ? skipPunchException.punch_to_skip : null;
 
             if (shift && dayPunches.length > 0) {
@@ -700,7 +700,7 @@ export default function DailyBreakdownDialog({
             // Check for SKIP_PUNCH exception (only for working employees)
             const skipPunchEx = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
             const isLeaveOrHoliday = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF', 'MANUAL_ABSENT'
             ].includes(dateException.type);
             const hasActiveSkipPunch = skipPunchEx && !isLeaveOrHoliday && skipPunchEx.punch_to_skip;
             
@@ -730,11 +730,16 @@ export default function DailyBreakdownDialog({
                 }
             }
             
-            // SKIP_PUNCH status override: if skip applied and would have been absent
+            // SKIP_PUNCH status override: if skip applied and would have been absent or half day due to missing forgiven punch
             if (hasActiveSkipPunch) {
-                if (dayPunches.length === 0 && skipPunchEx.punch_to_skip === 'FULL_SKIP') {
+                if (dayPunches.length === 0) {
+                    // 0 punches: any skip type forces Present (matches backend fake punch behavior)
                     status = 'Present (Skip Punch)';
                 } else if (status === 'Absent') {
+                    status = 'Present (Skip Punch)';
+                } else if (status === 'Half Day') {
+                    // If the only reason it's Half Day is the forgiven punch point is missing, upgrade to Present
+                    // This covers: single shift with AM_PUNCH_OUT skip (only AM_START matched = 1 punch = Half Day)
                     status = 'Present (Skip Punch)';
                 }
             }
