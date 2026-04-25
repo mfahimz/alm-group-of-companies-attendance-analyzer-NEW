@@ -713,8 +713,10 @@ export default function DailyBreakdownDialog({
                 if (isSingleShift) {
                     status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
                 } else {
-                    // Split shift: 1-2 = Half, 3-4 = Present
-                    status = dayPunches.length >= 3 ? 'Present' : 'Half Day';
+                    // Split shift: AM punch-in + PM punch-out covers full day even with 2 punches
+                    const hasAmIn = punchMatches.some(m => m.matchedTo === 'AM_START');
+                    const hasPmOut = punchMatches.some(m => m.matchedTo === 'PM_END');
+                    status = (dayPunches.length >= 3 || (hasAmIn && hasPmOut)) ? 'Present' : 'Half Day';
                 }
             }
             
