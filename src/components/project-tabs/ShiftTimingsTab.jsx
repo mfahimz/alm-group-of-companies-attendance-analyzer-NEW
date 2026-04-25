@@ -1535,13 +1535,12 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                 </Card>
             )}
 
-            {/* Add Shift Form */}
-            {showAddForm && (
-                <Card className="border-0 shadow-sm">
-                    <CardHeader>
-                        <CardTitle>Add Shift Timing</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+            {/* Add Shift Dialog */}
+            <Dialog open={showAddForm} onOpenChange={(open) => { if (!open) setShowAddForm(false); }}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Add Shift Timing</DialogTitle>
+                    </DialogHeader>
                         <form onSubmit={handleSubmitShift} className="space-y-4">
                             {/* Quick Entry with NLP */}
                             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
@@ -1760,9 +1759,8 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                 </Button>
                             </div>
                         </form>
-                    </CardContent>
-                </Card>
-            )}
+                </DialogContent>
+            </Dialog>
 
 
 
@@ -1780,7 +1778,6 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                 <Download className="w-4 h-4 mr-2" />
                                 Export All Shifts
                             </Button>
-                            {!showAddForm && (
                                 <Button
                                     onClick={() => setShowAddForm(true)}
                                     size="sm"
@@ -1789,7 +1786,6 @@ Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as 
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Shift
                                 </Button>
-                            )}
                         </div>
                     </div>
                 </CardHeader>
