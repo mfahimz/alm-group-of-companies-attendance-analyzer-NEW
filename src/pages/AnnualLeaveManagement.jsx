@@ -28,6 +28,7 @@ export default function AnnualLeaveManagement() {
     const [filterDateTo, setFilterDateTo] = useState(''); // State for manual to-date range filter
 
     const [unmatchedSearchTerm, setUnmatchedSearchTerm] = useState(''); // Search term for manual employee matching in import
+    const [unmatchedDropdownPos, setUnmatchedDropdownPos] = useState({ top: 0, left: 0, width: 0 });
     const [activeUnmatchedIdx, setActiveUnmatchedIdx] = useState(null); // Tracks which row is currently being manually matched
     const [expandedLeaveId, setExpandedLeaveId] = useState(null);
 
@@ -1243,9 +1244,11 @@ export default function AnnualLeaveManagement() {
                                                                     setActiveUnmatchedIdx(idx);
                                                                     setUnmatchedSearchTerm(e.target.value);
                                                                 }}
-                                                                onFocus={() => {
+                                                                onFocus={(e) => {
                                                                     setActiveUnmatchedIdx(idx);
                                                                     setUnmatchedSearchTerm('');
+                                                                    const rect = e.target.getBoundingClientRect();
+                                                                    setUnmatchedDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX, width: rect.width });
                                                                 }}
                                                             />
                                                             
@@ -1256,7 +1259,10 @@ export default function AnnualLeaveManagement() {
                                                                         className="fixed inset-0 z-[60]" 
                                                                         onClick={() => setActiveUnmatchedIdx(null)}
                                                                     />
-                                                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg z-[70] max-h-48 overflow-auto">
+                                                                    <div
+                                                                        className="bg-white border border-slate-200 rounded-md shadow-lg z-[70] max-h-48 overflow-auto"
+                                                                        style={{ position: 'fixed', top: unmatchedDropdownPos.top + 4, left: unmatchedDropdownPos.left, width: unmatchedDropdownPos.width || 200 }}
+                                                                    >
                                                                         {employees
                                                                             .filter(emp => emp.company === filterCompany && emp.name.toLowerCase().includes(unmatchedSearchTerm.toLowerCase()))
                                                                             .slice(0, 8)
