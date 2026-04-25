@@ -491,12 +491,12 @@ export default function AnnualLeaveManagement() {
                 for (const row of batch) {
                     const leaveData = {
                         company: filterCompany,
-                        employee_id: row.employeeId,
+                        employee_id: row.employeeId ? String(row.employeeId) : undefined,
                         date_from: row.leaveStart,
                         date_to: row.leaveEnd,
                         leave_type: 'annual',
                         reason: 'Bulk Import',
-                        attendance_id: row.attendanceId,
+                        attendance_id: row.attendanceId ? String(row.attendanceId) : undefined,
                         employee_name: row.matchedName,
                         total_days: row.dayCount,
                         salary_leave_days: row.dayCount,
