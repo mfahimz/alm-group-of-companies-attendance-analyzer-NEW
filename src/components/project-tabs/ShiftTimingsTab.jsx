@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy, Sparkles } from 'lucide-react';
+import { Upload, AlertTriangle, Search, Trash2, Edit, Plus, Calendar, Download, Eye, Copy, Sparkles, Info } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SortableTableHead from '../ui/SortableTableHead';
@@ -777,22 +777,29 @@ User request: "${nlpText}"
 
 Return JSON:
 {
-    "attendance_id": "employee ID from list",
-    "am_start": "HH:MM AM/PM (e.g., 8:00 AM)",
-    "am_end": "HH:MM AM/PM (e.g., 12:00 PM)",
-    "pm_start": "HH:MM AM/PM (e.g., 1:00 PM)",
-    "pm_end": "HH:MM AM/PM (e.g., 5:00 PM)",
-    "is_single_shift": boolean (true if single shift/punch in-out only),
-    "is_friday_shift": boolean (true if Friday shift),
-    "applicable_days": array of day names (e.g., ["Monday", "Tuesday", "Friday"]) - leave empty or null for all days
+"attendance_id": "employee ID from list above — match by name or ID. If user says 'all' or references everyone, return 'ALL'",
+"am_start": "HH:MM AM/PM (e.g., 8:00 AM)",
+"am_end": "HH:MM AM/PM (e.g., 12:00 PM)",
+"pm_start": "HH:MM AM/PM (e.g., 1:00 PM)",
+"pm_end": "HH:MM AM/PM (e.g., 5:00 PM)",
+"is_single_shift": boolean — true if user says 'single shift', 'punch in/out only', or only gives 2 times,
+"is_friday_shift": boolean — true if user says 'friday shift' or 'friday only',
+"applicable_days": array of full day names e.g. ["Monday","Tuesday","Wednesday","Thursday","Friday"] — null or [] means all working days
 }
 
-Match employee names/IDs intelligently. If single shift, only fill am_start and pm_end.
-For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all working days", specific days mentioned.`,
+Rules:
+
+If single shift, set am_start = check-in time, pm_end = check-out time, leave am_end and pm_start empty.
+
+For applicable_days, detect: "Monday to Friday" = Mon-Fri array, "weekdays" = Mon-Fri, "Sunday to Thursday" = Sun-Thu array, "all days" or "all working days" = empty array, specific day names listed.
+
+Match employee names loosely (e.g. "Ali" matches "Ali Hassan", "Ahmed" matches first Ahmed found).
+
+Time formats accepted: "8am", "8:00am", "8:00 AM", "08:00" — always return as "H:MM AM/PM".`,
                 response_json_schema: {
                     type: "object",
                     properties: {
-                        attendance_id: { type: "string" },
+                        attendance_id: { type: "string" }, // employee ID or "ALL"
                         am_start: { type: "string" },
                         am_end: { type: "string" },
                         pm_start: { type: "string" },
@@ -806,6 +813,42 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
             });
 
             const parsed = response;
+
+            if (parsed.attendance_id === 'ALL') {
+                // Bulk: create one record per employee with the same times
+                const toastId = toast.loading(`Creating shift for all ${employees.length} employees...`);
+                const blockRange = blockDateRanges[selectedBlock];
+                const records = employees.map(emp => ({
+                    project_id: project.id,
+                    attendance_id: String(emp.attendance_id),
+                    date: null,
+                    is_friday_shift: parsed.is_friday_shift || false,
+                    is_single_shift: parsed.is_single_shift || false,
+                    applicable_days: parsed.applicable_days?.length ? JSON.stringify(parsed.applicable_days) : '',
+                    am_start: parsed.am_start || '',
+                    am_end: parsed.am_end || '',
+                    pm_start: parsed.pm_start || '',
+                    pm_end: parsed.pm_end || '',
+                    effective_from: blockRange.from,
+                    effective_to: blockRange.to,
+                    shift_block: selectedBlock
+                }));
+                try {
+                    const batchSize = 50;
+                    for (let i = 0; i < records.length; i += batchSize) {
+                        await base44.entities.ShiftTiming.bulkCreate(records.slice(i, i + batchSize));
+                    }
+                    queryClient.invalidateQueries(['shifts', project.id]);
+                    toast.dismiss(toastId);
+                    toast.success(`Shift created for all ${records.length} employees`);
+                    setNlpText('');
+                } catch (err) {
+                    toast.dismiss(toastId);
+                    toast.error('Bulk create failed: ' + err.message);
+                }
+                setNlpParsing(false);
+                return;
+            }
             
             // Pre-fill the form
             setFormData({
@@ -1501,6 +1544,20 @@ For applicable_days: detect phrases like "Monday to Friday", "weekdays", "all wo
                                 <div className="flex items-center gap-2 mb-2">
                                     <Sparkles className="w-4 h-4 text-indigo-600" />
                                     <Label className="font-medium text-indigo-900">Quick Entry (Optional)</Label>
+                                    <div className="relative group inline-flex items-center">
+                                        <Info className="w-3.5 h-3.5 text-indigo-400 cursor-help" />
+                                        <div className="absolute left-5 top-0 z-50 hidden group-hover:block w-72 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl leading-relaxed">
+                                            <p className="font-semibold mb-1.5 text-indigo-300">Supported phrases:</p>
+                                            <ul className="space-y-1 text-slate-200">
+                                                <li>-  <span className="text-white font-medium">Ali 8am to 5pm single shift</span></li>
+                                                <li>-  <span className="text-white font-medium">Ahmed 8am-12pm 1pm-5pm</span></li>
+                                                <li>-  <span className="text-white font-medium">All employees 8am-5pm single shift</span></li>
+                                                <li>-  <span className="text-white font-medium">John 9am-1pm 2pm-6pm Sunday to Thursday</span></li>
+                                                <li>-  <span className="text-white font-medium">Sara 8am-12pm Friday only</span></li>
+                                            </ul>
+                                            <p className="mt-2 text-slate-400 text-xs">Employee names are matched loosely. Times like "8am", "8:00 AM", or "08:00" all work.</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <p className="text-xs text-slate-600 mb-3">
                                     Describe in natural language and we'll fill the form below
