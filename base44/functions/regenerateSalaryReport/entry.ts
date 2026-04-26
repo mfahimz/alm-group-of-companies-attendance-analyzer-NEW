@@ -17,8 +17,10 @@ Deno.serve(async (req) => {
         }
 
         const userRole = user?.extended_role || user?.role || 'user';
-        if (userRole !== 'admin' && userRole !== 'supervisor') {
-            return Response.json({ error: 'Access denied: Admin or Supervisor role required' }, { status: 403 });
+        // Allow admin, supervisor, hr_manager, and senior_accountant to regenerate salary reports
+        const allowedRoles = ['admin', 'supervisor', 'hr_manager', 'senior_accountant'];
+        if (!allowedRoles.includes(userRole)) {
+            return Response.json({ error: 'Access denied: Insufficient role' }, { status: 403 });
         }
 
         const { salary_report_id } = await req.json();

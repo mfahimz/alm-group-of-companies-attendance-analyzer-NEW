@@ -53,6 +53,14 @@ export default function SalaryReportDetail() {
     // Tracks which employee hrms_ids currently have an active ON_HOLD PayrollHold
     // record for this report. Keyed by hrms_id, value is the PayrollHold record id.
     const [activeHolds, setActiveHolds] = useState({});
+    // Hold dialog state
+    const [holdDialogOpen, setHoldDialogOpen] = useState(false);
+    const [holdDialogRow, setHoldDialogRow] = useState(null);
+    const [holdLeaveSalaryChecked, setHoldLeaveSalaryChecked] = useState(false);
+    const [holdCustomAmount, setHoldCustomAmount] = useState('');
+    const [holdReason, setHoldReason] = useState('');
+    const [holdSubmitting, setHoldSubmitting] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     // Controls visibility of the stats bar — hidden by default on page open
     const [showStats, setShowStats] = useState(false);
@@ -767,17 +775,38 @@ export default function SalaryReportDetail() {
         }
     };
 
-    // Places or releases a manual leave salary hold for a single employee row.
-    // Hold amount is the employee's salaryLeaveAmount for this report period.
-    // Uses a deterministic auto_key for idempotency to prevent duplicate holds.
-    const handleToggleHold = async (row) => {
+    // Opens the hold dialog for an employee row.
+    // Pre-fills existing LEAVE_DEFERRAL hold data if present.
+    const handleOpenHoldDialog = (row) => {
       if (!canManageHolds) return;
-      const autoKey = `${row.hrms_id}_MANUAL_LEAVE_HOLD_${report.report_run_id}`;
+      setHoldDialogRow(row);
+      // Pre-fill leave salary checkbox if employee already has an active hold
       const existingHoldId = activeHolds[row.hrms_id];
+      setHoldLeaveSalaryChecked(!!existingHoldId && (row.salaryLeaveAmount || 0) > 0);
+      setHoldCustomAmount('');
+      setHoldReason('');
+      setHoldDialogOpen(true);
+    };
 
-      if (existingHoldId) {
-        // Release: update status to RELEASED
-        try {
+    // Confirms the hold dialog — creates/releases PayrollHold records based on user selections.
+    const handleConfirmHold = async () => {
+      if (!holdDialogRow) return;
+      if (!holdReason.trim()) {
+        toast.error('Reason is required');
+        return;
+      }
+      const hasLeaveSalary = holdLeaveSalaryChecked && (holdDialogRow.salaryLeaveAmount || 0) > 0;
+      const customAmt = parseFloat(holdCustomAmount) || 0;
+      if (!hasLeaveSalary && customAmt <= 0) {
+        toast.error('Select leave salary hold or enter a custom amount');
+        return;
+      }
+      setHoldSubmitting(true);
+      try {
+        const existingHoldId = activeHolds[holdDialogRow.hrms_id];
+
+        // If there was an existing hold and leave salary is now unchecked — release it
+        if (existingHoldId && !hasLeaveSalary) {
           await base44.entities.PayrollHold.update(existingHoldId, {
             status: 'RELEASED',
             updated_by: currentUser?.id,
@@ -785,44 +814,88 @@ export default function SalaryReportDetail() {
           });
           setActiveHolds(prev => {
             const next = { ...prev };
-            delete next[row.hrms_id];
+            delete next[holdDialogRow.hrms_id];
             return next;
           });
-          toast.success(`Hold released for ${row.name}`);
-        } catch (err) {
-          console.error('Failed to release hold:', err);
-          toast.error('Failed to release hold');
         }
-      } else {
-        // Place hold: create a new MANUAL PayrollHold record
-        try {
+
+        // If leave salary hold is checked and no existing hold — create it
+        if (hasLeaveSalary && !existingHoldId) {
+          const autoKey = `${holdDialogRow.hrms_id}_MANUAL_LEAVE_HOLD_${report.report_run_id}`;
           const newHold = await base44.entities.PayrollHold.create({
-            employee_id: row.attendance_id,
-            hrms_id: row.hrms_id,
-            employee_name: row.name,
+            employee_id: holdDialogRow.attendance_id,
+            hrms_id: holdDialogRow.hrms_id,
+            employee_name: holdDialogRow.name,
             company: report.company,
             hold_type: 'MANUAL_HOLD',
             source: 'MANUAL',
             reason_code: 'MANUAL_LEAVE_SALARY_HOLD',
-            amount: row.salaryLeaveAmount || 0,
+            amount: holdDialogRow.salaryLeaveAmount || 0,
             status: 'ON_HOLD',
             origin_period_start: report.date_from,
             origin_period_end: report.date_to,
-            notes: `Manual hold placed from Salary Report Detail. Report run: ${report.report_run_id}`,
+            notes: holdReason.trim(),
             auto_key: autoKey,
             created_by: currentUser?.id,
             created_date: new Date().toISOString()
           });
-          setActiveHolds(prev => ({
-            ...prev,
-            [row.hrms_id]: newHold.id
-          }));
-          toast.success(`Leave salary held for ${row.name}`);
-        } catch (err) {
-          console.error('Failed to place hold:', err);
-          toast.error('Failed to place hold');
+          setActiveHolds(prev => ({ ...prev, [holdDialogRow.hrms_id]: newHold.id }));
         }
+
+        // If custom amount is entered — always create a separate hold record for it
+        if (customAmt > 0) {
+          const customAutoKey = `${holdDialogRow.hrms_id}_CUSTOM_HOLD_${report.report_run_id}_${Date.now()}`;
+          await base44.entities.PayrollHold.create({
+            employee_id: holdDialogRow.attendance_id,
+            hrms_id: holdDialogRow.hrms_id,
+            employee_name: holdDialogRow.name,
+            company: report.company,
+            hold_type: 'MANUAL_HOLD',
+            source: 'MANUAL',
+            reason_code: 'CUSTOM_AMOUNT_HOLD',
+            amount: customAmt,
+            status: 'ON_HOLD',
+            origin_period_start: report.date_from,
+            origin_period_end: report.date_to,
+            notes: holdReason.trim(),
+            auto_key: customAutoKey,
+            created_by: currentUser?.id,
+            created_date: new Date().toISOString()
+          });
+        }
+
+        toast.success(`Hold saved for ${holdDialogRow.name}`);
+        setHoldDialogOpen(false);
+      } catch (err) {
+        console.error('Failed to save hold:', err);
+        toast.error('Failed to save hold');
+      } finally {
+        setHoldSubmitting(false);
       }
+    };
+
+    // Syncs the SalaryReport snapshot_data from current live SalarySnapshot records.
+    // Use this after edits in Branch/Bodyshop tabs to refresh OnHold and Summary tabs.
+    const handleSync = async () => {
+        if (!report?.id) return;
+        setSyncing(true);
+        try {
+            const response = await base44.functions.invoke('regenerateSalaryReport', {
+                salary_report_id: report.id
+            });
+            if (response?.data?.success) {
+                toast.success('Report synced successfully');
+                queryClient.invalidateQueries({ queryKey: ['salaryReport', reportId] });
+                queryClient.invalidateQueries({ queryKey: ['liveSalarySnapshots', report?.report_run_id] });
+            } else {
+                toast.error(response?.data?.error || 'Sync failed');
+            }
+        } catch (err) {
+            console.error('[handleSync] Error:', err);
+            toast.error('Sync failed: ' + (err.message || 'Unknown error'));
+        } finally {
+            setSyncing(false);
+        }
     };
 
     const handleExportToExcel = () => {
@@ -1357,12 +1430,7 @@ export default function SalaryReportDetail() {
                                         ) : filteredData.map((row, idx) => {
                                             const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
                                             
-                                            // Determine if this employee is eligible for a manual leave salary hold
-                                            // Condition: at least 2 LOP days OR at least 2 annual leave days, and has leave salary
-                                            const isHoldEligible = ((row.full_absence_count || 0) >= 2 || (row.annual_leave_count || 0) >= 2)
-                                                && (row.salaryLeaveAmount || 0) > 0;
-
-                                            // Check if a hold is currently active for this employee in this report
+                                            // All employees can be put on hold — no eligibility gate
                                             const isHeld = !!activeHolds[row.hrms_id];
 
                                             // If held, subtract salaryLeaveAmount from displayed total and wpsPay
@@ -1554,7 +1622,7 @@ export default function SalaryReportDetail() {
 
                                                     {/* Manual leave salary hold button — only shown for eligible rows */}
                                                     <td className={`${cellBase} bg-indigo-50 text-center whitespace-nowrap pb-2`}>
-                                                        {isHoldEligible && canManageHolds ? (
+                                                        {canManageHolds ? (
                                                             <Button
                                                                 size="sm"
                                                                 variant={isHeld ? "outline" : "destructive"}
@@ -1562,9 +1630,9 @@ export default function SalaryReportDetail() {
                                                                     ? "text-xs px-2 py-1 h-7 border-amber-400 text-amber-700 hover:bg-amber-50"
                                                                     : "text-xs px-2 py-1 h-7"
                                                                 }
-                                                                onClick={() => handleToggleHold(row)}
+                                                                onClick={() => handleOpenHoldDialog(row)}
                                                             >
-                                                                {isHeld ? "Release" : "Hold"}
+                                                                {isHeld ? "Modify Hold" : "Hold"}
                                                             </Button>
                                                         ) : (
                                                             <span className="text-slate-300 text-xs">—</span>
@@ -1592,7 +1660,7 @@ export default function SalaryReportDetail() {
                             )}
 
                             <TabsContent value="onhold" className="p-6 m-0">
-                                <OnHoldTab report={report} project={project} />
+                                <OnHoldTab report={report} project={project} onSync={handleSync} syncing={syncing} />
                             </TabsContent>
 
                             {/* Summary tab — mirrors Main Sheet from Excel payroll file */}
@@ -1607,6 +1675,8 @@ export default function SalaryReportDetail() {
                                         onSaveAsTemplate={handleSaveAsTemplate}
                                         userRole={userRole}
                                         currentUser={currentUser}
+                                        onSync={handleSync}
+                                        syncing={syncing}
                                     />
                                 </TabsContent>
                             )}
@@ -1623,7 +1693,7 @@ export default function SalaryReportDetail() {
                                     getValue={getValue}
                                     calculateTotals={calculateTotals}
                                     activeHolds={activeHolds}
-                                    handleToggleHold={handleToggleHold}
+                                    handleToggleHold={handleOpenHoldDialog}
                                     canManageHolds={canManageHolds}
                                     verifiedEmployees={verifiedEmployees}
                                     toggleVerification={toggleVerification}
@@ -1652,7 +1722,7 @@ export default function SalaryReportDetail() {
                                     getValue={getValue}
                                     calculateTotals={calculateTotals}
                                     activeHolds={activeHolds}
-                                    handleToggleHold={handleToggleHold}
+                                    handleToggleHold={handleOpenHoldDialog}
                                     canManageHolds={canManageHolds}
                                     verifiedEmployees={verifiedEmployees}
                                     toggleVerification={toggleVerification}
@@ -1678,6 +1748,78 @@ export default function SalaryReportDetail() {
                         </Tabs>
                     </CardContent>
                 </Card>
+            )}
+
+            {/* Hold Dialog */}
+            {holdDialogOpen && holdDialogRow && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-base font-bold text-slate-900">Payroll Hold — {holdDialogRow.name}</h2>
+                            <button onClick={() => setHoldDialogOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                        </div>
+
+                        {/* Leave Salary Hold */}
+                        {(holdDialogRow.salaryLeaveAmount || 0) > 0 && (
+                            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                <input
+                                    type="checkbox"
+                                    id="holdLeaveSalary"
+                                    checked={holdLeaveSalaryChecked}
+                                    onChange={e => setHoldLeaveSalaryChecked(e.target.checked)}
+                                    className="h-4 w-4 accent-amber-500"
+                                />
+                                <label htmlFor="holdLeaveSalary" className="text-sm text-amber-800 font-medium cursor-pointer">
+                                    Hold Leave Salary — AED {Number(holdDialogRow.salaryLeaveAmount).toFixed(2)}
+                                </label>
+                            </div>
+                        )}
+
+                        {/* Custom Amount Hold */}
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Custom Hold Amount (AED)</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={holdCustomAmount}
+                                onChange={e => setHoldCustomAmount(e.target.value)}
+                                placeholder="Enter amount to hold"
+                                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            />
+                            <p className="text-xs text-slate-400">Max: AED {Number(holdDialogRow.total_salary || 0).toFixed(2)}</p>
+                        </div>
+
+                        {/* Reason — mandatory */}
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-slate-700">Reason <span className="text-red-500">*</span></label>
+                            <textarea
+                                value={holdReason}
+                                onChange={e => setHoldReason(e.target.value)}
+                                placeholder="Enter reason for hold (required)"
+                                rows={3}
+                                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-2 pt-1">
+                            <button
+                                onClick={() => setHoldDialogOpen(false)}
+                                className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmHold}
+                                disabled={holdSubmitting}
+                                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                                {holdSubmitting ? 'Saving...' : 'Confirm Hold'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Salary Snapshot Detail Dialog */}

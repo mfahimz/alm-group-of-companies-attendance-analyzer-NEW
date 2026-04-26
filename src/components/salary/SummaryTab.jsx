@@ -20,7 +20,9 @@ import {
     X, 
     Lock,
     Settings2,
-    LayoutTemplate
+    LayoutTemplate,
+    RefreshCw,
+    Loader2
 } from 'lucide-react';
 
 // --- PART A: CONSTANTS ---
@@ -324,7 +326,9 @@ export default function SummaryTab({
     onLoadTemplate,
     onSaveAsTemplate,
     userRole = 'user',
-    currentUser = {}
+    currentUser = {},
+    onSync,
+    syncing = false
 }) {
 
     // --- PART B: CALCULATED VALUES MEMO ---
@@ -726,6 +730,24 @@ export default function SummaryTab({
                     </p>
                 </div>
                 
+                <div className="flex items-center gap-2">
+                    {onSync && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onSync}
+                            disabled={syncing}
+                            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                        >
+                            {syncing
+                                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                : <RefreshCw className="w-4 h-4 mr-2" />
+                            }
+                            {syncing ? 'Syncing...' : 'Sync'}
+                        </Button>
+                    )}
+                </div>
+
                 {canEdit && (
                     <div className="flex items-center gap-2">
                         {!editMode ? (

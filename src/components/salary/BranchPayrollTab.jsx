@@ -256,9 +256,7 @@ export default function BranchPayrollTab({
                         ) : filteredData.map((row, idx) => {
                             const { total, wpsPay, balance, wpsCapApplied, normalOtSalary, specialOtSalary, totalOtSalary, netAdditions, netDeductions } = calculateTotals(row);
                             
-                            const isHoldEligible = ((row.full_absence_count || 0) >= 2 || (row.annual_leave_count || 0) >= 2)
-                                && (row.salaryLeaveAmount || 0) > 0;
-
+                            // All employees can be put on hold — no eligibility gate
                             const isHeld = !!activeHolds[row.hrms_id];
 
                             const displayTotal = isHeld ? total - (row.salaryLeaveAmount || 0) : total;
@@ -409,7 +407,7 @@ export default function BranchPayrollTab({
                                     </td>
 
                                     <td className={`${cellBase} bg-indigo-50 text-center whitespace-nowrap pb-2`}>
-                                        {isHoldEligible && canManageHolds ? (
+                                        {canManageHolds ? (
                                             <Button
                                                 size="sm"
                                                 variant={isHeld ? "outline" : "destructive"}
@@ -419,7 +417,7 @@ export default function BranchPayrollTab({
                                                 }
                                                 onClick={() => handleToggleHold(row)}
                                             >
-                                                {isHeld ? "Release" : "Hold"}
+                                                {isHeld ? "Modify Hold" : "Hold"}
                                             </Button>
                                         ) : (
                                             <span className="text-slate-300 text-xs">—</span>
