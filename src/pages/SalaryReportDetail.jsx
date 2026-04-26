@@ -697,6 +697,78 @@ export default function SalaryReportDetail() {
                 }
             }
 
+            // Sync adjustment fields to OvertimeData so OvertimeTab reflects the same values.
+            // OvertimeData stores adjustment fields as JSON strings (array of {amount, desc} entries).
+            // SalaryReportDetail stores them as plain numbers — we convert to single-entry array format.
+            const adjustmentFields = ['bonus', 'incentive', 'open_leave_salary', 'variable_salary', 'otherDeduction', 'advanceSalaryDeduction'];
+            const hasAdjustmentEdits = Object.values(editableData).some(edits =>
+                adjustmentFields.some(f => f in edits)
+            );
+
+            if (hasAdjustmentEdits) {
+                try {
+                    // Fetch OvertimeData records for this project
+                    const overtimeRecords = await base44.entities.OvertimeData.filter(
+                        { project_id: report.project_id },
+                        null,
+                        5000
+                    );
+
+                    // Helper: convert a plain number to the JSON string format OvertimeTab expects
+                    const toAdjustmentJson = (value) => {
+                        const num = parseFloat(value) || 0;
+                        return num > 0
+                            ? JSON.stringify([{ amount: num, desc: 'Updated from Salary Report' }])
+                            : JSON.stringify([]);
+                    };
+
+                    const otUpdates = [];
+                    for (const row of updatedData) {
+                        const edits = editableData[row.hrms_id];
+                        if (!edits) continue;
+
+                        // Check if any adjustment field was edited for this employee
+                        const hasAdj = adjustmentFields.some(f => f in edits);
+                        if (!hasAdj) continue;
+
+                        // Find the matching OvertimeData record by attendance_id
+                        const otRecord = overtimeRecords.find(ot =>
+                            String(ot.attendance_id) === String(row.attendance_id)
+                        );
+
+                        if (!otRecord) continue; // Only update existing records — do not create new ones here
+
+                        const otPayload = {};
+                        if ('bonus' in edits) otPayload.bonus = toAdjustmentJson(edits.bonus);
+                        if ('incentive' in edits) otPayload.incentive = toAdjustmentJson(edits.incentive);
+                        if ('open_leave_salary' in edits) otPayload.open_leave_salary = toAdjustmentJson(edits.open_leave_salary);
+                        if ('variable_salary' in edits) otPayload.variable_salary = toAdjustmentJson(edits.variable_salary);
+                        if ('otherDeduction' in edits) otPayload.otherDeduction = toAdjustmentJson(edits.otherDeduction);
+                        if ('advanceSalaryDeduction' in edits) otPayload.advanceSalaryDeduction = toAdjustmentJson(edits.advanceSalaryDeduction);
+
+                        if (Object.keys(otPayload).length > 0) {
+                            otUpdates.push({ id: otRecord.id, payload: otPayload });
+                        }
+                    }
+
+                    // Process OvertimeData updates in batches of 10 with 300ms delay
+                    for (let i = 0; i < otUpdates.length; i += 10) {
+                        const batch = otUpdates.slice(i, i + 10);
+                        await Promise.all(batch.map(u => base44.entities.OvertimeData.update(u.id, u.payload)));
+                        if (i + 10 < otUpdates.length) {
+                            await new Promise(r => setTimeout(r, 300));
+                        }
+                    }
+
+                    if (otUpdates.length > 0) {
+                        console.log(`[handleSave] Synced adjustment fields to ${otUpdates.length} OvertimeData record(s)`);
+                    }
+                } catch (otErr) {
+                    // Non-fatal — log but do not block the save
+                    console.warn('[handleSave] Failed to sync adjustments to OvertimeData:', otErr);
+                }
+            }
+
             toast.success('Report saved successfully');
             setEditableData({});
             // Stagger query invalidations to prevent burst of API calls
