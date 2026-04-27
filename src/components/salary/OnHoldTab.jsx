@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import { Loader2, AlertCircle, Info, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function OnHoldTab({ report, project, onSync, syncing }) {
+export default function OnHoldTab({ report, project, onSync, syncing, onHoldsChanged }) {
     const queryClient = useQueryClient();
     const [deletingId, setDeletingId] = useState(null);
 
@@ -46,7 +46,11 @@ export default function OnHoldTab({ report, project, onSync, syncing }) {
                 updated_date: new Date().toISOString()
             });
             toast.success(`Hold released for ${hold.employee_name}`);
+            
+            // Invalidate local query and notify parent to refresh activeHolds state
+            // This ensures both the tab list and parent stats/badges are updated
             queryClient.invalidateQueries({ queryKey: ['payrollHolds', project?.company] });
+            if (onHoldsChanged) onHoldsChanged();
         } catch (err) {
             console.error('[OnHoldTab] Failed to release hold:', err);
             toast.error('Failed to release hold');

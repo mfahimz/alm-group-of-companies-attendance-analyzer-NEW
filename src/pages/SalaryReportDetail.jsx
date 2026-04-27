@@ -301,29 +301,32 @@ export default function SalaryReportDetail() {
         }
     }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
 
+    // Fetches all active PayrollHold records for this company and filters for employees in this report.
+    // Updates the local activeHolds state to ensure all tabs have consistent hold status.
+    const fetchActiveHolds = async () => {
+      if (!report?.company || salaryData.length === 0) return;
+      try {
+        const holds = await base44.entities.PayrollHold.filter({
+          company: report.company,
+          status: 'ON_HOLD'
+        });
+        const reportHrmsIds = new Set(salaryData.map(r => String(r.hrms_id)));
+        const holdMap = {};
+        (holds || []).forEach(h => {
+          if (reportHrmsIds.has(String(h.hrms_id))) {
+            holdMap[h.hrms_id] = h.id;
+          }
+        });
+        setActiveHolds(holdMap);
+      } catch (err) {
+        console.error('Failed to load manual holds:', err);
+      }
+    };
+
     // Load existing manual leave salary holds for this report on mount
     // Filters by company and status only, scopes to employees in this report client-side
     useEffect(() => {
-      if (!report?.company || salaryData.length === 0) return;
-      const loadHolds = async () => {
-        try {
-          const holds = await base44.entities.PayrollHold.filter({
-            company: report.company,
-            status: 'ON_HOLD'
-          });
-          const reportHrmsIds = new Set(salaryData.map(r => String(r.hrms_id)));
-          const holdMap = {};
-          (holds || []).forEach(h => {
-            if (reportHrmsIds.has(String(h.hrms_id))) {
-              holdMap[h.hrms_id] = h.id;
-            }
-          });
-          setActiveHolds(holdMap);
-        } catch (err) {
-          console.error('Failed to load manual holds:', err);
-        }
-      };
-      loadHolds();
+      fetchActiveHolds();
     }, [report?.company, salaryData.length]);
 
     // ============================================
@@ -938,6 +941,8 @@ export default function SalaryReportDetail() {
 
         toast.success(`Hold saved for ${holdDialogRow.name}`);
         setHoldDialogOpen(false);
+        // Invalidate payrollHolds query so OnHoldTab reflects the changes immediately
+        queryClient.invalidateQueries({ queryKey: ['payrollHolds', project?.company] });
       } catch (err) {
         console.error('Failed to save hold:', err);
         toast.error('Failed to save hold');
@@ -1732,7 +1737,13 @@ export default function SalaryReportDetail() {
                             )}
 
                             <TabsContent value="onhold" className="p-6 m-0">
-                                <OnHoldTab report={report} project={project} onSync={handleSync} syncing={syncing} />
+                                <OnHoldTab 
+                                    report={report} 
+                                    project={project} 
+                                    onSync={handleSync} 
+                                    syncing={syncing} 
+                                    onHoldsChanged={fetchActiveHolds} 
+                                />
                             </TabsContent>
 
                             {/* Summary tab — mirrors Main Sheet from Excel payroll file */}
