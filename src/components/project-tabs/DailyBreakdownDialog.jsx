@@ -850,6 +850,8 @@ export default function DailyBreakdownDialog({
                 lateMinutesTotal: Math.max(0, lateMinutesTotal || 0),
                 earlyCheckoutInfo: earlyCheckoutInfo || '-',
                 otherMinutes: Math.max(0, currentOtherMinutes),
+                // allowedMinutes: approved ALLOWED_MINUTES exception value for this day, used to display in Al Maraghi Motors column
+                allowedMinutes: allowedMinutesForDay,
                 hasOverride: !!dayOverride,
                 partialDayReason: null,
                 punchMatches,
@@ -1155,6 +1157,10 @@ export default function DailyBreakdownDialog({
                                     <TableHead>Late Min</TableHead>
                                     <TableHead>Early Min</TableHead>
                                     <TableHead>Other Min</TableHead>
+                                    {/* Allowed Minutes column — shown for Al Maraghi Motors projects only */}
+                                    {project?.company === 'Al Maraghi Motors' && (
+                                        <TableHead>Allowed Min</TableHead>
+                                    )}
                                     <TableHead>Abnormal</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -1278,6 +1284,16 @@ export default function DailyBreakdownDialog({
                                                 <span className="text-slate-400">-</span>
                                             )}
                                         </TableCell>
+                                        {/* Allowed Minutes cell — shown for Al Maraghi Motors projects only, only renders value when greater than zero */}
+                                        {project?.company === 'Al Maraghi Motors' && (
+                                            <TableCell className="text-xs">
+                                                {day.allowedMinutes > 0 ? (
+                                                    <span className="text-blue-600 font-medium">{day.allowedMinutes} min</span>
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
+                                            </TableCell>
+                                        )}
                                         <TableCell className="text-xs">
                                             {day.abnormal && <span className="text-amber-600 font-medium">Yes</span>}
                                         </TableCell>
