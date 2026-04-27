@@ -108,10 +108,12 @@ Deno.serve(async (req) => {
         let totalDeductions = 0;
         let totalOtSalary = 0;
 
+        // Safe numeric parsing for all totals calculation to prevent NaN propagation
+        // Wrap every field in Number() || 0 to handle missing or non-numeric data safely
         updatedData.forEach(row => {
-            totalSalaryAmount += row.total || 0;
-            totalDeductions += (row.netDeduction || 0) + (row.deductibleHoursPay || 0) + (row.otherDeduction || 0) + (row.advanceSalaryDeduction || 0);
-            totalOtSalary += (row.normalOtSalary || 0) + (row.specialOtSalary || 0);
+            totalSalaryAmount += Number(row.total) || 0;
+            totalDeductions += (Number(row.netDeduction) || 0) + (Number(row.deductibleHoursPay) || 0) + (Number(row.otherDeduction) || 0) + (Number(row.advanceSalaryDeduction) || 0);
+            totalOtSalary += (Number(row.normalOtSalary) || 0) + (Number(row.specialOtSalary) || 0);
         });
 
         // Update the report
@@ -122,13 +124,18 @@ Deno.serve(async (req) => {
             total_ot_salary: Math.round(totalOtSalary)
         });
 
-        // Log audit
-        await base44.asServiceRole.functions.invoke('logAudit', {
-            action: 'REGENERATE_SALARY_REPORT',
-            entity_type: 'SalaryReport',
-            entity_id: salary_report_id,
-            details: `Regenerated salary report from ${snapshots.length} current snapshots`
-        });
+        // Wrap logAudit in its own try/catch to ensure main function succeeds even if auditing fails
+        // This prevents the entire sync operation from returning 500 due to non-critical audit log errors
+        try {
+            await base44.asServiceRole.functions.invoke('logAudit', {
+                action: 'REGENERATE_SALARY_REPORT',
+                entity_type: 'SalaryReport',
+                entity_id: salary_report_id,
+                details: `Regenerated salary report from ${snapshots.length} current snapshots`
+            });
+        } catch (auditError) {
+            console.error('Audit log failed for REGENERATE_SALARY_REPORT:', auditError);
+        }
 
         return Response.json({
             success: true,
