@@ -95,9 +95,13 @@ export default function ReportDetailPage() {
     };
 
     useEffect(() => {
-        if (!reportRun || !project || reportReadyRef.current) return;
-        reportReadyRef.current = true;
+        if (!reportRun || !project) return;
+        // Always attempt to restart the timer if it was paused by a background data refresh.
+        // startTicking has its own guard (timerRef.current check) so calling it again is safe.
         startTicking();
+        if (reportReadyRef.current) return;
+        // First run only: mark ready and register the visibilitychange listener
+        reportReadyRef.current = true;
 
         const handleVisibility = () => {
             if (document.visibilityState === 'hidden') {
