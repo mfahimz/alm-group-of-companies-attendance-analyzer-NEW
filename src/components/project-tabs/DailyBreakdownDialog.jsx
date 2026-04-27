@@ -723,10 +723,10 @@ export default function DailyBreakdownDialog({
                 if (isSingleShift) {
                     status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
                 } else {
-                    // Split shift: AM punch-in + PM punch-out covers full day even with 2 punches
-                    const hasAmIn = punchMatches.some(m => m.matchedTo === 'AM_START');
-                    const hasPmOut = punchMatches.some(m => m.matchedTo === 'PM_END');
-                    status = (dayPunches.length >= 3 || (hasAmIn && hasPmOut)) ? 'Present' : 'Half Day';
+                    // Split shift half day rule: 1 or 2 punches is always Half Day
+                    // 3 or more punches is Present
+                    // The AM_START + PM_END override was removed to match backend behavior exactly
+                    status = dayPunches.length >= 3 ? 'Present' : 'Half Day';
                 }
             }
             
