@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -132,25 +132,12 @@ export default function ChecklistSection({ project, checklistItems = [], current
         deleteTaskMutation.mutate(task.id);
     };
 
-    // Build stats and merged ordered list for filter chips (ONLY predefined Add Task types)
-    const mergedOrderedTypes = [...ADD_TASK_PREDEFINED_TYPES];
-
-    const taskTypeStats = {};
-    mergedOrderedTypes.forEach(type => {
-        taskTypeStats[type] = { total: 0, completed: 0 };
-    });
-
-    checklistItems.forEach(task => {
-        const type = (task.task_type || 'Uncategorized').trim();
-        // Only count if it's one of the predefined types shown as chips
-        if (taskTypeStats[type]) {
-            taskTypeStats[type].total++;
-            if (task.status === 'completed') taskTypeStats[type].completed++;
-        }
-    });
-
-    // Use merged order for filter chips
-    const sortedTaskTypes = mergedOrderedTypes.map(type => [type, taskTypeStats[type]]);
+    // availableTaskTypes: dynamically built from actual task types present in checklistItems
+    // ensures filter chips always reflect the real data without hardcoding
+    const availableTaskTypes = useMemo(() => {
+        const types = [...new Set(checklistItems.map(item => item.task_type).filter(Boolean))].sort();
+        return ['All', ...types];
+    }, [checklistItems]);
 
     const displayedItems = selectedTaskType
         ? checklistItems.filter(t => (t.task_type || 'Uncategorized').trim() === selectedTaskType)
@@ -290,18 +277,26 @@ export default function ChecklistSection({ project, checklistItems = [], current
             </CardHeader>
             <CardContent className="p-6 space-y-6">
                 {/* Task Type Filter Bar - CLICKABLE */}
-                {checklistItems.length > 0 && sortedTaskTypes.length > 0 && (
+                {checklistItems.length > 0 && availableTaskTypes.length > 0 && (
                     <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
                         <div className="flex items-center gap-3 flex-wrap">
                             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Filter:</span>
-                            {sortedTaskTypes.map(([taskType, stats]) => {
+                            {availableTaskTypes.map((taskType) => {
+                                const isAll = taskType === 'All';
+                                const filteredTasks = isAll 
+                                    ? checklistItems 
+                                    : checklistItems.filter(t => (t.task_type || '').trim() === taskType);
+                                const stats = {
+                                    total: filteredTasks.length,
+                                    completed: filteredTasks.filter(t => t.status === 'completed').length
+                                };
                                 const isComplete = stats.total > 0 && stats.completed === stats.total;
-                                const isSelected = selectedTaskType === taskType;
+                                const isSelected = isAll ? !selectedTaskType : selectedTaskType === taskType;
                                 return (
                                     <button
                                         key={taskType}
                                         type="button"
-                                        onClick={() => setSelectedTaskType(prev => prev === taskType ? null : taskType)}
+                                        onClick={() => setSelectedTaskType(isAll ? null : (selectedTaskType === taskType ? null : taskType))}
                                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all duration-150 cursor-pointer select-none ${isSelected
                                                 ? 'ring-2 ring-indigo-500 ring-offset-1 border-indigo-400 bg-indigo-50 text-indigo-700'
                                                 : isComplete
@@ -363,7 +358,19 @@ export default function ChecklistSection({ project, checklistItems = [], current
                                         <TableCell className="px-4">
                                             <Checkbox checked={!!selectedIds.has(task.id)} onCheckedChange={(checked) => handleSelectRow(task.id, !!checked)} className="cursor-pointer" />
                                         </TableCell>
-                                        <TableCell className="font-medium">{task.task_type}</TableCell>
+                                        {/* task_type cell with Auto/Manual badge to identify task origin */}
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{task.task_type}</span>
+                                                {task.is_auto_created === true ? (
+                                                    // Auto badge — task was created by a background sync function
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Auto</span>
+                                                ) : (
+                                                    // Manual badge — task was created manually by a user
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500">Manual</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className={task.status === 'completed' ? 'line-through text-slate-500' : ''}>{task.task_description}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex gap-1 justify-end">
