@@ -1,7 +1,8 @@
 {
     "name": "Project",
+    "type": "object",
     "description": "Represents an attendance and payroll analysis period for a specific company. Stores configuration for employee scope, shift timings, and business rule overrides.",
-    "fields": {
+    "properties": {
         "name": {
             "type": "string",
             "required": true,
@@ -9,7 +10,6 @@
         },
         "description": {
             "type": "string",
-            "required": false,
             "description": "Optional detailed notes about the project scope."
         },
         "company": {
@@ -34,7 +34,7 @@
             "required": true,
             "default": "draft",
             "enum": ["draft", "analyzed", "locked", "closed"],
-            "description": "Current lifecycle state of the project. 'Draft' allows data uploads, 'Analyzed' means computations are ready, 'Locked' prevents record edits, 'Closed' is the final read-only state after salary snapshots are created."
+            "description": "Current lifecycle state of the project."
         },
         "last_saved_report_id": {
             "type": "string",
@@ -69,13 +69,11 @@
         "gift_minutes_date_from": {
             "type": "string",
             "format": "date",
-            "required": false,
             "description": "Start date for the Gift Minutes period (mandatory when use_gift_minutes is true)."
         },
         "gift_minutes_date_to": {
             "type": "string",
             "format": "date",
-            "required": false,
             "description": "End date for the Gift Minutes period (mandatory when use_gift_minutes is true)."
         },
         "weekly_off_override": {
@@ -95,20 +93,18 @@
         },
         "created_by": {
             "type": "string",
-            "required": false,
             "description": "Email or ID of the user who created the project."
         },
         "created_date": {
             "type": "string",
             "format": "date-time",
-            "required": false,
             "description": "ISO timestamp of creation."
         },
         "updated_date": {
             "type": "string",
             "format": "date-time",
-            "required": false,
             "description": "ISO timestamp of the last analysis run or project update."
         }
-    }
+    },
+    "required": ["name", "company", "date_from", "date_to", "status"]
 }

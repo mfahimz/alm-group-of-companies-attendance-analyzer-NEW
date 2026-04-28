@@ -1,7 +1,8 @@
 {
     "name": "Exception",
+    "type": "object",
     "description": "Represents a specific adjustment or manual correction to an employee's attendance records for a given date range. Used for leave management, manual attendance corrections, and special pay components like Gift Minutes.",
-    "fields": {
+    "properties": {
         "project_id": {
             "type": "string",
             "required": true,
@@ -31,7 +32,6 @@
         },
         "details": {
             "type": "string",
-            "required": false,
             "description": "Human-readable explanation of the exception."
         },
         "allowed_minutes": {
@@ -94,5 +94,6 @@
             "enum": ["AM_START", "AM_END", "PM_START", "PM_END"],
             "description": "Specifies which punch this exception targets (for Unified Grace / ALLOWED_MINUTES)."
         }
-    }
+    },
+    "required": ["project_id", "attendance_id", "date_from", "date_to", "type"]
 }

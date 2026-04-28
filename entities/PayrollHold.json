@@ -1,7 +1,8 @@
 {
     "name": "PayrollHold",
+    "type": "object",
     "description": "Stores AED amounts held from payroll for a specific employee. Supports deferred leave salary and manual accountant holds with future release tracking.",
-    "fields": {
+    "properties": {
         "employee_id": {
             "type": "string",
             "required": true,
@@ -40,7 +41,6 @@
         },
         "days": {
             "type": "number",
-            "required": false,
             "default": null,
             "description": "Optional number of days associated with the amount (e.g. leave days)."
         },
@@ -72,56 +72,48 @@
         "release_period_start": {
             "type": "string",
             "format": "date",
-            "required": false,
             "default": null,
             "description": "The start date of the payroll period where the hold was released."
         },
         "release_period_end": {
             "type": "string",
             "format": "date",
-            "required": false,
             "default": null,
             "description": "The end date of the payroll period where the hold was released."
         },
         "release_report_id": {
             "type": "string",
-            "required": false,
             "default": null,
             "description": "Optional reference to the SalaryReport ID where the release occurred."
         },
         "notes": {
             "type": "string",
-            "required": false,
             "default": null,
             "description": "Detailed notes or system-generated explanation for the hold."
         },
         "auto_key": {
             "type": "string",
-            "required": false,
             "default": null,
             "description": "Deterministic key used for idempotent system updates of AUTO entries."
         },
         "created_by": {
             "type": "string",
-            "required": false,
             "description": "User identifier who created the record."
         },
         "updated_by": {
             "type": "string",
-            "required": false,
             "description": "User identifier who last updated the record."
         },
         "created_date": {
             "type": "string",
             "format": "date-time",
-            "required": false,
             "description": "ISO timestamp of creation."
         },
         "updated_date": {
             "type": "string",
             "format": "date-time",
-            "required": false,
             "description": "ISO timestamp of the last update."
         }
-    }
+    },
+    "required": ["employee_id", "hrms_id", "employee_name", "company", "hold_type", "reason_code", "amount", "source", "status", "origin_period_start", "origin_period_end"]
 }
