@@ -1,24 +1,28 @@
 {
     "name": "CompanyRoleMaster",
-    "fields": {
+    "type": "object",
+    "properties": {
         "role_title": {
             "type": "string",
-            "required": true
+            "description": "The title of the role."
         },
         "company": {
             "type": "string",
-            "required": true
+            "description": "The company this role belongs to."
         },
         "status": {
             "type": "string",
-            "required": true
+            "description": "Current status of the role."
         },
         "created_by": {
-            "type": "string"
+            "type": "string",
+            "description": "Email of the user who created this role."
         },
         "created_at": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Timestamp of when this role was created."
         }
-    }
+    },
+    "required": ["role_title", "company", "status"]
 }
