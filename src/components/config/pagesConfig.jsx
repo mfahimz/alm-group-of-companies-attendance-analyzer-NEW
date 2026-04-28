@@ -107,6 +107,7 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor', 'ceo', 'hr_manager', 'senior_accountant']
     },
+
     HalfYearlyMinutesManagement: {
         name: 'HalfYearlyMinutesManagement',
         title: 'Half Yearly Minutes',
