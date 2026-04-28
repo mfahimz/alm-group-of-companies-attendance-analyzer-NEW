@@ -2055,7 +2055,13 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
             </Card>
 
             {/* Payroll Checklist Section */}
-            <ChecklistSection project={project} checklistItems={sortedChecklistItems} />
+            {/* currentUser and reportRunId are needed for the background sync operations */}
+            <ChecklistSection 
+                project={project} 
+                checklistItems={sortedChecklistItems} 
+                currentUser={currentUser}
+                reportRunId={undefined}
+            />
 
             {/* Report-Generated Exceptions */}
             {reportExceptions.length > 0 && (

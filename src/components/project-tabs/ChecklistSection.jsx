@@ -57,8 +57,19 @@ const formatMergedWorksheet = (worksheet, data, XLSX) => {
     worksheet['!merges'] = merges;
 };
 
-export default function ChecklistSection({ project, checklistItems = [] }) {
+/**
+ * ChecklistSection component
+ * 
+ * Props:
+ * - project: The current project object
+ * - checklistItems: List of checklist tasks for this project
+ * - currentUser: The currently logged-in user (needed for sync operations)
+ * - reportRunId: ID of the finalized report run (needed for report-specific sync)
+ */
+export default function ChecklistSection({ project, checklistItems = [], currentUser, reportRunId }) {
     const queryClient = useQueryClient();
+    // isSyncing: tracks whether the checklist sync operation is in progress to show loading state and prevent double trigger
+    const [isSyncing, setIsSyncing] = useState(false);
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -69,7 +80,7 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [previewData, setPreviewData] = useState([]);
 
-    const { data: currentUser } = useQuery({ queryKey: ['currentUser'], queryFn: () => base44.auth.me() });
+
 
     const initializePredefinedTasksMutation = useMutation({
         mutationFn: async () => {
@@ -174,6 +185,55 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
         toast.success('Checklist exported');
     };
 
+    // handleSyncAll: runs all checklist sync operations in sequence
+    // 1. Salary modifications sync (always runs)
+    // 2. Report checklist tasks sync (only if reportRunId is available)
+    // 3. Annual leave checklist sync for all leaves in this project (always runs)
+    const handleSyncAll = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        try {
+            // SYNC 1: Salary modifications — increments and decrements
+            await base44.functions.invoke('syncSalaryModificationsChecklist', {
+                project_id: project.id,
+                company: project.company,
+                project_date_to: project.date_to
+            });
+
+            // SYNC 2: Report checklist tasks — only if a finalized report run exists
+            if (reportRunId) {
+                await base44.functions.invoke('createReportChecklistTasks', {
+                    reportRunId: reportRunId,
+                    action: 'upsert'
+                });
+            }
+
+            // SYNC 3: Annual leave checklist — fetch all leaves for this project and sync each
+            const leaves = await base44.entities.AnnualLeave.filter(
+                { project_id: project.id },
+                null,
+                5000
+            );
+            for (const leave of leaves) {
+                await base44.functions.invoke('syncAnnualLeaveChecklistTasks', {
+                    leaveId: leave.id,
+                    projectId: project.id,
+                    action: 'update'
+                });
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            toast.success('Checklist synced successfully');
+            // Invalidate checklist items query so table refreshes
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+        } catch (err) {
+            console.error('Sync error:', err);
+            toast.error('Sync failed: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <Card className="border-0 shadow-sm bg-white rounded-xl ring-1 ring-slate-200/80 overflow-hidden">
             <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
@@ -189,6 +249,29 @@ export default function ChecklistSection({ project, checklistItems = [] }) {
                         )}
                     </div>
                     <div className="flex gap-2">
+                        {/* Sync Checklist button — runs all background sync operations to update checklist tasks */}
+                        <button
+                            onClick={handleSyncAll}
+                            disabled={isSyncing}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            {isSyncing ? (
+                                <>
+                                    <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                    </svg>
+                                    Syncing...
+                                </>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Sync Checklist
+                                </>
+                            )}
+                        </button>
                         {selectedIds.size > 0 && (
                             <Button variant="outline" size="sm" onClick={() => setShowBulkDeleteConfirm(true)} disabled={bulkDeleteTasksMutation.isPending} className="text-red-600 border-red-100 hover:bg-red-50">
                                 <Trash2 className="w-4 h-4 mr-2" />Delete ({selectedIds.size})
