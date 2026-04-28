@@ -171,14 +171,18 @@ Deno.serve(async (req) => {
         
         const expectedTasks: Array<{ fingerprint: string, type: string, description: string, notes: string }> = [];
 
-        const calculateRejoiningDate = (lastLeaveDateStr: string, weeklyOffDay: number): string => {
+        // calculateRejoiningDate: finds the first working day after annual leave end date
+        // Skips Weekly Off days, Public Holiday dates, and employee LOP dates
+        // This ensures rejoining date reflects the actual first day the employee returned
+        const calculateRejoiningDate = (lastLeaveDateStr: string, weeklyOffDay: number, lopDates: Set<string>): string => {
             const candidate = new Date(lastLeaveDateStr);
             candidate.setDate(candidate.getDate() + 1);
             let safety = 0;
             while (safety < 60) {
                 const dateStr = candidate.toISOString().split('T')[0];
                 const dayOfWeek = candidate.getUTCDay();
-                if (dayOfWeek !== weeklyOffDay && !publicHolidayDates.has(dateStr)) {
+                // Day is valid rejoining date only if it is not weekly off, not a public holiday, and not an LOP date
+                if (dayOfWeek !== weeklyOffDay && !publicHolidayDates.has(dateStr) && !lopDates.has(dateStr)) {
                     return dateStr;
                 }
                 candidate.setDate(candidate.getDate() + 1);
@@ -270,11 +274,21 @@ Deno.serve(async (req) => {
                 });
             }
 
+            // Build LOP dates set for this employee from lop_dates field on AnalysisResult
+            // This includes both regular LOP days and LOP-adjacent weekly off days
+            const employeeLopDates = new Set<string>();
+            if (res.lop_dates) {
+                String(res.lop_dates).split(',').map(d => d.trim()).filter(d => d).forEach(d => employeeLopDates.add(d));
+            }
+            if (res.lop_adjacent_weekly_off_dates) {
+                String(res.lop_adjacent_weekly_off_dates).split(',').map(d => d.trim()).filter(d => d).forEach(d => employeeLopDates.add(d));
+            }
+
             const annualLeave = Number(res.annual_leave_count) || 0;
             if (annualLeave > 0 && annualLeaveLastDateMap[attId]) {
                 const lastLeaveDate = annualLeaveLastDateMap[attId];
                 const weeklyOffDay = employeeWeeklyOffMap[attId] ?? 5;
-                const rejoiningDate = calculateRejoiningDate(lastLeaveDate, weeklyOffDay);
+                const rejoiningDate = calculateRejoiningDate(lastLeaveDate, weeklyOffDay, employeeLopDates);
                 const fp = `RejoiningDate_${projectId}_${attId}_${rejoiningDate}_${nameKey}`;
                 expectedTasks.push({
                     fingerprint: fp,
