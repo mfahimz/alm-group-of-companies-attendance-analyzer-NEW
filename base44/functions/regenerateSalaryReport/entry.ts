@@ -55,6 +55,8 @@ Deno.serve(async (req) => {
             attendance_source: s.attendance_source,
             basic_salary: s.basic_salary,
             allowances: s.allowances,
+            // allowances_with_bonus: total allowances including bonus — must be preserved in snapshot to display correctly in salary report detail
+            allowances_with_bonus: s.allowances_with_bonus,
             total_salary: s.total_salary,
             working_hours: s.working_hours,
             working_days: s.working_days,
