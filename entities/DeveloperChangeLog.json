@@ -1,62 +1,54 @@
 {
     "name": "DeveloperChangeLog",
+    "type": "object",
     "description": "Source of truth for tracking all development activity. Supports categorization, priority management, and technical implementation notes.",
-    "fields": {
+    "properties": {
         "title": {
             "type": "string",
-            "required": true,
             "description": "Short descriptive title of the change request."
         },
         "description": {
             "type": "string",
-            "required": true,
             "description": "Detailed business or functional description of the change."
         },
         "category": {
             "type": "string",
-            "required": true,
             "enum": ["Logic", "UI", "Architecture"],
             "description": "Functional domain of the change."
         },
         "priority": {
             "type": "string",
-            "required": true,
             "enum": ["Low", "Medium", "High", "Critical"],
             "description": "Importance and urgency level."
         },
         "status": {
             "type": "string",
-            "required": true,
             "default": "Pending",
             "enum": ["Pending", "In Progress", "Frozen", "Completed"],
             "description": "Current lifecycle state of the work."
         },
         "technical_notes": {
             "type": "string",
-            "required": false,
             "description": "Implementation prompts, code pointers, and technical constraints."
         },
         "implemented_by": {
             "type": "string",
-            "required": false,
             "description": "Name or email of the developer."
         },
         "implemented_date": {
             "type": "string",
             "format": "date",
-            "required": false,
             "description": "Completion date."
         },
         "created_by": {
             "type": "string",
-            "required": false,
             "description": "System user who logged the request."
         },
         "created_at": {
             "type": "string",
             "format": "date-time",
-            "required": false,
             "description": "Creation timestamp."
         }
-    }
+    },
+    "required": ["title", "description", "category", "priority", "status"]
 }
