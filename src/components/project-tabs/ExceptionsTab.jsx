@@ -20,7 +20,1381 @@ import { Checkbox } from '@/components/ui/checkbox';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 import ChecklistSection, { formatMergedWorksheet } from './ChecklistSection';
 import ReportGeneratedExceptions from '../exceptions/ReportGeneratedExceptions';
-...
+
+// Map user-friendly names to system type codes generated from central source
+const TYPE_MAP = EXCEPTION_TYPES.reduce((acc, type) => {
+    const key = type.value.toLowerCase().replace(/_/g, ' ');
+    acc[key] = type.value;
+    if (type.value === 'PUBLIC_HOLIDAY') acc['holiday'] = 'PUBLIC_HOLIDAY';
+    if (type.value === 'MANUAL_PRESENT') acc['present'] = 'MANUAL_PRESENT';
+    if (type.value === 'MANUAL_ABSENT') acc['absent'] = 'MANUAL_ABSENT';
+    return acc;
+}, {
+    'manual_absent': 'MANUAL_ABSENT'
+});
+
+export default function ExceptionsTab({ project }) {
+    const [showForm, setShowForm] = useState(false);
+    const [isImportingLeaves, setIsImportingLeaves] = useState(false);
+    const [nlpText, setNlpText] = useState('');
+    const [nlpParsing, setNlpParsing] = useState(false);
+    const [employeeSearch, setEmployeeSearch] = useState('');
+    const [formData, setFormData] = useState({
+        attendance_id: '',
+        date_from: '',
+        date_to: '',
+        type: 'PUBLIC_HOLIDAY',
+        new_am_start: '',
+        new_am_end: '',
+        new_pm_start: '',
+        new_pm_end: '',
+        early_checkout_minutes: '',
+        allowed_minutes: '',
+        allowed_minutes_type: 'both',
+        details: '',
+        include_friday: false,
+        other_minutes: '',
+        punch_to_skip: 'AM_PUNCH_IN',
+        half_day_target: 'AM',
+        target_punch: 'AM_START',
+        new_weekly_off: '',
+        working_day_override: '',
+        salary_leave_days: ''
+    });
+
+    const clearShiftOverride = () => {
+        setFormData(prev => ({
+            ...prev,
+            new_am_start: '',
+            new_am_end: '',
+            new_pm_start: '',
+            new_pm_end: ''
+        }));
+    };
+
+    const [filter, setFilter] = useState({ 
+        search: '', 
+        type: 'all',
+        dateFrom: '',
+        dateTo: '',
+        department: 'all',
+        createdFromReport: 'all',
+        useInAnalysis: 'all',
+        approvalStatus: 'all'
+    });
+    const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
+    const [uploadProgress, setUploadProgress] = useState(null);
+    const [editedRows, setEditedRows] = useState({});
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [selectedExceptions, setSelectedExceptions] = useState([]);
+    const [showBulkEdit, setShowBulkEdit] = useState(false);
+    const [viewingException, setViewingException] = useState(null);
+    const [editingException, setEditingException] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [importPreview, setImportPreview] = useState(null);
+    const [showImportPreview, setShowImportPreview] = useState(false);
+
+    const [previewConfig, setPreviewConfig] = useState({
+        isOpen: false,
+        data: [],
+        headers: [],
+        fileName: '',
+        onConfirm: null
+    });
+
+    const queryClient = useQueryClient();
+
+    const { data: allExceptions = [] } = useQuery({
+        queryKey: ['exceptions', project.id],
+        queryFn: () => base44.entities.Exception.filter({ project_id: project.id })
+    });
+    
+    const exceptions = allExceptions.filter(ex => !ex.created_from_report);
+    const reportExceptions = allExceptions.filter(ex => ex.created_from_report);
+
+    const { data: masterEmployees = [] } = useQuery({
+        queryKey: ['employees', project.company],
+        queryFn: () => base44.entities.Employee.filter({ company: project.company })
+    });
+
+    const { data: projectEmployees = [] } = useQuery({
+        queryKey: ['projectEmployees', project.id],
+        queryFn: () => base44.entities.ProjectEmployee.filter({ project_id: project.id })
+    });
+
+    const employees = useMemo(() => {
+        const combined = [...masterEmployees];
+        for (const pe of projectEmployees) {
+            if (!masterEmployees.some(e => String(e.attendance_id) === String(pe.attendance_id))) {
+                combined.push({
+                    id: pe.id,
+                    attendance_id: pe.attendance_id,
+                    name: pe.name,
+                    department: pe.department || 'Admin',
+                    weekly_off: pe.weekly_off || 'Sunday',
+                    _isProjectOverride: true
+                });
+            }
+        }
+        return combined.filter(emp => emp.attendance_id && String(emp.attendance_id).trim());
+    }, [masterEmployees, projectEmployees]);
+
+    const { data: currentUser } = useQuery({
+        queryKey: ['currentUser'],
+        queryFn: () => base44.auth.me()
+    });
+
+    const { data: checklistItems = [], isLoading: checklistLoading } = useQuery({
+        queryKey: ['checklistItems', project.id],
+        queryFn: () => base44.entities.ChecklistItem.filter({ project_id: project.id }, 'created_date'),
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false
+    });
+
+    const selectedEmployeeAttId = formData.attendance_id && formData.attendance_id !== 'ALL' ? formData.attendance_id : null;
+    const { data: employeeShifts = [] } = useQuery({
+        queryKey: ['shiftsForEmployee', project.id, selectedEmployeeAttId],
+        queryFn: () => base44.entities.ShiftTiming.filter({ project_id: project.id, attendance_id: selectedEmployeeAttId }),
+        enabled: !!selectedEmployeeAttId && formData.type === 'SKIP_PUNCH',
+    });
+    const selectedEmployeeIsSingleShift = employeeShifts.length > 0
+        ? (employeeShifts[0].is_single_shift === true || !employeeShifts[0].am_end || !employeeShifts[0].pm_start ||
+           String(employeeShifts[0].am_end).trim() === '' || String(employeeShifts[0].pm_start).trim() === '' ||
+           employeeShifts[0].am_end === '-' || employeeShifts[0].pm_start === '-')
+        : null;
+
+    const sortedChecklistItems = useMemo(() => {
+        if (!checklistItems) return [];
+        return [...checklistItems].sort((a, b) => {
+            const typeA = (a.task_type || '').toLowerCase();
+            const typeB = (b.task_type || '').toLowerCase();
+            if (typeA < typeB) return -1;
+            if (typeA > typeB) return 1;
+            const descA = (a.task_description || '').toLowerCase();
+            const descB = (b.task_description || '').toLowerCase();
+            if (descA < descB) return -1;
+            if (descA > descB) return 1;
+            return 0;
+        });
+    }, [checklistItems]);
+
+    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
+    const isUser = userRole === 'user';
+    const isAdmin = userRole === 'admin';
+    const isSupervisor = userRole === 'supervisor';
+    const canEditAllowedMinutes = ['admin', 'ceo'].includes(userRole);
+
+    const createMutation = useMutation({
+        mutationFn: async (data) => {
+            const exceptionData = {
+                ...data,
+                project_id: project.id,
+                approval_status: 'approved',
+                use_in_analysis: true
+            };
+            return await base44.entities.Exception.create(exceptionData);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            toast.success('Exception added successfully');
+            setShowForm(false);
+            resetForm();
+        },
+        onError: (error) => {
+            toast.error('Failed to add exception: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: async (id) => {
+            await base44.entities.Exception.delete(id);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            setSelectedItems([]);
+            setSelectedExceptions([]);
+            toast.success('Exception deleted');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete exception: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    const bulkDeleteMutation = useMutation({
+        mutationFn: async (ids) => {
+            await Promise.all(ids.map(id => base44.entities.Exception.delete(id)));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            setSelectedExceptions([]);
+            toast.success('Selected exceptions deleted');
+        },
+        onError: (error) => {
+            toast.error('Failed to delete exceptions: ' + error.message);
+        }
+    });
+
+    const bulkToggleUseMutation = useMutation({
+        mutationFn: async ({ ids, use_in_analysis }) => {
+            await Promise.all(ids.map(id => 
+                base44.entities.Exception.update(id, { use_in_analysis })
+            ));
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            setSelectedExceptions([]);
+            toast.success('Selected exceptions updated');
+        },
+        onError: (error) => {
+            toast.error('Failed to update exceptions: ' + error.message);
+        }
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, data }) => base44.entities.Exception.update(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            toast.success('Exception updated');
+        },
+        onError: (error) => {
+            toast.error('Failed to update exception: ' + (error.message || 'Unknown error'));
+        }
+    });
+
+    const handleCellChange = (exceptionId, field, value) => {
+        const exception = allExceptions.find(e => e.id === exceptionId);
+        if (exception?.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) return;
+        setEditedRows(prev => ({
+            ...prev,
+            [exceptionId]: { ...(prev[exceptionId] || {}), [field]: value }
+        }));
+    };
+
+    const handleSaveRow = (exceptionId) => {
+        const exception = allExceptions.find(e => e.id === exceptionId);
+        if (exception?.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) {
+            toast.error("Only Admin and CEO can edit allowed minutes.");
+            return;
+        }
+        if (editedRows[exceptionId]) {
+            updateMutation.mutate({ id: exceptionId, data: editedRows[exceptionId] }, {
+                onSuccess: () => {
+                    setEditedRows(prev => {
+                        const newState = { ...prev };
+                        delete newState[exceptionId];
+                        return newState;
+                    });
+                    toast.success('Exception updated');
+                }
+            });
+        }
+    };
+
+    const getFieldValue = (exception, field) => {
+        if (editedRows[exception.id] && editedRows[exception.id][field] !== undefined) {
+            return editedRows[exception.id][field];
+        }
+        return exception[field];
+    };
+
+    const parseDate = (value) => {
+        if (!value) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+        const match = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+        if (match) {
+            const [, day, month, year] = match;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        if (!isNaN(value)) {
+            const date = new Date((value - 25569) * 86400 * 1000);
+            return date.toISOString().split('T')[0];
+        }
+        return '';
+    };
+
+    const handleFileImport = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+
+                const exceptions = [];
+                const errors = [];
+                const warnings = [];
+
+                jsonData.forEach((row, index) => {
+                    const rowNum = index + 2;
+                    const attendance_id_raw = row.attendance_id || row.employee_id || row.id || row.AttendanceID || row.EmployeeID || '';
+                    const attendance_id = attendance_id_raw === 'ALL' ? 'ALL' : (attendance_id_raw ? String(attendance_id_raw).trim() : '');
+                    const date_from = parseDate(row.date_from || row.from || row.start_date || row.DateFrom || '');
+                    const date_to = parseDate(row.date_to || row.to || row.end_date || row.DateTo || date_from);
+                    const typeRaw = (row.type || row.Type || row.exception_type || '').toString().toLowerCase().trim();
+                    const type = TYPE_MAP[typeRaw];
+                    
+                    if (!type) {
+                        errors.push(`Row ${rowNum}: Invalid type "${row.type || ''}". Use: Public Holiday, Sick Leave, Present, Absent, Half Day, Shift Override`);
+                        return;
+                    }
+                    if (!date_from) {
+                        errors.push(`Row ${rowNum}: Missing or invalid date_from`);
+                        return;
+                    }
+                    const finalAttendanceId = type === 'PUBLIC_HOLIDAY' ? 'ALL' : attendance_id;
+                    if (type !== 'PUBLIC_HOLIDAY' && !finalAttendanceId) {
+                        errors.push(`Row ${rowNum}: Missing attendance_id`);
+                        return;
+                    }
+
+                    exceptions.push({
+                        project_id: project.id,
+                        attendance_id: finalAttendanceId === 'ALL' ? 'ALL' : String(finalAttendanceId),
+                        date_from,
+                        date_to: date_to || date_from,
+                        type,
+                        details: row.details || row.reason || row.notes || '',
+                        new_am_start: row.new_am_start || row.am_start || '',
+                        new_am_end: row.new_am_end || row.am_end || '',
+                        new_pm_start: row.new_pm_start || row.pm_start || '',
+                        new_pm_end: row.new_pm_end || row.pm_end || '',
+                        early_checkout_minutes: (row.early_checkout_minutes !== '' && row.early_checkout_minutes != null) ? Math.abs(parseInt(row.early_checkout_minutes)) : null,
+                        other_minutes: (row.other_minutes !== '' && row.other_minutes != null) ? Math.abs(parseInt(row.other_minutes)) : null,
+                        allowed_minutes: (row.allowed_minutes !== '' && row.allowed_minutes != null) ? Math.abs(parseInt(row.allowed_minutes)) : null
+                    });
+                });
+
+                if (errors.length > 0) {
+                    toast.error(`${errors.length} errors found:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...and ${errors.length - 3} more` : ''}`);
+                    return;
+                }
+                if (exceptions.length === 0) {
+                    toast.error('No valid exceptions found in file');
+                    return;
+                }
+
+                setImportPreview({ exceptions, warnings });
+                setShowImportPreview(true);
+            } catch (error) {
+                toast.error('Failed to import file: ' + error.message);
+                setUploadProgress(null);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        e.target.value = '';
+    };
+
+    const confirmImport = async () => {
+        if (!importPreview) return;
+
+        setUploadProgress({ current: 0, total: importPreview.exceptions.length, status: 'Importing exceptions...' });
+        setShowImportPreview(false);
+        
+        try {
+            const batchSize = 20;
+            for (let i = 0; i < importPreview.exceptions.length; i += batchSize) {
+                const batch = importPreview.exceptions.slice(i, i + batchSize);
+                await base44.entities.Exception.bulkCreate(batch);
+                setUploadProgress({ 
+                    current: Math.min(i + batchSize, importPreview.exceptions.length), 
+                    total: importPreview.exceptions.length,
+                    status: `Importing ${Math.min(i + batchSize, importPreview.exceptions.length)}/${importPreview.exceptions.length}...`
+                });
+            }
+            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+            toast.success(`Imported ${importPreview.exceptions.length} exceptions successfully`);
+        } catch (error) {
+            toast.error('Import failed: ' + (error.message || 'Unknown error'));
+        } finally {
+            setUploadProgress(null);
+            setImportPreview(null);
+        }
+    };
+
+    const handleBulkDelete = () => {
+        if (selectedExceptions.length === 0) return;
+        if (window.confirm(`Delete ${selectedExceptions.length} selected exception${selectedExceptions.length > 1 ? 's' : ''}? This action cannot be undone.`)) {
+            bulkDeleteMutation.mutate(selectedExceptions.map(e => e.id));
+        }
+    };
+
+    const handleBulkToggleUse = (use_in_analysis) => {
+        if (selectedExceptions.length === 0) return;
+        bulkToggleUseMutation.mutate({ ids: selectedExceptions.map(e => e.id), use_in_analysis });
+    };
+
+    const clearFilters = () => {
+        setFilter({ search: '', type: 'all', dateFrom: '', dateTo: '', department: 'all', createdFromReport: 'all', useInAnalysis: 'all', approvalStatus: 'all' });
+    };
+
+    const hasActiveFilters = filter.search || filter.type !== 'all' || filter.dateFrom || 
+                             filter.dateTo || filter.department !== 'all' || 
+                             filter.createdFromReport !== 'all' || filter.useInAnalysis !== 'all' ||
+                             filter.approvalStatus !== 'all';
+
+    const hasAdvancedFiltersActive = filter.type !== 'all' || filter.dateFrom || 
+                                     filter.dateTo || filter.department !== 'all' || 
+                                     filter.createdFromReport !== 'all' || filter.useInAnalysis !== 'all' ||
+                                     filter.approvalStatus !== 'all';
+
+    const downloadTemplate = () => {
+        const template = `attendance_id,name,date_from,date_to,type,details,other_minutes
+ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
+322,Jane Doe,2025-11-12,2025-11-14,Sick Leave,Medical certificate,0
+789,John Smith,2025-12-20,2025-12-22,Annual Leave,Vacation,0
+123,Bob Johnson,2025-11-20,2025-11-20,Present,Worked from home,0
+456,Alice Brown,2025-11-21,2025-11-21,Half Day,Left early,0`;
+        const blob = new Blob([template], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'exceptions_template.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExport = async () => {
+        const employeeMap = employees.reduce((acc, emp) => {
+            acc[String(emp.attendance_id)] = emp.name;
+            return acc;
+        }, {});
+
+        const exportData = sortedExceptions.map(ex => {
+            const empName = ex.attendance_id === 'ALL' ? 'All Employees' : (employeeMap[String(ex.attendance_id)] || '—');
+            return {
+                'Employee ID': ex.attendance_id,
+                'Employee Name': empName,
+                'Type': ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' '),
+                'From': ex.date_from ? new Date(ex.date_from).toLocaleDateString() : '—',
+                'To': ex.date_to ? new Date(ex.date_to).toLocaleDateString() : '—',
+                'Details': ex.details || '-',
+                'From Report': ex.created_from_report ? 'Yes' : 'No',
+                'Created By': ex.created_by || 'System',
+                'Created Date': ex.created_date ? new Date(ex.created_date).toLocaleString() : '—'
+            };
+        });
+
+        setPreviewConfig({
+            isOpen: true,
+            data: exportData,
+            headers: ['Employee ID', 'Employee Name', 'Type', 'From', 'To', 'Details', 'From Report', 'Created By', 'Created Date'],
+            fileName: `Exceptions_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`,
+            onConfirm: executeExportDownload
+        });
+    };
+
+    const executeExportDownload = async () => {
+        if (previewConfig.data.length === 0) return;
+        try {
+            const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+            const worksheet = XLSX.utils.json_to_sheet(previewConfig.data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Exceptions");
+            const wscols = [{ wch: 12 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 40 }, { wch: 12 }, { wch: 20 }, { wch: 20 }];
+            worksheet['!cols'] = wscols;
+            XLSX.writeFile(workbook, previewConfig.fileName);
+            toast.success('Exceptions exported to Excel');
+        } catch (error) {
+            toast.error('Export failed: ' + error.message);
+        }
+    };
+
+    const getTypeColor = (type) => {
+        const colors = {
+            'PUBLIC_HOLIDAY': 'bg-purple-50 text-purple-700 ring-1 ring-purple-200',
+            'SICK_LEAVE': 'bg-red-50 text-red-700 ring-1 ring-red-200',
+            'ANNUAL_LEAVE': 'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
+            'SHIFT_OVERRIDE': 'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
+            'MANUAL_PRESENT': 'bg-green-50 text-green-700 ring-1 ring-green-200',
+            'MANUAL_ABSENT': 'bg-red-50 text-red-700 ring-1 ring-red-200',
+            'ALLOWED_MINUTES': 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
+            'SKIP_PUNCH': 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200',
+            'DAY_SWAP': 'bg-pink-50 text-pink-700 ring-1 ring-pink-200',
+        };
+        return colors[type] || 'bg-slate-50 text-slate-700 ring-1 ring-slate-200';
+    };
+
+    const resetForm = () => {
+        setFormData({
+            attendance_id: '', date_from: '', date_to: '', type: 'PUBLIC_HOLIDAY',
+            new_am_start: '', new_am_end: '', new_pm_start: '', new_pm_end: '',
+            early_checkout_minutes: '', details: '', include_friday: false,
+            other_minutes: '', allowed_minutes: '', allowed_minutes_type: 'both',
+            punch_to_skip: 'AM_PUNCH_IN', half_day_target: 'AM', target_punch: 'AM_START',
+            new_weekly_off: '', working_day_override: '', salary_leave_days: ''
+        });
+        setEmployeeSearch('');
+    };
+
+    const handleNlpParse = async () => {
+        if (!nlpText.trim()) {
+            toast.error('Please enter some text to parse');
+            return;
+        }
+        setNlpParsing(true);
+        try {
+            const response = await base44.integrations.Core.InvokeLLM({
+                prompt: `Parse this exception request into structured data. Return ONLY valid JSON, no other text.
+
+Project date range: ${project.date_from} to ${project.date_to}
+Available employees: ${employees.map(e => `${e.attendance_id} (${e.name})`).join(', ')}
+
+Exception types:
+${getFilteredExceptionTypes('general', true).map(t => `- ${t.value}: ${t.label}`).join('\n')}
+
+User request: "${nlpText}"
+
+Return JSON:
+{
+    "attendance_id": "employee ID or 'ALL' for company-wide",
+    "date_from": "YYYY-MM-DD",
+    "date_to": "YYYY-MM-DD",
+    "type": "one of the types above",
+    "details": "brief description",
+    "new_am_start": "if SHIFT_OVERRIDE: HH:MM",
+    "new_am_end": "if SHIFT_OVERRIDE: HH:MM",
+    "new_pm_start": "if SHIFT_OVERRIDE: HH:MM",
+    "new_pm_end": "if SHIFT_OVERRIDE: HH:MM",
+    "allowed_minutes": "if ALLOWED_MINUTES: number",
+    "allowed_minutes_type": "if ALLOWED_MINUTES: 'late'/'early'/'both'"
+}
+
+Only include relevant fields. Match employee names/IDs intelligently.`,
+                response_json_schema: {
+                    type: "object",
+                    properties: {
+                        attendance_id: { type: "string" },
+                        date_from: { type: "string" },
+                        date_to: { type: "string" },
+                        type: { type: "string" },
+                        details: { type: "string" },
+                        new_am_start: { type: "string" },
+                        new_am_end: { type: "string" },
+                        new_pm_start: { type: "string" },
+                        new_pm_end: { type: "string" },
+                        allowed_minutes: { type: "number" },
+                        allowed_minutes_type: { type: "string" }
+                    },
+                    required: ["type"]
+                }
+            });
+
+            const parsed = response;
+            setFormData({
+                attendance_id: parsed.attendance_id || '',
+                date_from: parsed.date_from || '',
+                date_to: parsed.date_to || parsed.date_from || '',
+                type: parsed.type || 'PUBLIC_HOLIDAY',
+                new_am_start: parsed.new_am_start || '',
+                new_am_end: parsed.new_am_end || '',
+                new_pm_start: parsed.new_pm_start || '',
+                new_pm_end: parsed.new_pm_end || '',
+                early_checkout_minutes: '',
+                details: parsed.details || nlpText,
+                include_friday: false,
+                other_minutes: '',
+                allowed_minutes: parsed.allowed_minutes ?? '',
+                allowed_minutes_type: parsed.allowed_minutes_type || 'both',
+                punch_to_skip: 'AM_PUNCH_IN',
+                half_day_target: 'AM',
+                target_punch: 'AM_START',
+                new_weekly_off: '',
+                working_day_override: '',
+                salary_leave_days: parsed.salary_leave_days || ''
+            });
+            setNlpText('');
+            toast.success('Form filled from your description! Review and submit.');
+        } catch (error) {
+            toast.error('Failed to parse: ' + (error.message || 'Unknown error'));
+        } finally {
+            setNlpParsing(false);
+        }
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        if (formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'SKIP_DOUBLE_DEDUCTION' && !formData.attendance_id) {
+            toast.error('Please select an employee');
+            return;
+        }
+        if ((formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'HALF_DAY_HOLIDAY' || formData.type === 'SKIP_DOUBLE_DEDUCTION') && !formData.attendance_id) {
+            formData.attendance_id = 'ALL';
+        }
+        if (formData.type !== 'SINGLE_SHIFT' && (!formData.date_from || !formData.date_to)) {
+            toast.error('Please fill in date range');
+            return;
+        }
+        
+        const submitData = formData.type === 'PUBLIC_HOLIDAY' 
+            ? { ...formData, attendance_id: 'ALL' }
+            : formData;
+        
+        const cleanedData = {
+            attendance_id: submitData.attendance_id === 'ALL' ? 'ALL' : String(submitData.attendance_id),
+            date_from: submitData.type === 'SINGLE_SHIFT' ? project.date_from : submitData.date_from,
+            date_to: submitData.type === 'SINGLE_SHIFT' ? project.date_to : submitData.date_to,
+            type: submitData.type,
+            details: submitData.details || null
+        };
+        
+        if (submitData.type === 'SHIFT_OVERRIDE') {
+            cleanedData.new_am_start = submitData.new_am_start || null;
+            cleanedData.new_am_end = submitData.new_am_end || null;
+            cleanedData.new_pm_start = submitData.new_pm_start || null;
+            cleanedData.new_pm_end = submitData.new_pm_end || null;
+            cleanedData.include_friday = submitData.include_friday || false;
+        }
+
+        if (submitData.other_minutes !== '' && submitData.other_minutes != null) {
+            const val = parseInt(submitData.other_minutes);
+            if (!isNaN(val)) cleanedData.other_minutes = Math.abs(val);
+        } else {
+            cleanedData.other_minutes = null;
+        }
+
+        if (submitData.type === 'ALLOWED_MINUTES' && (submitData.allowed_minutes !== '' && submitData.allowed_minutes != null)) {
+            const val = parseInt(submitData.allowed_minutes);
+            if (!isNaN(val)) {
+                cleanedData.allowed_minutes = Math.abs(val);
+                cleanedData.allowed_minutes_type = submitData.allowed_minutes_type || 'both';
+            }
+        }
+
+        if (submitData.type === 'SKIP_PUNCH') {
+            cleanedData.punch_to_skip = submitData.punch_to_skip;
+        }
+
+        if (submitData.type === 'HALF_DAY_HOLIDAY') {
+            cleanedData.half_day_target = submitData.half_day_target || 'AM';
+            cleanedData.attendance_id = 'ALL';
+        }
+
+        if (submitData.type === 'ALLOWED_MINUTES' && (submitData.allowed_minutes !== '' && submitData.allowed_minutes != null)) {
+            cleanedData.target_punch = submitData.target_punch || null;
+        }
+
+        if (submitData.type === 'ANNUAL_LEAVE' && submitData.salary_leave_days !== '' && submitData.salary_leave_days !== null && submitData.salary_leave_days !== undefined) {
+            const salaryLeaveDays = Number(submitData.salary_leave_days);
+            if (Number.isFinite(salaryLeaveDays) && salaryLeaveDays >= 0) {
+                cleanedData.salary_leave_days = salaryLeaveDays;
+            }
+        }
+
+        if (submitData.type === 'DAY_SWAP') {
+            if (!submitData.new_weekly_off || !submitData.working_day_override) {
+                toast.error('Please select both new weekly off and working day');
+                return;
+            }
+            if (submitData.new_weekly_off === submitData.working_day_override) {
+                toast.error('New weekly off and working day cannot be the same');
+                return;
+            }
+            cleanedData.new_weekly_off = submitData.new_weekly_off;
+            cleanedData.working_day_override = submitData.working_day_override;
+        }
+
+        createMutation.mutate(cleanedData);
+    };
+
+    const departments = [...new Set(employees.map(e => e.department).filter(Boolean))].sort();
+
+    const exceptionStats = {
+        total: exceptions.length,
+        publicHolidays: exceptions.filter(e => e.type === 'PUBLIC_HOLIDAY').length,
+        sickLeave: exceptions.filter(e => e.type === 'SICK_LEAVE').length,
+        annualLeave: exceptions.filter(e => e.type === 'ANNUAL_LEAVE').length,
+        reportGenerated: reportExceptions.length
+    };
+
+    const filteredExceptions = exceptions
+        .filter(ex => {
+            if (filter.search) {
+                const searchLower = filter.search.toLowerCase();
+                const matchesId = String(ex.attendance_id).toLowerCase().includes(searchLower);
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
+                const matchesName = employee?.name?.toLowerCase().includes(searchLower);
+                const matchesDetails = ex.details?.toLowerCase().includes(searchLower);
+                const matchesType = ex.type.toLowerCase().includes(searchLower);
+                if (!matchesId && !matchesName && !matchesDetails && !matchesType) return false;
+            }
+            if (filter.type && filter.type !== 'all' && ex.type !== filter.type) return false;
+            if (filter.dateFrom || filter.dateTo) {
+                const exStart = ex.date_from;
+                const exEnd = ex.date_to;
+                if (filter.dateTo && exStart > filter.dateTo) return false;
+                if (filter.dateFrom && exEnd < filter.dateFrom) return false;
+            }
+            if (filter.department && filter.department !== 'all') {
+                if (ex.attendance_id === 'ALL') return false;
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id));
+                if (employee?.department !== filter.department) return false;
+            }
+            if (filter.createdFromReport !== 'all') {
+                const isFromReport = ex.created_from_report === true;
+                if (filter.createdFromReport === 'yes' && !isFromReport) return false;
+                if (filter.createdFromReport === 'no' && isFromReport) return false;
+            }
+            if (filter.useInAnalysis !== 'all') {
+                const isUsed = ex.use_in_analysis !== false;
+                if (filter.useInAnalysis === 'yes' && !isUsed) return false;
+                if (filter.useInAnalysis === 'no' && isUsed) return false;
+            }
+            if (filter.approvalStatus !== 'all') {
+                if (ex.approval_status !== filter.approvalStatus) return false;
+            }
+            return true;
+        })
+        .sort((a, b) => {
+            let aVal = a[sort.key];
+            let bVal = b[sort.key];
+            if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+            if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+            if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+    const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
+    const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
+    const needsSkipPunch = formData.type === 'SKIP_PUNCH';
+    const needsHalfDayHoliday = formData.type === 'HALF_DAY_HOLIDAY';
+    const needsDaySwap = formData.type === 'DAY_SWAP';
+    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
+
+    const sortedExceptions = useMemo(() => {
+        return [...filteredExceptions].sort((a, b) => {
+            const typeA = (a.is_custom_type ? (a.custom_type_name || 'Custom') : a.type.replace(/_/g, ' ')).toLowerCase();
+            const typeB = (b.is_custom_type ? (b.custom_type_name || 'Custom') : b.type.replace(/_/g, ' ')).toLowerCase();
+            if (typeA < typeB) return -1;
+            if (typeA > typeB) return 1;
+            const nameA = (employees.find(e => String(e.attendance_id) === String(a.attendance_id) && e.company === project.company)?.name || '').toLowerCase();
+            const nameB = (employees.find(e => String(e.attendance_id) === String(b.attendance_id) && e.company === project.company)?.name || '').toLowerCase();
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return 0;
+        });
+    }, [filteredExceptions, employees, project.company]);
+
+    const paginatedExceptions = sortedExceptions.slice(
+        (currentPage - 1) * rowsPerPage,
+        currentPage * rowsPerPage
+    );
+
+    const handleGroupExport = async () => {
+        const filteredExceptionsForExport = sortedExceptions.filter(ex => {
+            const typeName = (ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' ')).toLowerCase().trim();
+            return typeName !== 'annual leave';
+        });
+
+        const combinedData = [
+            ...filteredExceptionsForExport.map(ex => {
+                const employee = employees.find(e => String(e.attendance_id) === String(ex.attendance_id) && e.company === project.company);
+                const typeName = ex.is_custom_type ? (ex.custom_type_name || 'Custom') : ex.type.replace(/_/g, ' ');
+                const empName = ex.attendance_id === 'ALL' ? 'All Employees' : (employee?.name || '—');
+                return {
+                    type: typeName,
+                    category: 'Attendance Exception',
+                    id: ex.attendance_id === 'ALL' ? 'ALL' : ex.attendance_id,
+                    employeeTask: empName,
+                    details: ex.details || '-',
+                    context: `${typeName}${ex.created_from_report ? ' (From Report)' : ''}`,
+                    sortType: typeName.toLowerCase(),
+                    sortName: empName.toLowerCase()
+                };
+            }),
+            ...sortedChecklistItems.map(task => {
+                const taskType = task.task_type || 'General';
+                const taskDesc = task.task_description || '—';
+                return {
+                    type: taskType,
+                    category: 'Checklist Task',
+                    id: taskType,
+                    employeeTask: taskDesc,
+                    details: task.notes || '-',
+                    context: `${task.is_predefined ? 'Predefined' : 'Project Task'}${task.completed_by ? ` (By: ${task.completed_by})` : ''}`,
+                    sortType: taskType.toLowerCase(),
+                    sortName: taskDesc.toLowerCase()
+                };
+            })
+        ];
+
+        combinedData.sort((a, b) => {
+            if (a.sortType < b.sortType) return -1;
+            if (a.sortType > b.sortType) return 1;
+            if (a.sortName < b.sortName) return -1;
+            if (a.sortName > b.sortName) return 1;
+            return 0;
+        });
+
+        const exportRows = combinedData.map(item => ({
+            'Type': item.type,
+            'Category': item.category,
+            'Employee / Task': item.employeeTask,
+            'Details': item.details,
+            'Additional Context': item.context
+        }));
+
+        setPreviewConfig({
+            isOpen: true,
+            data: exportRows,
+            headers: ['Type', 'Category', 'Employee / Task', 'Details', 'Additional Context'],
+            fileName: `Unified_Export_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`,
+            onConfirm: executeGroupExportDownload,
+            simulateMergeColumns: ['Type']
+        });
+    };
+
+    const executeGroupExportDownload = async () => {
+        if (previewConfig.data.length === 0) return;
+        try {
+            const XLSX = await import('xlsx');
+            const worksheet = XLSX.utils.json_to_sheet(previewConfig.data);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Unified Export");
+            formatMergedWorksheet(worksheet, previewConfig.data, XLSX);
+            const wscols = [{ wch: 25 }, { wch: 25 }, { wch: 60 }, { wch: 40 }, { wch: 40 }];
+            worksheet['!cols'] = wscols;
+            XLSX.writeFile(workbook, previewConfig.fileName);
+            toast.success('Unified export downloaded with dynamic grouping');
+        } catch (error) {
+            toast.error('Export failed: ' + error.message);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Group Export Button */}
+            <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-green-50">
+                <CardContent className="p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <p className="font-medium text-slate-900">Export All Data</p>
+                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in a single consolidated sheet</p>
+                        </div>
+                        <Button
+                            onClick={handleGroupExport}
+                            disabled={sortedExceptions.length === 0 && checklistItems.length === 0}
+                            className="bg-gradient-to-r from-indigo-600 to-green-600 hover:from-indigo-700 hover:to-green-700"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Export Unified
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Upload Progress */}
+            {uploadProgress && (
+                <Card className="border-0 shadow-sm bg-indigo-50 border-indigo-200">
+                    <CardContent className="p-4">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="flex-1">
+                                <p className="font-medium text-indigo-900">{uploadProgress.status}</p>
+                                <p className="text-sm text-indigo-700 mt-1">{uploadProgress.current} / {uploadProgress.total} batches completed</p>
+                            </div>
+                        </div>
+                        <div className="w-full bg-indigo-200 rounded-full h-2">
+                            <div 
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%` }}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Add Exception Form */}
+            {showForm && (
+                <Card className="border-0 shadow-sm">
+                    <CardHeader>
+                        <CardTitle>Add Exception</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Quick Entry with NLP */}
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-lg border border-indigo-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                                    <Label className="font-medium text-indigo-900">Quick Entry (Optional)</Label>
+                                </div>
+                                <p className="text-xs text-slate-600 mb-3">Describe in natural language and we'll fill the form below</p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        className="border-slate-200 focus:ring-indigo-100 flex-1"
+                                        placeholder="e.g., Mark Ahmed as annual leave from Jan 15-20"
+                                        value={nlpText}
+                                        onChange={(e) => setNlpText(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !nlpParsing) { e.preventDefault(); handleNlpParse(); } }}
+                                        disabled={nlpParsing}
+                                    />
+                                    <Button type="button" onClick={handleNlpParse} disabled={nlpParsing || !nlpText.trim()} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                                        {nlpParsing ? <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />Parsing...</> : <><Sparkles className="w-4 h-4 mr-2" />Fill Form</>}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Employee {formData.type !== 'PUBLIC_HOLIDAY' && formData.type !== 'HALF_DAY_HOLIDAY' && formData.type !== 'ALLOWED_MINUTES' && formData.type !== 'SKIP_PUNCH' && formData.type !== 'SKIP_DOUBLE_DEDUCTION' && '*'}</Label>
+                                    {formData.type === 'PUBLIC_HOLIDAY' || formData.type === 'HALF_DAY_HOLIDAY' ? (
+                                        <Input value="All Employees" disabled className="bg-slate-50" />
+                                    ) : formData.type === 'ALLOWED_MINUTES' || formData.type === 'SKIP_PUNCH' || formData.type === 'SKIP_DOUBLE_DEDUCTION' ? (
+                                        <Select value={formData.attendance_id || undefined} onValueChange={(value) => setFormData({ ...formData, attendance_id: value, punch_to_skip: 'AM_PUNCH_IN' })}>
+                                            <SelectTrigger className="border-slate-200"><SelectValue placeholder="Select employee or all..." /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">All Employees</SelectItem>
+                                                <div className="p-2 border-t">
+                                                    <Input placeholder="Type to search..." value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} className="mb-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                                                </div>
+                                                <div className="max-h-[200px] overflow-y-auto">
+                                                    {employees.filter(emp => !employeeSearch || emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) || String(emp.attendance_id).toLowerCase().includes(employeeSearch.toLowerCase())).filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '').map(emp => (
+                                                        <SelectItem key={emp.id} value={String(emp.attendance_id)}>{emp.attendance_id} - {emp.name}</SelectItem>
+                                                    ))}
+                                                </div>
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <Select value={formData.attendance_id || undefined} onValueChange={(value) => setFormData({ ...formData, attendance_id: value })}>
+                                            <SelectTrigger className="border-slate-200"><SelectValue placeholder="Search and select employee..." /></SelectTrigger>
+                                            <SelectContent>
+                                                <div className="p-2">
+                                                    <Input placeholder="Type to search..." value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} className="mb-2" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} />
+                                                </div>
+                                                <div className="max-h-[200px] overflow-y-auto">
+                                                    {employees.filter(emp => !employeeSearch || emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) || String(emp.attendance_id).toLowerCase().includes(employeeSearch.toLowerCase())).filter(emp => emp.attendance_id && String(emp.attendance_id).trim() !== '').map(emp => (
+                                                        <SelectItem key={emp.id} value={String(emp.attendance_id)}>{emp.attendance_id} - {emp.name}</SelectItem>
+                                                    ))}
+                                                </div>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label>Exception Type *</Label>
+                                    <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
+                                        <SelectTrigger className="border-slate-200"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {getFilteredExceptionTypes('general', isAdmin || isSupervisor).map(type => (
+                                                <SelectItem key={type.value} value={type.value}>{type.label || formatExceptionTypeLabel(type.value)}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {formData.type !== 'SINGLE_SHIFT' && (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label>From Date <span className="text-red-500">*</span></Label>
+                                        <Input type="date" value={formData.date_from} onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (newDate >= project.date_from && newDate <= project.date_to) {
+                                                setFormData(prev => {
+                                                    const next = { ...prev, date_from: newDate };
+                                                    if (prev.type === 'ANNUAL_LEAVE' && prev.date_to) {
+                                                        const from = new Date(newDate);
+                                                        const to = new Date(prev.date_to);
+                                                        const diffDays = Math.ceil((Math.abs(to.getTime() - from.getTime())) / (1000 * 60 * 60 * 24)) + 1;
+                                                        next.salary_leave_days = Number.isFinite(diffDays) ? diffDays.toFixed(2) : prev.salary_leave_days;
+                                                    }
+                                                    return next;
+                                                });
+                                            }
+                                        }} min={project.date_from} max={project.date_to} className="border-slate-200" />
+                                    </div>
+                                    <div>
+                                        <Label>To Date <span className="text-red-500">*</span></Label>
+                                        <Input type="date" value={formData.date_to} onChange={(e) => {
+                                            const newDate = e.target.value;
+                                            if (newDate >= formData.date_from && newDate <= project.date_to && newDate >= project.date_from) {
+                                                setFormData(prev => {
+                                                    const next = { ...prev, date_to: newDate };
+                                                    if (prev.type === 'ANNUAL_LEAVE' && prev.date_from) {
+                                                        const from = new Date(prev.date_from);
+                                                        const to = new Date(newDate);
+                                                        const diffDays = Math.ceil((Math.abs(to.getTime() - from.getTime())) / (1000 * 60 * 60 * 24)) + 1;
+                                                        next.salary_leave_days = Number.isFinite(diffDays) ? diffDays.toFixed(2) : prev.salary_leave_days;
+                                                    }
+                                                    return next;
+                                                });
+                                            }
+                                        }} min={formData.date_from} max={project.date_to} className="border-slate-200" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {needsSalaryLeaveDays && (
+                                <div className="space-y-2 border-t pt-4">
+                                    <Label>Salary Leave Days (for salary calculation only) <span className="text-red-500">*</span></Label>
+                                    <Input type="number" step="0.01" min="0" value={formData.salary_leave_days} onChange={(e) => setFormData({ ...formData, salary_leave_days: e.target.value })} placeholder="e.g. 14.17" className="border-slate-200" />
+                                    {formData.date_from && formData.date_to && (
+                                        <p className="text-xs text-emerald-700">💡 Calculated: {Math.ceil((Math.abs(new Date(formData.date_to).getTime() - new Date(formData.date_from).getTime())) / (1000 * 60 * 60 * 24)) + 1} days between selected dates. Edit if partial days are needed.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {needsShiftOverride && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="block">Override Shift Times</Label>
+                                        <Button type="button" variant="ghost" size="sm" onClick={clearShiftOverride} className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50">Clear Shift Override</Button>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div><Label className="text-xs">AM Start</Label><TimePicker placeholder="08:00 AM" value={formData.new_am_start} onChange={(value) => setFormData({ ...formData, new_am_start: value })} /></div>
+                                        <div><Label className="text-xs">AM End</Label><TimePicker placeholder="12:00 PM" value={formData.new_am_end} onChange={(value) => setFormData({ ...formData, new_am_end: value })} /></div>
+                                        <div><Label className="text-xs">PM Start</Label><TimePicker placeholder="01:00 PM" value={formData.new_pm_start} onChange={(value) => setFormData({ ...formData, new_pm_start: value })} /></div>
+                                        <div><Label className="text-xs">PM End</Label><TimePicker placeholder="05:00 PM" value={formData.new_pm_end} onChange={(value) => setFormData({ ...formData, new_pm_end: value })} /></div>
+                                    </div>
+                                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-slate-50">
+                                        <Checkbox id="include-friday" checked={formData.include_friday} onCheckedChange={(checked) => setFormData({ ...formData, include_friday: checked })} />
+                                        <Label htmlFor="include-friday" className="cursor-pointer">Include Friday in shift override</Label>
+                                    </div>
+                                    <p className="text-xs text-slate-500">{formData.include_friday ? 'This override will apply to all days including Friday' : 'This override will apply to all working days except Friday'}</p>
+                                </div>
+                            )}
+
+                            {needsAllowedMinutes && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label>Allowed Minutes *</Label>
+                                            <Input type="number" placeholder="e.g. 60" value={formData.allowed_minutes} onChange={(e) => {
+                                                const raw = e.target.value;
+                                                if (raw === '') { setFormData({ ...formData, allowed_minutes: '' }); }
+                                                else { const value = Math.abs(parseInt(raw)); if (!Number.isNaN(value)) { setFormData({ ...formData, allowed_minutes: value }); } }
+                                            }} min="1" className="border-slate-200" />
+                                        </div>
+                                        <div>
+                                            <Label>Apply To *</Label>
+                                            <Select value={formData.allowed_minutes_type} onValueChange={(value) => setFormData({ ...formData, allowed_minutes_type: value })}>
+                                                <SelectTrigger className="border-slate-200"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="late">Late Arrivals Only</SelectItem>
+                                                    <SelectItem value="early">Early Checkouts Only</SelectItem>
+                                                    <SelectItem value="both">Both Late &amp; Early</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="border border-indigo-100 bg-indigo-50/20 p-3 rounded-lg space-y-2">
+                                        <Label className="text-xs text-indigo-700 font-semibold block">Unified Grace Target (Optional)</Label>
+                                        <p className="text-[10px] text-indigo-600 mb-2">Target a specific punch for these minutes. If Employee is 'All Employees', this adds grace to EVERY employee's matching punch.</p>
+                                        <Select value={formData.target_punch || 'none'} onValueChange={(value) => setFormData({ ...formData, target_punch: value === 'none' ? null : value })}>
+                                            <SelectTrigger className="border-slate-200 h-8 text-xs bg-white"><SelectValue placeholder="No specific punch target" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">General (Late/Early Deductible)</SelectItem>
+                                                <SelectItem value="AM_START">AM Start (Shift In)</SelectItem>
+                                                <SelectItem value="AM_END">AM End (Morning Out)</SelectItem>
+                                                <SelectItem value="PM_START">PM Start (Afternoon In)</SelectItem>
+                                                <SelectItem value="PM_END">PM End (Shift Out)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <p className="text-xs text-slate-500">Minutes to excuse due to natural calamity or personal reasons</p>
+                                </div>
+                            )}
+
+                            {needsSkipPunch && (
+                                <div className="space-y-4">
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                        <p className="text-sm text-amber-800 mb-3">This exception will skip a specific punch from the analysis for the selected dates.</p>
+                                        <div>
+                                            <Label>Punch to Skip *</Label>
+                                            <Select value={formData.punch_to_skip} onValueChange={(value) => setFormData({ ...formData, punch_to_skip: value })}>
+                                                <SelectTrigger className="border-slate-200"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="AM_PUNCH_IN">AM Punch In (Shift Start)</SelectItem>
+                                                    {selectedEmployeeIsSingleShift !== true && <SelectItem value="AM_PUNCH_OUT">AM Punch Out (Morning End)</SelectItem>}
+                                                    {selectedEmployeeIsSingleShift !== true && <SelectItem value="PM_PUNCH_IN">PM Punch In (Afternoon Start)</SelectItem>}
+                                                    <SelectItem value="PM_PUNCH_OUT">PM Punch Out (Shift End)</SelectItem>
+                                                    <SelectItem value="FULL_SKIP">Full Skip (Ignore All Punches)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            {formData.attendance_id && formData.attendance_id !== 'ALL' && (
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    {selectedEmployeeIsSingleShift === true && '⚡ Single shift detected — AM/PM mid-day options hidden'}
+                                                    {selectedEmployeeIsSingleShift === false && '⚡ Split shift detected — all punch options available'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {needsHalfDayHoliday && (
+                                <div className="space-y-4">
+                                    <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                                        <p className="text-sm text-indigo-800 mb-3 font-medium">Half-Day Holiday (Natural Calamity / Global)</p>
+                                        <p className="text-xs text-indigo-600 mb-4">This will mark all employees as present and skip all shift points for the selected target (AM or PM).</p>
+                                        <div>
+                                            <Label>Half-Day Target *</Label>
+                                            <Select value={formData.half_day_target} onValueChange={(value) => setFormData({ ...formData, half_day_target: value })}>
+                                                <SelectTrigger className="border-slate-200 bg-white"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="AM">AM Shift (Morning)</SelectItem>
+                                                    <SelectItem value="PM">PM Shift (Afternoon)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {needsDaySwap && (() => {
+                                const selectedEmployee = employees.find(e => String(e.attendance_id) === String(formData.attendance_id));
+                                const currentWeeklyOff = selectedEmployee?.weekly_off || 'Sunday';
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                            <p className="text-sm text-blue-800 mb-4">This exception swaps a weekly off day with a working day for the selected date range.</p>
+                                            {formData.attendance_id && selectedEmployee && (
+                                                <div className="mb-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                                                    <p className="text-sm font-medium text-blue-900">Current Weekly Off: <span className="text-blue-700 font-bold">{currentWeeklyOff}</span></p>
+                                                    <p className="text-xs text-blue-700 mt-1">Select a new weekly off day below, and {currentWeeklyOff} will automatically become a working day</p>
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label>New Weekly Off Day *</Label>
+                                                    <Select value={formData.new_weekly_off} onValueChange={(value) => setFormData({ ...formData, new_weekly_off: value, working_day_override: currentWeeklyOff })}>
+                                                        <SelectTrigger className="border-slate-200"><SelectValue placeholder="Select day..." /></SelectTrigger>
+                                                        <SelectContent>
+                                                            {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <p className="text-xs text-slate-500 mt-1">This day will become the holiday</p>
+                                                </div>
+                                                <div>
+                                                    <Label>New Working Day (Auto-filled) *</Label>
+                                                    <Input value={formData.working_day_override} disabled className="bg-slate-100" />
+                                                    <p className="text-xs text-green-600 mt-1">✓ Automatically set to current weekly off</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            <div>
+                                <Label>Details / Reason</Label>
+                                <Input value={formData.details} onChange={(e) => setFormData({ ...formData, details: e.target.value })} placeholder="Optional notes" className="border-slate-200" />
+                            </div>
+
+                            <div className="flex gap-3">
+                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createMutation.isPending}>
+                                    {createMutation.isPending ? 'Adding...' : 'Add Exception'}
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Exceptions Section */}
+            <Card className="border-0 shadow-sm bg-blue-50/30">
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <CardTitle>Exceptions ({filteredExceptions.length})</CardTitle>
+                        <div className="flex gap-2">
+                            <div className="relative">
+                                <Button variant="outline" size="sm" disabled={isImportingLeaves} onClick={async () => {
+                                    try {
+                                        setIsImportingLeaves(true);
+                                        const response = await base44.functions.invoke('importAnnualLeavesToProject', { projectId: project.id });
+                                        if (response.data.success) {
+                                            toast.success(response.data.message);
+                                            queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
+                                            await new Promise(r => setTimeout(r, 500));
+                                            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+                                        }
+                                    } catch (error) {
+                                        toast.error('Failed to import: ' + error.message);
+                                    } finally {
+                                        setIsImportingLeaves(false);
+                                    }
+                                }} className="text-green-600 border-green-300 hover:bg-green-50">
+                                    {isImportingLeaves ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importing...</> : <><Calendar className="w-4 h-4 mr-2" />Import Annual Leaves</>}
+                                </Button>
+                                {isImportingLeaves && <div className="absolute -bottom-1.5 left-0 right-0 h-1 bg-green-400 animate-pulse rounded-full" />}
+                            </div>
+                            <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredExceptions.length === 0}>
+                                <Download className="w-4 h-4 mr-2" />Export
+                            </Button>
+                            {!showForm && (
+                                <Button onClick={() => setShowForm(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                                    <Plus className="w-4 h-4 mr-2" />Add Exception
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-4">
+                            {selectedExceptions.length > 0 && !isUser && (
+                                <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => setShowBulkEdit(true)} className="bg-indigo-600 hover:bg-indigo-700"><Edit className="w-4 h-4 mr-2" />Edit ({selectedExceptions.length})</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleBulkToggleUse(true)}>Enable Use</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleBulkToggleUse(false)}>Disable Use</Button>
+                                    <Button size="sm" variant="destructive" onClick={handleBulkDelete}><Trash2 className="w-4 h-4 mr-2" />Delete</Button>
+                                </div>
+                            )}
+                            <div className="relative flex-1 max-w-xs">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <Input className="border-slate-200 pl-9" placeholder="Search ID, name, or details..." value={filter.search} onChange={(e) => setFilter({ ...filter, search: e.target.value })} />
+                            </div>
+                            <Button size="sm" variant="outline" onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className="relative">
+                                <Filter className="w-4 h-4 mr-2" />{showAdvancedFilters ? 'Hide' : 'Show'} Filters
+                                {hasAdvancedFiltersActive && (
+                                    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                    </span>
+                                )}
+                            </Button>
+                            {hasActiveFilters && <Button size="sm" variant="ghost" onClick={clearFilters} className="text-red-600 hover:text-red-700">Clear All</Button>}
+                        </div>
+
+                        {showAdvancedFilters && (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-lg border">
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Type</Label>
+                                    <Select value={filter.type} onValueChange={(value) => setFilter({ ...filter, type: value })}>
+                                        <SelectTrigger className="border-slate-200 h-9"><SelectValue placeholder="All types" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All types</SelectItem>
+                                            {getFilteredExceptionTypes('filter', true).map(type => (
+                                                <SelectItem key={type.value} value={type.value}>{type.label || formatExceptionTypeLabel(type.value)}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Department</Label>
+                                    <Select value={filter.department} onValueChange={(value) => setFilter({ ...filter, department: value })}>
+                                        <SelectTrigger className="border-slate-200 h-9"><SelectValue placeholder="All departments" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All departments</SelectItem>
+                                            {departments.filter(dept => dept && dept.trim() !== '').map(dept => <SelectItem key={dept} value={dept || 'unknown'}>{dept}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">From Date</Label>
+                                    <Input type="date" value={filter.dateFrom} onChange={(e) => { const v = e.target.value; if (!v || (v >= project.date_from && v <= project.date_to)) setFilter({ ...filter, dateFrom: v }); }} min={project.date_from} max={project.date_to} className="h-9 border-slate-200" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">To Date</Label>
+                                    <Input type="date" value={filter.dateTo} onChange={(e) => { const v = e.target.value; if (!v || (v >= project.date_from && v <= project.date_to && (!filter.dateFrom || v >= filter.dateFrom))) setFilter({ ...filter, dateTo: v }); }} min={filter.dateFrom || project.date_from} max={project.date_to} className="h-9 border-slate-200" />
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">From Report</Label>
+                                    <Select value={filter.createdFromReport} onValueChange={(value) => setFilter({ ...filter, createdFromReport: value })}>
+                                        <SelectTrigger className="border-slate-200 h-9"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Use in Analysis</Label>
+                                    <Select value={filter.useInAnalysis} onValueChange={(value) => setFilter({ ...filter, useInAnalysis: value })}>
+                                        <SelectTrigger className="border-slate-200 h-9"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="yes">Yes</SelectItem><SelectItem value="no">No</SelectItem></SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs text-slate-600 mb-1">Approval Status</Label>
+                                    <Select value={filter.approvalStatus} onValueChange={(value) => setFilter({ ...filter, approvalStatus: value })}>
+                                        <SelectTrigger className="border-slate-200 h-9"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All</SelectItem>
+                                            <SelectItem value="pending_dept_head">Pending Dept Head</SelectItem>
+                                            <SelectItem value="approved_dept_head">Approved Dept Head</SelectItem>
+                                            <SelectItem value="pending_hr">Pending HR</SelectItem>
+                                            <SelectItem value="approved_hr">Approved HR</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {filteredExceptions.length === 0 ? (
+                        <p className="text-slate-500 text-center py-8">No exceptions found</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
+                                    <TableRow className="hover:bg-transparent border-none">
+                                        {!isUser && (
+                                            <TableHead className="w-12">
+                                                <Checkbox checked={selectedExceptions.length === filteredExceptions.length && filteredExceptions.length > 0} onCheckedChange={(checked) => { if (checked) { setSelectedExceptions(filteredExceptions); } else { setSelectedExceptions([]); } }} />
+                                            </TableHead>
+                                        )}
+                                        <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort}>Att ID</SortableTableHead>
+                                        <TableHead>Name</TableHead>
+                                        <SortableTableHead sortKey="type" currentSort={sort} onSort={setSort}>Type</SortableTableHead>
+                                        <SortableTableHead sortKey="date_from" currentSort={sort} onSort={setSort}>From</SortableTableHead>
+                                        <SortableTableHead sortKey="date_to" currentSort={sort} onSort={setSort}>To</SortableTableHead>
+                                        <TableHead>Details</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {paginatedExceptions.map((exception) => {
+                                        const employeeName = employees.find(e => String(e.attendance_id) === String(exception.attendance_id) && e.company === project.company)?.name || '—';
+                                        return (
+                                            <TableRow key={exception.id} className="hover:bg-slate-100/50 transition-colors duration-200">
+                                                {!isUser && (
+                                                    <TableCell className="p-1">
+                                                        <Checkbox checked={selectedExceptions.some(e => e.id === exception.id)} onCheckedChange={(checked) => { if (checked) { setSelectedExceptions([...selectedExceptions, exception]); } else { setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id)); } }} />
+                                                    </TableCell>
+                                                )}
+                                                <TableCell className="p-1 text-sm font-mono text-slate-900">{exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}</TableCell>
+                                                <TableCell className="p-1 text-sm text-slate-900">{exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}</TableCell>
+                                                <TableCell className="p-1">
+                                                    {exception.is_custom_type ? (
+                                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">{exception.custom_type_name || 'Custom'}</span>
+                                                    ) : (
+                                                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>{exception.type.replace(/_/g, ' ')}</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="p-1 text-sm">{exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) ? '—' : new Date(exception.date_from).toLocaleDateString()}</TableCell>
+                                                <TableCell className="p-1 text-sm">{exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) ? '—' : new Date(exception.date_to).toLocaleDateString()}</TableCell>
+                                                <TableCell className="p-1 text-sm max-w-xs truncate">{exception.details || '-'}</TableCell>
+                                                <TableCell className="text-right p-1">
+                                                    <div className="flex gap-1 justify-end">
+                                                        <Button size="sm" variant="ghost" onClick={() => setViewingException(exception)} title="View exception"><Eye className="w-4 h-4 text-indigo-600" /></Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => { if (exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) { toast.error("Only Admin and CEO can edit allowed minutes."); return; } setEditingException(exception); }} disabled={exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes}><Edit className={`w-4 h-4 ${exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes ? 'text-slate-400' : 'text-blue-600'}`} /></Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => deleteMutation.mutate(exception.id)}><Trash2 className="w-4 h-4 text-red-600" /></Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                    {sortedExceptions.length > 0 && (
+                        <TablePagination totalItems={sortedExceptions.length} currentPage={currentPage} rowsPerPage={rowsPerPage} onPageChange={setCurrentPage} onRowsPerPageChange={(value) => { setRowsPerPage(value); setCurrentPage(1); }} />
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Payroll Checklist Section */}
+            <ChecklistSection project={project} checklistItems={sortedChecklistItems} currentUser={currentUser} reportRunId={undefined} />
+
+            {/* Report-Generated Exceptions (grouped by report) */}
             <ReportGeneratedExceptions
                 project={project}
                 reportExceptions={reportExceptions}
@@ -29,204 +1403,79 @@ import ReportGeneratedExceptions from '../exceptions/ReportGeneratedExceptions';
             />
 
             {/* Edit Exception Dialog */}
-            <EditExceptionDialog
-                open={!!editingException}
-                onClose={() => setEditingException(null)}
-                exception={editingException}
-                projectId={project.id}
-                canEditAllowedMinutes={canEditAllowedMinutes}
-            />
+            <EditExceptionDialog open={!!editingException} onClose={() => setEditingException(null)} exception={editingException} projectId={project.id} canEditAllowedMinutes={canEditAllowedMinutes} />
 
             {/* Bulk Edit Dialog */}
-            <BulkEditExceptionDialog
-                open={showBulkEdit}
-                onClose={() => {
-                    setShowBulkEdit(false);
-                    setSelectedExceptions([]);
-                }}
-                selectedExceptions={selectedExceptions}
-                projectId={project.id}
-                canEditAllowedMinutes={canEditAllowedMinutes}
-            />
+            <BulkEditExceptionDialog open={showBulkEdit} onClose={() => { setShowBulkEdit(false); setSelectedExceptions([]); }} selectedExceptions={selectedExceptions} projectId={project.id} canEditAllowedMinutes={canEditAllowedMinutes} />
 
             {/* View Exception Dialog */}
             <Dialog open={!!viewingException} onOpenChange={() => setViewingException(null)}>
                 <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Exception Details</DialogTitle>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Exception Details</DialogTitle></DialogHeader>
                     {viewingException && (
                         <div className="space-y-4 py-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label className="text-slate-500 text-xs">Employee ID</Label>
-                                    <p className="font-medium text-slate-900">
-                                        {viewingException.attendance_id === 'ALL' ? 'All Employees' : viewingException.attendance_id}
-                                    </p>
-                                </div>
-                                <div>
-                                    <Label className="text-slate-500 text-xs">Employee Name</Label>
-                                    <p className="font-medium text-slate-900">
-                                        {viewingException.attendance_id === 'ALL' 
-                                            ? '—' 
-                                            : employees.find(e => String(e.attendance_id) === String(viewingException.attendance_id) && e.company === project.company)?.name || '—'}
-                                    </p>
-                                </div>
+                                <div><Label className="text-slate-500 text-xs">Employee ID</Label><p className="font-medium text-slate-900">{viewingException.attendance_id === 'ALL' ? 'All Employees' : viewingException.attendance_id}</p></div>
+                                <div><Label className="text-slate-500 text-xs">Employee Name</Label><p className="font-medium text-slate-900">{viewingException.attendance_id === 'ALL' ? '—' : employees.find(e => String(e.attendance_id) === String(viewingException.attendance_id) && e.company === project.company)?.name || '—'}</p></div>
                                 <div>
                                     <Label className="text-slate-500 text-xs">Exception Type</Label>
                                     {viewingException.is_custom_type ? (
-                                        <div>
-                                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 inline-block">
-                                                {viewingException.custom_type_name || 'Custom'}
-                                            </span>
-                                            <p className="text-xs text-amber-600 mt-1">Not used in analysis</p>
-                                        </div>
+                                        <div><span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 inline-block">{viewingException.custom_type_name || 'Custom'}</span><p className="text-xs text-amber-600 mt-1">Not used in analysis</p></div>
                                     ) : (
                                         <p className="font-medium text-slate-900">{viewingException.type.replace(/_/g, ' ')}</p>
                                     )}
                                 </div>
-                                <div>
-                                    <Label className="text-slate-500 text-xs">Created From Report</Label>
-                                    <p className="font-medium text-slate-900">
-                                        {viewingException.created_from_report ? 'Yes' : 'No'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <Label className="text-slate-500 text-xs">From Date</Label>
-                                    <p className="font-medium text-slate-900">
-                                        {new Date(viewingException.date_from).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div>
-                                    <Label className="text-slate-500 text-xs">To Date</Label>
-                                    <p className="font-medium text-slate-900">
-                                        {new Date(viewingException.date_to).toLocaleDateString()}
-                                    </p>
-                                </div>
+                                <div><Label className="text-slate-500 text-xs">Created From Report</Label><p className="font-medium text-slate-900">{viewingException.created_from_report ? 'Yes' : 'No'}</p></div>
+                                <div><Label className="text-slate-500 text-xs">From Date</Label><p className="font-medium text-slate-900">{new Date(viewingException.date_from).toLocaleDateString()}</p></div>
+                                <div><Label className="text-slate-500 text-xs">To Date</Label><p className="font-medium text-slate-900">{new Date(viewingException.date_to).toLocaleDateString()}</p></div>
                             </div>
-
                             {viewingException.type === 'SHIFT_OVERRIDE' && (
                                 <div className="border-t pt-4">
                                     <Label className="text-slate-500 text-xs mb-2 block">Shift Override Times</Label>
                                     <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg">
-                                        <div>
-                                            <span className="text-xs text-slate-600">AM Start:</span>
-                                            <p className="font-medium">{viewingException.new_am_start || '—'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-600">AM End:</span>
-                                            <p className="font-medium">{viewingException.new_am_end || '—'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-600">PM Start:</span>
-                                            <p className="font-medium">{viewingException.new_pm_start || '—'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-xs text-slate-600">PM End:</span>
-                                            <p className="font-medium">{viewingException.new_pm_end || '—'}</p>
-                                        </div>
+                                        <div><span className="text-xs text-slate-600">AM Start:</span><p className="font-medium">{viewingException.new_am_start || '—'}</p></div>
+                                        <div><span className="text-xs text-slate-600">AM End:</span><p className="font-medium">{viewingException.new_am_end || '—'}</p></div>
+                                        <div><span className="text-xs text-slate-600">PM Start:</span><p className="font-medium">{viewingException.new_pm_start || '—'}</p></div>
+                                        <div><span className="text-xs text-slate-600">PM End:</span><p className="font-medium">{viewingException.new_pm_end || '—'}</p></div>
                                     </div>
-                                    {viewingException.include_friday !== undefined && (
-                                        <p className="text-sm text-slate-600 mt-2">
-                                            {viewingException.include_friday 
-                                                ? '✓ Includes Friday' 
-                                                : '✗ Excludes Friday'}
-                                        </p>
-                                    )}
+                                    {viewingException.include_friday !== undefined && <p className="text-sm text-slate-600 mt-2">{viewingException.include_friday ? '✓ Includes Friday' : '✗ Excludes Friday'}</p>}
                                 </div>
                             )}
-
-                            {/* Added display for other_minutes */}
-                            {viewingException.other_minutes && (
-                                <div className="border-t pt-4">
-                                    <Label className="text-slate-500 text-xs">Other Minutes</Label>
-                                    <p className="font-medium text-slate-900">{viewingException.other_minutes} minutes</p>
-                                </div>
-                            )}
-
-                            {viewingException.allowed_minutes && (
-                                <div className="border-t pt-4">
-                                    <Label className="text-slate-500 text-xs">Allowed Minutes (Excused)</Label>
-                                    <p className="font-medium text-slate-900">{viewingException.allowed_minutes} minutes</p>
-                                </div>
-                            )}
-
-                            {viewingException.details && (
-                                <div className="border-t pt-4">
-                                    <Label className="text-slate-500 text-xs">Details / Reason</Label>
-                                    <p className="text-slate-900 mt-1">{viewingException.details}</p>
-                                </div>
-                            )}
-
+                            {viewingException.other_minutes && (<div className="border-t pt-4"><Label className="text-slate-500 text-xs">Other Minutes</Label><p className="font-medium text-slate-900">{viewingException.other_minutes} minutes</p></div>)}
+                            {viewingException.allowed_minutes && (<div className="border-t pt-4"><Label className="text-slate-500 text-xs">Allowed Minutes (Excused)</Label><p className="font-medium text-slate-900">{viewingException.allowed_minutes} minutes</p></div>)}
+                            {viewingException.details && (<div className="border-t pt-4"><Label className="text-slate-500 text-xs">Details / Reason</Label><p className="text-slate-900 mt-1">{viewingException.details}</p></div>)}
                             <div className="border-t pt-4">
                                 <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
-                                    <div>
-                                        <span>Created:</span>
-                                        <p className="text-slate-900">
-                                            {new Date(viewingException.created_date).toLocaleString('en-US', {
-                                                day: '2-digit',
-                                                month: '2-digit',
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                                hour12: true,
-                                                timeZone: 'Asia/Dubai'
-                                            })}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <span>Created By:</span>
-                                        <p className="text-slate-900">{viewingException.created_by || '—'}</p>
-                                    </div>
+                                    <div><span>Created:</span><p className="text-slate-900">{new Date(viewingException.created_date).toLocaleString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Dubai' })}</p></div>
+                                    <div><span>Created By:</span><p className="text-slate-900">{viewingException.created_by || '—'}</p></div>
                                 </div>
                             </div>
                         </div>
                     )}
-                    <div className="flex justify-end">
-                        <Button onClick={() => setViewingException(null)}>Close</Button>
-                    </div>
+                    <div className="flex justify-end"><Button onClick={() => setViewingException(null)}>Close</Button></div>
                 </DialogContent>
             </Dialog>
 
             {/* Import Preview Dialog */}
             <Dialog open={showImportPreview} onOpenChange={setShowImportPreview}>
                 <DialogContent className="max-w-4xl max-h-[80vh]">
-                    <DialogHeader>
-                        <DialogTitle>Import Preview - Review Before Importing</DialogTitle>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Import Preview - Review Before Importing</DialogTitle></DialogHeader>
                     {importPreview && (
                         <div className="space-y-4 overflow-y-auto">
                             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                 <p className="text-sm text-blue-800">
                                     Ready to import <strong>{importPreview.exceptions.length}</strong> exception{importPreview.exceptions.length > 1 ? 's' : ''}.
-                                    {importPreview.warnings.length > 0 && (
-                                        <span className="block mt-2 text-amber-700">
-                                            ⚠️ {importPreview.warnings.length} warning{importPreview.warnings.length > 1 ? 's' : ''} found
-                                        </span>
-                                    )}
+                                    {importPreview.warnings.length > 0 && <span className="block mt-2 text-amber-700">⚠️ {importPreview.warnings.length} warning{importPreview.warnings.length > 1 ? 's' : ''} found</span>}
                                 </p>
                             </div>
-
                             <div className="border rounded-lg overflow-x-auto">
                                 <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Attendance ID</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>From</TableHead>
-                                            <TableHead>To</TableHead>
-                                            <TableHead>Details</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
+                                    <TableHeader><TableRow><TableHead>Attendance ID</TableHead><TableHead>Type</TableHead><TableHead>From</TableHead><TableHead>To</TableHead><TableHead>Details</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                         {importPreview.exceptions.slice(0, 10).map((ex, idx) => (
                                             <TableRow key={idx}>
                                                 <TableCell className="text-sm">{ex.attendance_id}</TableCell>
-                                                <TableCell className="text-sm">
-                                                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(ex.type)}`}>
-                                                        {ex.type.replace(/_/g, ' ')}
-                                                    </span>
-                                                </TableCell>
+                                                <TableCell className="text-sm"><span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(ex.type)}`}>{ex.type.replace(/_/g, ' ')}</span></TableCell>
                                                 <TableCell className="text-sm">{new Date(ex.date_from).toLocaleDateString()}</TableCell>
                                                 <TableCell className="text-sm">{new Date(ex.date_to).toLocaleDateString()}</TableCell>
                                                 <TableCell className="text-sm">{ex.details || '—'}</TableCell>
@@ -234,29 +1483,11 @@ import ReportGeneratedExceptions from '../exceptions/ReportGeneratedExceptions';
                                         ))}
                                     </TableBody>
                                 </Table>
-                                {importPreview.exceptions.length > 10 && (
-                                    <div className="p-3 bg-slate-50 text-center text-sm text-slate-600 border-t">
-                                        ... and {importPreview.exceptions.length - 10} more
-                                    </div>
-                                )}
+                                {importPreview.exceptions.length > 10 && <div className="p-3 bg-slate-50 text-center text-sm text-slate-600 border-t">... and {importPreview.exceptions.length - 10} more</div>}
                             </div>
-
                             <div className="flex gap-3 justify-end">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setShowImportPreview(false);
-                                        setImportPreview(null);
-                                    }}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    className="bg-green-600 hover:bg-green-700"
-                                    onClick={confirmImport}
-                                >
-                                    Confirm & Import {importPreview.exceptions.length} Exception{importPreview.exceptions.length > 1 ? 's' : ''}
-                                </Button>
+                                <Button variant="outline" onClick={() => { setShowImportPreview(false); setImportPreview(null); }}>Cancel</Button>
+                                <Button className="bg-green-600 hover:bg-green-700" onClick={confirmImport}>Confirm & Import {importPreview.exceptions.length} Exception{importPreview.exceptions.length > 1 ? 's' : ''}</Button>
                             </div>
                         </div>
                     )}
