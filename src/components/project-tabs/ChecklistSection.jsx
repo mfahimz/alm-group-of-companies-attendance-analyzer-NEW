@@ -93,7 +93,8 @@ export default function ChecklistSection({ project, checklistItems = [], current
         salaryModifications: true,
         reportTasks: true,
         annualLeave: true,
-        recurringAdjustments: true
+        recurringAdjustments: true,
+        otAdjustments: true
     });
 
     // syncingItem: tracks which individual sync is currently running — null means none
@@ -250,6 +251,25 @@ export default function ChecklistSection({ project, checklistItems = [], current
         }
     };
 
+    // runOTAdjustmentsSync: syncs OT hours + manual salary adjustments from the Adjustments tab
+    const runOTAdjustmentsSync = async () => {
+        if (syncingItem) return;
+        setSyncingItem('otAdjustments');
+        try {
+            await base44.functions.invoke('syncOTAdjustmentsChecklist', {
+                project_id: project.id,
+                project_name: project.name
+            });
+            toast.success('OT & adjustments synced to checklist');
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+        } catch (err) {
+            toast.error('Sync failed: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setSyncingItem(null);
+            setSyncDropdownOpen(false);
+        }
+    };
+
     // runRecurringAdjustmentsSync: runs only the recurring adjustments checklist sync
     const runRecurringAdjustmentsSync = async () => {
         if (syncingItem) return;
@@ -322,7 +342,15 @@ export default function ChecklistSection({ project, checklistItems = [], current
                 });
             }
 
-            // SYNC 3: Recurring adjustments — only if checked
+            // SYNC 3: OT & manual adjustments — only if checked
+            if (selectedSyncs.otAdjustments) {
+                await base44.functions.invoke('syncOTAdjustmentsChecklist', {
+                    project_id: project.id,
+                    project_name: project.name
+                });
+            }
+
+            // SYNC 4: Recurring adjustments — only if checked
             if (selectedSyncs.recurringAdjustments) {
                 await base44.functions.invoke('syncRecurringAdjustmentsChecklist', {
                     project_id: project.id,
@@ -479,6 +507,27 @@ export default function ChecklistSection({ project, checklistItems = [], current
                                             className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
                                         >
                                             {syncingItem === 'annualLeave' ? '...' : 'Run'}
+                                        </button>
+                                    </div>
+
+                                    {/* OT & Manual Adjustments option */}
+                                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedSyncs.otAdjustments}
+                                                onChange={e => setSelectedSyncs(prev => ({ ...prev, otAdjustments: e.target.checked }))}
+                                                className="h-3.5 w-3.5 accent-indigo-600"
+                                                id="sync-ot-adj"
+                                            />
+                                            <label htmlFor="sync-ot-adj" className="text-xs font-medium text-slate-700 cursor-pointer">OT & Manual Adjustments</label>
+                                        </div>
+                                        <button
+                                            onClick={runOTAdjustmentsSync}
+                                            disabled={!!syncingItem}
+                                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            {syncingItem === 'otAdjustments' ? '...' : 'Run'}
                                         </button>
                                     </div>
 

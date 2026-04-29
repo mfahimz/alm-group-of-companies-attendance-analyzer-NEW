@@ -172,7 +172,7 @@ export default function OvertimeTab({ project }) {
     const [editableAdjustments, setEditableAdjustments] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [isSavingAdjustments, setIsSavingAdjustments] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
+
     const [sortColumn, setSortColumn] = useState({ key: 'name', direction: 'asc' });
 
     // Preview States
@@ -651,136 +651,6 @@ export default function OvertimeTab({ project }) {
         }
     };
 
-    // Sync Adjustments to Checklist logic
-    const handleSyncToChecklist = async () => {
-        if (!project?.id) return;
-        
-        setIsSyncing(true);
-        const flattenToSum = (val) => {
-            if (!val) return 0;
-            if (Array.isArray(val)) {
-                return val.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-            }
-            return parseFloat(val) || 0;
-        };
-
-        try {
-            // 1. Fetch current checklist items once to check for existing tasks (Efficiency)
-            const existingTasks = await base44.entities.ChecklistItem.filter({ 
-                project_id: project.id,
-                is_auto_created: true
-            });
-
-            const operations = []; // To track all create/update calls
-
-            // ============================================
-            // 2. Overtime Task Logic (Single Task)
-            // ============================================
-            const otEmployees = overtimeData.filter(emp => {
-                const nOT = flattenToSum(emp.normalOtHours);
-                const sOT = flattenToSum(emp.specialOtHours);
-                return nOT > 0 || sOT > 0;
-            });
-
-            if (otEmployees.length > 0) {
-                const otTaskName = `Overtime Management - ${project.name}`;
-                const otDescription = otEmployees.map(e => e.name).join(', ');
-                const otFingerprint = `OT_MANAGEMENT_${project.id}`;
-                
-                const existingOTTask = existingTasks.find(t => t.fingerprint === otFingerprint);
-                const otPayload = {
-                    project_id: project.id,
-                    task_type: otTaskName,
-                    task_description: otDescription,
-                    status: 'pending',
-                    is_auto_created: true,
-                    linked_entity_id: 'salary_adjustments', // Link to Salary Adjustments
-                    fingerprint: otFingerprint,
-                    notes: `System-generated task for overtime monitoring.\nEmployees: ${otEmployees.length}`
-                };
-
-                if (existingOTTask) {
-                    await base44.entities.ChecklistItem.update(existingOTTask.id, otPayload);
-                } else {
-                    await base44.entities.ChecklistItem.create(otPayload);
-                }
-            }
-
-            // ============================================
-            // 3. Adjustment Task Logic (Categorized Tasks)
-            // ============================================
-            // Fixed set of columns to check as per UI/schema
-            const columns = [
-                { key: 'bonus', name: 'Bonus' },
-                { key: 'incentive', name: 'Incentive' },
-                { key: 'open_leave_salary', name: 'Open Leave Salary' },
-                { key: 'variable_salary', name: 'Variable Salary' },
-                { key: 'otherDeduction', name: 'Other Deduction' },
-                { key: 'advanceSalaryDeduction', name: 'Advance Salary Deduction' }
-            ];
-
-            for (const col of columns) {
-                const entries = [];
-                
-                overtimeData.forEach(emp => {
-                    const empEntries = emp[col.key];
-                    if (Array.isArray(empEntries) && empEntries.length > 0) {
-                        empEntries.forEach(entry => {
-                            if (parseFloat(entry.amount) > 0) {
-                                entries.push({
-                                    name: emp.name,
-                                    amount: entry.amount,
-                                    desc: entry.desc || 'No remarks'
-                                });
-                            }
-                        });
-                    } else if (parseFloat(emp[col.key]) > 0) {
-                        // Handle legacy numeric values if any
-                        entries.push({
-                            name: emp.name,
-                            amount: emp[col.key],
-                            desc: 'No remarks'
-                        });
-                    }
-                });
-
-                if (entries.length > 0) {
-                    const adjTaskName = col.name;
-                    const adjDescription = entries.map(e => 
-                        `${e.name} | ${parseFloat(e.amount).toFixed(2)} AED | ${e.desc}`
-                    ).join('\n');
-                    const adjFingerprint = `ADJ_${col.key}_${project.id}`;
-
-                    const existingAdjTask = existingTasks.find(t => t.fingerprint === adjFingerprint);
-                    const adjPayload = {
-                        project_id: project.id,
-                        task_type: adjTaskName,
-                        task_description: adjDescription,
-                        status: 'pending',
-                        is_auto_created: true,
-                        linked_entity_id: 'salary_adjustments',
-                        fingerprint: adjFingerprint,
-                        notes: `System-generated adjustment tasks for ${col.name}.\nTotal Entries: ${entries.length}`
-                    };
-
-                    if (existingAdjTask) {
-                        await base44.entities.ChecklistItem.update(existingAdjTask.id, adjPayload);
-                    } else {
-                        await base44.entities.ChecklistItem.create(adjPayload);
-                    }
-                }
-            }
-
-            toast.success('Checklist updated successfully with adjustments.');
-            queryClient.invalidateQueries(['checklistItems', project.id]);
-        } catch (error) {
-            console.error('Sync Error:', error);
-            toast.error('Failed to sync to checklist: ' + error.message);
-        } finally {
-            setIsSyncing(false);
-        }
-    };
-
     // ============================================
     // RENDER
     // ============================================
@@ -809,23 +679,6 @@ export default function OvertimeTab({ project }) {
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Button
-                            onClick={handleSyncToChecklist}
-                            disabled={isSyncing || isSaving}
-                            className="bg-indigo-600 hover:bg-indigo-700 shadow-md transition-all duration-200"
-                        >
-                            {isSyncing ? (
-                                <>
-                                    <Clock className="w-4 h-4 mr-2 animate-spin" />
-                                    Syncing...
-                                </>
-                            ) : (
-                                <>
-                                    <Clock className="w-4 h-4 mr-2" />
-                                    Sync Adjustments to Checklist
-                                </>
-                            )}
-                        </Button>
                         <Button
                             variant="outline"
                             onClick={handleExportTemplate}
