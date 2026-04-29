@@ -138,10 +138,76 @@ export default function ProjectDetail() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-                <div className="text-slate-500">Loading project...</div>
-            </div>);
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white p-6 space-y-6">
+        {/* Breadcrumb skeleton */}
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-16 bg-slate-200 rounded animate-pulse" />
+          <div className="h-4 w-3 bg-slate-200 rounded animate-pulse" />
+          <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
+        </div>
 
+        {/* Header skeleton */}
+        <div className="bg-white rounded-[2rem] border border-slate-200/60 shadow-sm p-6 sm:p-10 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-2 h-12 rounded-full bg-slate-200 animate-pulse" />
+              <div className="space-y-2">
+                <div className="h-8 w-64 bg-slate-200 rounded-lg animate-pulse" />
+                <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
+              </div>
+            </div>
+            <div className="h-7 w-20 bg-slate-200 rounded-full animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="h-4 w-4 bg-slate-200 rounded animate-pulse" />
+            <div className="h-4 w-48 bg-slate-200 rounded animate-pulse" />
+          </div>
+        </div>
+
+        {/* Tabs skeleton */}
+        <div className="h-12 bg-slate-200/50 rounded-full w-full sm:w-auto animate-pulse" />
+
+        {/* Content skeleton */}
+        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 ring-1 ring-slate-200 p-6 min-h-[400px] space-y-4">
+          {/* Shimmer bars */}
+          {[100, 80, 90, 60, 75].map((w, i) => (
+            <div key={i} className="h-4 rounded animate-pulse bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%]" style={{ width: `${w}%`, animationDelay: `${i * 0.1}s` }} />
+          ))}
+          <div className="mt-6 grid grid-cols-3 gap-4">
+            {[1,2,3].map(i => (
+              <div key={i} className="h-24 rounded-xl bg-slate-100 animate-pulse" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+          {[70, 85, 50].map((w, i) => (
+            <div key={i} className="h-4 rounded animate-pulse bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 bg-[length:200%_100%]" style={{ width: `${w}%`, animationDelay: `${(i + 5) * 0.1}s` }} />
+          ))}
+
+          {/* Buffering indicator */}
+          <div className="flex items-center justify-center gap-3 pt-8">
+            <div className="flex gap-1.5">
+              {[0, 1, 2, 3, 4].map(i => (
+                <div
+                  key={i}
+                  className="w-1.5 rounded-full bg-indigo-400"
+                  style={{
+                    animation: `buffering 1.2s ease-in-out ${i * 0.15}s infinite`,
+                    height: '20px'
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-sm text-slate-400 font-medium">Loading project...</span>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes buffering {
+            0%, 100% { transform: scaleY(0.4); opacity: 0.4; }
+            50% { transform: scaleY(1); opacity: 1; }
+          }
+        `}</style>
+      </div>
+    );
   }
 
   if (!project) {
