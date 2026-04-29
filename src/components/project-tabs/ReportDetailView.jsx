@@ -2093,14 +2093,10 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 <>
                                     {!reportRun.is_final && (
                                         <Button onClick={handleReanalyze} disabled={isReanalyzing} className="bg-indigo-600 hover:bg-indigo-700" title="Re-runs analysis with latest exceptions and shifts">
-                                            {isReanalyzing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving & Reanalyzing...</> : <><Zap className="w-4 h-4 mr-2" />Reanalyze Report</>}
+                                            {isReanalyzing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving & Reanalyzing...</> : <><Zap className="w-4 h-4 mr-2" />Save & Reanalyze</>}
                                         </Button>
                                     )}
-                                    {!reportRun.is_final && (
-                                        <Button onClick={() => setShowSaveConfirmation(true)} disabled={isSaving} className="bg-green-600 hover:bg-green-700" title="Save report edits as exceptions">
-                                            {isSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : <><Save className="w-4 h-4 mr-2" />Save Report</>}
-                                        </Button>
-                                    )}
+
                                     {!reportRun.is_final && (
                                         <Button onClick={() => finalizeReportMutation.mutate()} disabled={finalizeReportMutation.isPending} className="bg-purple-600 hover:bg-purple-700" title="Finalize report for salary calculation">
                                             {finalizeReportMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Finalizing...</> : <><CheckCircle className="w-4 h-4 mr-2" />Finalize Report</>}
