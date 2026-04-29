@@ -106,34 +106,297 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         refetchOnMount: false
     });
 
-    // Analysis functions - simplified since analysis runs on backend
-    const performDataQualityCheck = () => {
+    // Fetch full data needed for comprehensive quality check (lazy - only fetched when button pressed)
+    const [fullCheckData, setFullCheckData] = React.useState(null);
+    const [isCheckLoading, setIsCheckLoading] = React.useState(false);
+
+    const parseTimeForCheck = (timeStr) => {
+        if (!timeStr || timeStr === '—' || timeStr === '-') return null;
+        const ampm = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)/i);
+        if (ampm) {
+            let h = parseInt(ampm[1]), m = parseInt(ampm[2]);
+            const period = ampm[4].toUpperCase();
+            if (period === 'PM' && h !== 12) h += 12;
+            if (period === 'AM' && h === 12) h = 0;
+            const d = new Date(); d.setHours(h, m, 0, 0); return d;
+        }
+        const h24 = timeStr.match(/^(\d{1,2}):(\d{2})/);
+        if (h24) { const d = new Date(); d.setHours(parseInt(h24[1]), parseInt(h24[2]), 0, 0); return d; }
+        return null;
+    };
+
+    const normalizeApplicableDays = (value) => {
+        if (!value) return [];
+        try { const p = JSON.parse(value); if (Array.isArray(p)) return p; } catch {}
+        if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
+        const s = value.trim().toLowerCase();
+        if (s === 'friday') return ['Friday'];
+        if (s === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
+        if (s === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        if (s === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+        if (s === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+        return [value.trim()];
+    };
+
+    const performDataQualityCheck = async () => {
+        setIsCheckLoading(true);
         const issues = [];
-        
-        if (!dataCounts.hasPunches) {
+
+        try {
+            // Fetch full data for comprehensive checks
+            const [allPunches, allShifts, allEmployees, allExceptions] = await Promise.all([
+                base44.entities.Punch.filter({ project_id: project.id }, null, 5000),
+                base44.entities.ShiftTiming.filter({ project_id: project.id }, null, 5000),
+                base44.entities.Employee.filter({ company: project.company, active: true }, null, 5000),
+                base44.entities.Exception.filter({ project_id: project.id }, null, 5000)
+            ]);
+
+            // ── 1. No punch data ─────────────────────────────────────────────
+            if (allPunches.length === 0) {
+                issues.push({
+                    type: 'error',
+                    title: 'No punch data uploaded',
+                    details: 'Upload punch data in the Punches tab before running analysis'
+                });
+            }
+
+            // ── 2. Attendance rules not configured ───────────────────────────
+            if (!rules) {
+                issues.push({
+                    type: 'error',
+                    title: 'Attendance rules not configured',
+                    details: 'Configure rules in Settings > Rules for this company before running analysis'
+                });
+            }
+
+            // ── 3. No shift timings at all ───────────────────────────────────
+            if (allShifts.length === 0) {
+                issues.push({
+                    type: 'warning',
+                    title: 'No shift timings configured',
+                    details: 'Add shift timings in the Shifts tab for accurate lateness and early checkout calculations'
+                });
+            }
+
+            // ── 4. Employees without attendance IDs ──────────────────────────
+            const activeEmployeesWithoutId = allEmployees.filter(e => e.has_attendance_tracking !== false && (!e.attendance_id || String(e.attendance_id).trim() === ''));
+            if (activeEmployeesWithoutId.length > 0) {
+                issues.push({
+                    type: 'error',
+                    title: `${activeEmployeesWithoutId.length} active employee(s) missing attendance ID`,
+                    details: activeEmployeesWithoutId.slice(0, 5).map(e => e.name).join(', ') + (activeEmployeesWithoutId.length > 5 ? ` and ${activeEmployeesWithoutId.length - 5} more` : '')
+                });
+            }
+
+            // ── 5. Duplicate attendance IDs ──────────────────────────────────
+            const attIdMap = {};
+            allEmployees.forEach(emp => {
+                if (emp.attendance_id) {
+                    if (!attIdMap[emp.attendance_id]) attIdMap[emp.attendance_id] = [];
+                    attIdMap[emp.attendance_id].push(emp.name);
+                }
+            });
+            const dupAttIds = Object.entries(attIdMap).filter(([, names]) => names.length > 1);
+            if (dupAttIds.length > 0) {
+                issues.push({
+                    type: 'error',
+                    title: `Duplicate Attendance IDs found (${dupAttIds.length})`,
+                    details: dupAttIds.map(([id, names]) => `ID "${id}": ${names.join(', ')}`).join(' | ')
+                });
+            }
+
+            // ── 6. Duplicate HRMS IDs ────────────────────────────────────────
+            const hrmsIdMap = {};
+            allEmployees.forEach(emp => {
+                if (emp.hrms_id) {
+                    if (!hrmsIdMap[emp.hrms_id]) hrmsIdMap[emp.hrms_id] = [];
+                    hrmsIdMap[emp.hrms_id].push(emp.name);
+                }
+            });
+            const dupHrmsIds = Object.entries(hrmsIdMap).filter(([, names]) => names.length > 1);
+            if (dupHrmsIds.length > 0) {
+                issues.push({
+                    type: 'error',
+                    title: `Duplicate HRMS IDs found (${dupHrmsIds.length})`,
+                    details: dupHrmsIds.map(([id, names]) => `HRMS "${id}": ${names.join(', ')}`).join(' | ')
+                });
+            }
+
+            // ── 7. Punch IDs not in employee master ──────────────────────────
+            const masterAttIds = new Set(allEmployees.map(e => String(e.attendance_id)).filter(Boolean));
+            const punchAttIds = [...new Set(allPunches.map(p => String(p.attendance_id)))];
+            const orphanPunchIds = punchAttIds.filter(id => !masterAttIds.has(id));
+            if (orphanPunchIds.length > 0) {
+                issues.push({
+                    type: 'warning',
+                    title: `${orphanPunchIds.length} punch attendance ID(s) not found in employee master`,
+                    details: `IDs: ${orphanPunchIds.slice(0, 10).join(', ')}${orphanPunchIds.length > 10 ? ` and ${orphanPunchIds.length - 10} more` : ''}. These employees will still be analyzed but may be missing department/shift info.`
+                });
+            }
+
+            // ── 8. Employees with punches but no shifts ──────────────────────
+            if (allPunches.length > 0 && allShifts.length > 0) {
+                const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                const dayNameToNum = { Sunday:0, Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6 };
+                const missingShiftCases = [];
+
+                punchAttIds.forEach(attId => {
+                    const empShifts = allShifts.filter(s => String(s.attendance_id) === attId);
+                    const employee = allEmployees.find(e => String(e.attendance_id) === attId);
+                    const weeklyOffDay = project.weekly_off_override && project.weekly_off_override !== 'None'
+                        ? dayNameToNum[project.weekly_off_override]
+                        : (employee?.weekly_off ? dayNameToNum[employee.weekly_off] : null);
+
+                    // Get unique punch dates for this employee within project range
+                    const empPunchDates = [...new Set(
+                        allPunches
+                            .filter(p => String(p.attendance_id) === attId && p.punch_date >= dateFrom && p.punch_date <= dateTo)
+                            .map(p => p.punch_date)
+                    )];
+
+                    empPunchDates.forEach(dateStr => {
+                        const d = new Date(dateStr);
+                        const dow = d.getDay();
+                        if (weeklyOffDay !== null && dow === weeklyOffDay) return; // skip weekly off
+
+                        const currentDayName = dayNames[dow];
+                        const hasShift = empShifts.some(s => {
+                            if (s.date === dateStr) return true;
+                            if (!s.date && s.applicable_days) {
+                                const days = normalizeApplicableDays(s.applicable_days);
+                                return days.some(day => day.toLowerCase() === currentDayName.toLowerCase());
+                            }
+                            if (!s.date && !s.applicable_days) {
+                                if (dow === 5 && s.is_friday_shift) return true;
+                                if (dow !== 5 && !s.is_friday_shift) return true;
+                                if (dow === 5 && !empShifts.some(ss => ss.is_friday_shift)) return true;
+                            }
+                            return false;
+                        });
+
+                        if (!hasShift) {
+                            missingShiftCases.push({ name: employee?.name || `ID: ${attId}`, date: dateStr });
+                        }
+                    });
+                });
+
+                if (missingShiftCases.length > 0) {
+                    const uniqueEmp = [...new Set(missingShiftCases.map(m => m.name))].length;
+                    issues.push({
+                        type: 'warning',
+                        title: `Missing shift timings on punch days — ${uniqueEmp} employee(s) affected`,
+                        details: `${missingShiftCases.length} employee-day combinations have punches but no matching shift. Late/early calculations will be skipped for these days.`,
+                        affectedList: missingShiftCases
+                    });
+                }
+            }
+
+            // ── 9. Shift timings with invalid/missing times ──────────────────
+            const badShifts = allShifts.filter(s => {
+                const amStart = parseTimeForCheck(s.am_start);
+                const pmEnd = parseTimeForCheck(s.pm_end);
+                return !amStart || !pmEnd;
+            });
+            if (badShifts.length > 0) {
+                const badEmpIds = [...new Set(badShifts.map(s => s.attendance_id))];
+                const badEmpNames = badEmpIds.map(id => {
+                    const emp = allEmployees.find(e => String(e.attendance_id) === String(id));
+                    return emp?.name || `ID: ${id}`;
+                });
+                issues.push({
+                    type: 'error',
+                    title: `${badShifts.length} shift record(s) have missing or invalid times`,
+                    details: `Employees: ${badEmpNames.slice(0, 5).join(', ')}${badEmpNames.length > 5 ? ` and ${badEmpNames.length - 5} more` : ''}. Fix in the Shifts tab.`
+                });
+            }
+
+            // ── 10. Punch data outside project date range ────────────────────
+            const outOfRangePunches = allPunches.filter(p => p.punch_date < project.date_from || p.punch_date > project.date_to);
+            if (outOfRangePunches.length > 0) {
+                issues.push({
+                    type: 'warning',
+                    title: `${outOfRangePunches.length} punches are outside the project date range`,
+                    details: `Project range: ${project.date_from} to ${project.date_to}. These punches will be ignored during analysis.`
+                });
+            }
+
+            // ── 11. Unusual punch counts per date ────────────────────────────
+            const punchCountByDate = {};
+            allPunches.forEach(p => { punchCountByDate[p.punch_date] = (punchCountByDate[p.punch_date] || 0) + 1; });
+            const unusualDates = Object.entries(punchCountByDate).filter(([, c]) => c < 5 || c > 1000);
+            if (unusualDates.length > 0) {
+                issues.push({
+                    type: 'warning',
+                    title: `${unusualDates.length} date(s) have unusually low or high punch counts`,
+                    details: unusualDates.slice(0, 3).map(([d, c]) => `${d}: ${c} punches`).join(', ') + (unusualDates.length > 3 ? ` and ${unusualDates.length - 3} more` : '')
+                });
+            }
+
+            // ── 12. Date gaps in punch data > 3 days ─────────────────────────
+            const sortedPunchDates = [...new Set(allPunches.map(p => p.punch_date))].sort();
+            if (sortedPunchDates.length > 1) {
+                const gaps = [];
+                for (let i = 1; i < sortedPunchDates.length; i++) {
+                    const prev = new Date(sortedPunchDates[i - 1]);
+                    const curr = new Date(sortedPunchDates[i]);
+                    const diffDays = (curr - prev) / (1000 * 60 * 60 * 24);
+                    if (diffDays > 3) gaps.push(`${sortedPunchDates[i-1]} → ${sortedPunchDates[i]} (${Math.floor(diffDays)} days gap)`);
+                }
+                if (gaps.length > 0) {
+                    issues.push({
+                        type: 'warning',
+                        title: `${gaps.length} date gap(s) in punch data (>3 days)`,
+                        details: gaps.slice(0, 3).join(', ') + (gaps.length > 3 ? ` and ${gaps.length - 3} more` : '')
+                    });
+                }
+            }
+
+            // ── 13. Near-duplicate punches (auto-filtered info) ──────────────
+            let dupPunchCount = 0;
+            const byEmpDate = {};
+            allPunches.forEach(p => {
+                const key = `${p.attendance_id}_${p.punch_date}`;
+                if (!byEmpDate[key]) byEmpDate[key] = [];
+                byEmpDate[key].push(p);
+            });
+            Object.values(byEmpDate).forEach(dayPunches => {
+                if (dayPunches.length <= 1) return;
+                const withTime = dayPunches.map(p => ({ ...p, t: parseTimeForCheck(p.timestamp_raw) })).filter(p => p.t).sort((a, b) => a.t - b.t);
+                for (let i = 1; i < withTime.length; i++) {
+                    if (Math.abs(withTime[i].t - withTime[i-1].t) / 60000 < 10) dupPunchCount++;
+                }
+            });
+            if (dupPunchCount > 0) {
+                issues.push({
+                    type: 'info',
+                    title: `${dupPunchCount} near-duplicate punch(es) will be auto-removed during analysis`,
+                    details: 'Punches within 10 minutes of each other for the same employee are automatically deduplicated. No action needed.'
+                });
+            }
+
+            // ── 14. Exceptions with invalid date ranges ──────────────────────
+            const badExceptions = allExceptions.filter(ex => {
+                if (!ex.date_from || !ex.date_to) return true;
+                return new Date(ex.date_from) > new Date(ex.date_to);
+            });
+            if (badExceptions.length > 0) {
+                issues.push({
+                    type: 'error',
+                    title: `${badExceptions.length} exception(s) have invalid date ranges (from > to)`,
+                    details: 'Fix or delete these exceptions before running analysis to avoid unexpected results.'
+                });
+            }
+
+        } catch (err) {
             issues.push({
                 type: 'error',
-                title: 'No punch data uploaded',
-                details: 'Upload punch data in the Punches tab before running analysis'
+                title: 'Data quality check failed to load some data',
+                details: err.message || 'Unknown error fetching data for quality check'
             });
+        } finally {
+            setIsCheckLoading(false);
         }
 
-        if (!dataCounts.hasShifts) {
-            issues.push({
-                type: 'warning',
-                title: 'No shift timings configured',
-                details: 'Add shift timings in the Shifts tab for accurate analysis'
-            });
-        }
-
-        if (!rules) {
-            issues.push({
-                type: 'error',
-                title: 'Attendance rules not configured',
-                details: 'Configure rules in Settings > Rules for this company'
-            });
-        }
-        
         setDataQualityIssues(issues);
         return issues;
     };
@@ -144,10 +407,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             return;
         }
         
-        const issues = performDataQualityCheck();
+        const issues = await performDataQualityCheck();
         const hasErrors = issues.some(i => i.type === 'error');
         
-        if (hasErrors && !isAdmin) {
+        if (hasErrors) {
             setShowQualityCheck(true);
             return;
         }
@@ -668,16 +931,19 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
                         <div className="flex gap-2">
                             <Button 
-                                onClick={() => {
-                                    performDataQualityCheck();
+                                onClick={async () => {
+                                    await performDataQualityCheck();
                                     setShowQualityCheck(true);
                                 }}
                                 variant="outline"
-                                disabled={isAnalyzing}
+                                disabled={isAnalyzing || isCheckLoading}
                                 size="lg"
                             >
-                                <AlertTriangle className="w-5 h-5 mr-2" />
-                                Check Data Quality
+                                {isCheckLoading ? (
+                                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Checking...</>
+                                ) : (
+                                    <><AlertTriangle className="w-5 h-5 mr-2" />Check Data Quality</>
+                                )}
                             </Button>
                             <Button
                                 onClick={handleAnalyze}
