@@ -568,11 +568,14 @@ export default function AnnualLeaveManagement() {
             const totalDays = calculateDays(data.date_from, data.date_to);
 
             const leaveData = {
-                ...data,
-                attendance_id: employee.attendance_id ? String(employee.attendance_id) : '',
-                employee_id: String(employee.hrms_id || data.employee_id),
                 company: employee.company,
+                employee_id: String(employee.hrms_id || ''),
+                attendance_id: String(employee.attendance_id || ''),
                 employee_name: employee.name,
+                date_from: data.date_from,
+                date_to: data.date_to,
+                leave_type: data.leave_type || 'annual',
+                reason: data.reason || '',
                 total_days: totalDays,
                 salary_leave_days: totalDays,
                 status: 'approved',
