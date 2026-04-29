@@ -569,10 +569,13 @@ export default function DailyBreakdownDialog({
             }));
             const dayPunches = filterMultiplePunches(taggedRawPunches, shift);
 
+            // hasMiddleTimes: checks if shift has valid middle times to determine single vs split shift
+            // Must match backend runAnalysis check exactly — includes 'null' string check
             const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
                 String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
                 shift.am_end !== '—' && shift.pm_start !== '—' &&
-                shift.am_end !== '-' && shift.pm_start !== '-';
+                shift.am_end !== '-' && shift.pm_start !== '-' &&
+                shift.am_end !== 'null' && shift.pm_start !== 'null';
             // Strict boolean equality is required because is_single_shift may be stored as the string 'false' or number 0 which are falsy but would incorrectly evaluate as truthy in a loose check; this must match backend runAnalysis.ts behavior exactly.
             const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
 
