@@ -5,11 +5,10 @@ Deno.serve(async (req) => {
         const base44 = createClientFromRequest(req);
         const user = await base44.auth.me();
 
-        // SECURITY: Admin, Supervisor, CEO, and HR Manager can finalize reports
-        const userRole = user?.extended_role || user?.role || 'user';
-        if (!['admin', 'supervisor', 'ceo', 'hr_manager'].includes(userRole)) {
-            return Response.json({ error: 'Access denied: Admin, Supervisor, CEO, or HR Manager role required' }, { status: 403 });
+        if (!user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        // No role restriction — all authenticated users can finalize reports
 
         const { report_run_id, project_id } = await req.json();
 
