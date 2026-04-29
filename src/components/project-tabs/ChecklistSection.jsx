@@ -92,7 +92,8 @@ export default function ChecklistSection({ project, checklistItems = [], current
     const [selectedSyncs, setSelectedSyncs] = useState({
         salaryModifications: true,
         reportTasks: true,
-        annualLeave: true
+        annualLeave: true,
+        recurringAdjustments: true
     });
 
     // syncingItem: tracks which individual sync is currently running — null means none
@@ -249,6 +250,27 @@ export default function ChecklistSection({ project, checklistItems = [], current
         }
     };
 
+    // runRecurringAdjustmentsSync: runs only the recurring adjustments checklist sync
+    const runRecurringAdjustmentsSync = async () => {
+        if (syncingItem) return;
+        setSyncingItem('recurringAdjustments');
+        try {
+            await base44.functions.invoke('syncRecurringAdjustmentsChecklist', {
+                project_id: project.id,
+                company: project.company,
+                project_date_from: project.date_from,
+                project_date_to: project.date_to
+            });
+            toast.success('Recurring adjustments synced');
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+        } catch (err) {
+            toast.error('Sync failed: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setSyncingItem(null);
+            setSyncDropdownOpen(false);
+        }
+    };
+
     // runAnnualLeaveSync: runs only the annual leave checklist sync
     const runAnnualLeaveSync = async () => {
         if (syncingItem) return;
@@ -300,7 +322,17 @@ export default function ChecklistSection({ project, checklistItems = [], current
                 });
             }
 
-            // SYNC 3: Annual leave — only if checked
+            // SYNC 3: Recurring adjustments — only if checked
+            if (selectedSyncs.recurringAdjustments) {
+                await base44.functions.invoke('syncRecurringAdjustmentsChecklist', {
+                    project_id: project.id,
+                    company: project.company,
+                    project_date_from: project.date_from,
+                    project_date_to: project.date_to
+                });
+            }
+
+            // SYNC 4: Annual leave — only if checked
             if (selectedSyncs.annualLeave) {
                 const leaves = await base44.entities.AnnualLeave.filter(
                     { project_id: project.id },
@@ -447,6 +479,27 @@ export default function ChecklistSection({ project, checklistItems = [], current
                                             className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
                                         >
                                             {syncingItem === 'annualLeave' ? '...' : 'Run'}
+                                        </button>
+                                    </div>
+
+                                    {/* Recurring Adjustments option */}
+                                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedSyncs.recurringAdjustments}
+                                                onChange={e => setSelectedSyncs(prev => ({ ...prev, recurringAdjustments: e.target.checked }))}
+                                                className="h-3.5 w-3.5 accent-indigo-600"
+                                                id="sync-adjustments"
+                                            />
+                                            <label htmlFor="sync-adjustments" className="text-xs font-medium text-slate-700 cursor-pointer">Recurring Adjustments</label>
+                                        </div>
+                                        <button
+                                            onClick={runRecurringAdjustmentsSync}
+                                            disabled={!!syncingItem}
+                                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            {syncingItem === 'recurringAdjustments' ? '...' : 'Run'}
                                         </button>
                                     </div>
 
