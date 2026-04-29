@@ -439,12 +439,12 @@ export default function PunchUploadTab({ project }) {
             }));
 
             setUploadProgress({ 
-              phase: 'Uploading punch records to database...', 
+              phase: 'Preparing records for upload...', 
               current: 0, 
               total: punchRecords.length 
             });
 
-            const batchSize = 25;
+            const batchSize = 50;
             const BASE_DELAY = 150;
             const MAX_RETRIES = 3;
             let totalUploaded = 0;
@@ -463,7 +463,7 @@ export default function PunchUploadTab({ project }) {
                             const backoff = Math.min(2000 * Math.pow(2, attempt), 12000);
                             setUploadProgress(prev => ({
                                 ...prev,
-                                phase: `${context}: Rate limit hit — retrying in ${Math.round(backoff/1000)}s (attempt ${attempt + 1}/${MAX_RETRIES})...`
+                                phase: 'Upload slowing down — please wait a moment...'
                             }));
                             await new Promise(r => setTimeout(r, backoff));
                         } else {
@@ -486,7 +486,7 @@ export default function PunchUploadTab({ project }) {
                     const batchNum = Math.floor(i / batchSize) + 1;
                     const totalBatches = Math.ceil(punchRecords.length / batchSize);
                     setUploadProgress({ 
-                        phase: `Uploading batch ${batchNum}/${totalBatches}...`, 
+                        phase: `Uploading records... ${totalUploaded} of ${punchRecords.length} done`, 
                         current: totalUploaded, 
                         total: punchRecords.length 
                     });
@@ -496,7 +496,7 @@ export default function PunchUploadTab({ project }) {
                 // SUCCESS: Clear the batch tag from all uploaded records
                 // so the field is clean for normal use
                 setUploadProgress({
-                    phase: 'Finalizing upload...',
+                    phase: 'Almost done — finishing up...',
                     current: punchRecords.length,
                     total: punchRecords.length
                 });
@@ -520,7 +520,7 @@ export default function PunchUploadTab({ project }) {
             } catch (uploadError) {
                 // === ROLLBACK: Query all records with this batch tag and delete them ===
                 setUploadProgress({
-                    phase: `Upload failed — rolling back ${totalUploaded} records...`,
+                    phase: 'Upload did not complete — removing partial data...',
                     current: 0,
                     total: totalUploaded
                 });
@@ -535,7 +535,7 @@ export default function PunchUploadTab({ project }) {
 
                     if (toRollback.length > 0) {
                         setUploadProgress({
-                            phase: `Rolling back ${toRollback.length} records...`,
+                            phase: 'Removing incomplete upload data...',
                             current: 0,
                             total: toRollback.length
                         });
@@ -563,7 +563,7 @@ export default function PunchUploadTab({ project }) {
                             setUploadProgress(prev => ({
                                 ...prev,
                                 current: deleted,
-                                phase: `Rolling back... ${deleted}/${toRollback.length}`
+                                phase: `Cleaning up... ${deleted} of ${toRollback.length} records removed`
                             }));
                         }
                     }
@@ -580,7 +580,7 @@ export default function PunchUploadTab({ project }) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
-            toast.success('Punches uploaded successfully');
+            toast.success(`${punchRecords.length} attendance records uploaded successfully.`);
             setParsedData([]);
             setFile(null);
             setUploadProgress(null);
@@ -591,12 +591,12 @@ export default function PunchUploadTab({ project }) {
             setUploadProgress(null);
             
             if (error.rollbackFailed) {
-                toast.error(`Upload failed and rollback also failed. Please manually check for orphaned punch records with batch ID: ${error.importBatchId}. Contact support if needed.`, { duration: 10000 });
+                toast.error('The upload did not complete and some records could not be removed automatically. Please contact your system administrator to check for incomplete data.', { duration: 10000 });
             } else {
                 const isRateLimit = error?.status === 429 || /rate.?limit|too many/i.test(error?.message || '');
                 const msg = isRateLimit 
-                    ? 'Rate limit exceeded after retries. All uploaded records have been rolled back. Please wait a minute and try again.'
-                    : 'Upload failed: ' + (error.message || 'Unknown error') + '. All uploaded records have been rolled back.';
+                    ? 'The upload could not complete due to high server load. All partial data has been removed. Please wait a minute and try again.'
+                    : 'The upload did not complete. All partial data has been removed. Please try again or contact your administrator if the problem persists.';
                 toast.error(msg, { duration: 8000 });
             }
         }

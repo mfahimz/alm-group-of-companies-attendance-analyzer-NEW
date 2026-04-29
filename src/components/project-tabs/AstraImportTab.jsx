@@ -359,8 +359,8 @@ export default function AstraImportTab({ project, employees }) {
             calendar_period_id: importBatchId
         }));
 
-        const BATCH_SIZE = 8;
-        const BATCH_DELAY = 1500; // ms between batches
+        const BATCH_SIZE = 40;
+        const BATCH_DELAY = 400; // ms between batches
         const RETRY_DELAYS = [1000, 2000, 4000]; // retry delays for 429 errors
 
         setIsUploading(true);
@@ -443,7 +443,7 @@ export default function AstraImportTab({ project, employees }) {
             if (fileInputRef.current) fileInputRef.current.value = '';
 
             toast.success(
-                `${punchRecords.length} punches uploaded successfully. Please run analysis from the Attendance tab.`,
+                `${punchRecords.length} attendance records uploaded successfully. You can now run the attendance analysis.`,
                 { duration: 6000 }
             );
 
@@ -491,10 +491,10 @@ export default function AstraImportTab({ project, employees }) {
             setUploadProgress({ current: 0, total: 0 });
 
             if (rollbackFailed) {
-                toast.error(`Upload failed and rollback also failed. Please manually check for orphaned punch records with batch ID: ${importBatchId}. Contact support if needed.`, { duration: 10000 });
+                toast.error('The upload did not complete and some records could not be removed automatically. Please contact your system administrator to check for incomplete data.', { duration: 10000 });
             } else {
                 toast.error(
-                    'Upload failed. All uploaded records have been rolled back.',
+                    'The upload did not complete. All partial data has been removed. Please try again or contact your administrator if the problem persists.',
                     { duration: 8000 }
                 );
             }

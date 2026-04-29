@@ -106,3 +106,23 @@ These arrive as YYYY-MM-DD strings: "2026-04-20"
 
 Always import from: '@/components/ui/timezone'
 
+
+## User-Facing Messages Rule
+
+Any message shown to the user in the UI must be written in plain non-technical language that any non-technical person can understand. This applies to:
+- Success messages and toast notifications
+- Error messages and failure notifications  
+- Progress bar phase labels and status updates
+- Any inline text shown during an ongoing process
+
+NEVER include in user-facing messages:
+- Technical field names, entity names, or database terms
+- Batch IDs, record IDs, or any system-generated identifiers
+- Words like "rollback", "orphaned records", "batch", "entity", "query", "rate limit", "API", "null", "undefined"
+- Stack traces, error codes, or raw error messages
+- Internal function names or process names
+
+ALWAYS write messages as if explaining to a non-technical office HR staff member:
+- Success: tell them what was accomplished and what to do next if anything
+- Error: tell them something went wrong, what to do next, and who to contact if needed — no technical details
+- Progress: tell them what is happening in plain words like "Uploading records...", "Please wait...", "Cleaning up..."
