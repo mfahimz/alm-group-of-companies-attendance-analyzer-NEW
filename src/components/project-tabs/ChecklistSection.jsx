@@ -30,6 +30,21 @@ const PREDEFINED_TASKS = [
     { task_type: 'Exit', task_description: 'Process certificates and related documentation' }
 ];
 
+// COMPANY_SPECIFIC_TASKS: additional predefined task types shown only for specific companies
+// Naser Mohsin Auto Parts and Astra Auto Parts have vehicle-related deduction tasks
+const COMPANY_SPECIFIC_TASKS = {
+    'Naser Mohsin Auto Parts': [
+        { task_type: 'Traffic Fine', task_description: 'Process traffic fine deductions for employees' },
+        { task_type: 'EMI - Monthly Installment', task_description: 'Process monthly EMI installment deductions' },
+        { task_type: 'Parking Charge', task_description: 'Process parking charge deductions for employees' }
+    ],
+    'Astra Auto Parts': [
+        { task_type: 'Traffic Fine', task_description: 'Process traffic fine deductions for employees' },
+        { task_type: 'EMI - Monthly Installment', task_description: 'Process monthly EMI installment deductions' },
+        { task_type: 'Parking Charge', task_description: 'Process parking charge deductions for employees' }
+    ]
+};
+
 const ADD_TASK_PREDEFINED_TYPES = PREDEFINED_TASKS.map(t => t.task_type);
 
 
@@ -144,12 +159,18 @@ export default function ChecklistSection({ project, checklistItems = [], current
         deleteTaskMutation.mutate(task.id);
     };
 
-    // availableTaskTypes: dynamically built from actual task types present in checklistItems
-    // ensures filter chips always reflect the real data without hardcoding
+    // availableTaskTypes: starts with all hardcoded PREDEFINED_TASKS types as the base
+    // adds company-specific task types for Naser Mohsin Auto Parts and Astra Auto Parts
+    // then adds any extra task types found in live checklistItems that are not already included
+    const predefinedTaskTypes = PREDEFINED_TASKS.map(t => t.task_type);
     const availableTaskTypes = useMemo(() => {
-        const types = [...new Set(checklistItems.map(item => item.task_type).filter(Boolean))].sort();
-        return ['All', ...types];
-    }, [checklistItems]);
+        const companySpecific = (COMPANY_SPECIFIC_TASKS[project?.company] || []).map(t => t.task_type);
+        const liveTypes = checklistItems.map(item => item.task_type).filter(Boolean);
+        const allKnown = [...predefinedTaskTypes, ...companySpecific];
+        const extraTypes = liveTypes.filter(t => !allKnown.includes(t));
+        const combined = [...predefinedTaskTypes, ...companySpecific, ...new Set(extraTypes)];
+        return ['All', ...combined];
+    }, [checklistItems, project?.company]);
 
     const displayedItems = selectedTaskType
         ? checklistItems.filter(t => (t.task_type || 'Uncategorized').trim() === selectedTaskType)
@@ -596,7 +617,10 @@ export default function ChecklistSection({ project, checklistItems = [], current
                                 <Select value={newTask.task_type} onValueChange={(value) => { if (value === '__custom__') { setIsCustomType(true); setNewTask({ ...newTask, task_type: '' }); } else { setIsCustomType(false); setNewTask({ ...newTask, task_type: value }); } }}>
                                     <SelectTrigger><SelectValue placeholder="Select task type..." /></SelectTrigger>
                                     <SelectContent>
+                                        {/* Predefined task types always available */}
                                         {PREDEFINED_TASKS.map(task => (<SelectItem key={task.task_type} value={task.task_type}>{task.task_type}</SelectItem>))}
+                                        {/* Company-specific task types for Naser Mohsin Auto Parts and Astra Auto Parts */}
+                                        {(COMPANY_SPECIFIC_TASKS[project?.company] || []).map(task => (<SelectItem key={task.task_type} value={task.task_type}>{task.task_type}</SelectItem>))}
                                         <SelectItem value="__custom__">Enter Custom Type...</SelectItem>
                                     </SelectContent>
                                 </Select>
