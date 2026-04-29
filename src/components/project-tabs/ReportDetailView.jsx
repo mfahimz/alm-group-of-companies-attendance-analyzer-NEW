@@ -2113,26 +2113,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                             {isReanalyzing ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                    Reanalyzing...
+                                                    Saving & Reanalyzing...
                                                 </>
                                             ) : (
                                                 <>
                                                     <Zap className="w-4 h-4 mr-2" />
-                                                    Reanalyze Report
+                                                    Save & Reanalyze
                                                 </>
                                             )}
                                         </Button>
                                     )}
-                                    {canModifyAttendance && (
-                                        <Button
-                                            onClick={() => { loadRawData(); setShowSaveConfirmation(true); }}
-                                            disabled={isSaving || (rawDataRequested && !allRawDataLoaded)}
-                                            className="bg-green-600 hover:bg-green-700"
-                                        >
-                                            <Save className="w-4 h-4 mr-2" />
-                                            {isSaving ? 'Saving...' : 'Save Report'}
-                                        </Button>
-                                    )}
+
                                     {canModifyAttendance && !reportRun.is_final && (
                                         <Button
                                             onClick={() => finalizeReportMutation.mutate()}
