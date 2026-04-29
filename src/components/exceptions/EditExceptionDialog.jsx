@@ -186,7 +186,9 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const needsShiftOverride = formData.type === 'SHIFT_OVERRIDE';
     const needsAllowedMinutes = formData.type === 'ALLOWED_MINUTES';
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
-    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
+    // needsSalaryLeaveDays: salary leave days field is only relevant for Al Maraghi Motors
+    // other companies do not use this field for salary calculation
+    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE' && project?.company === 'Al Maraghi Motors';
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
     const needsHalfDayHoliday = formData.type === 'HALF_DAY_HOLIDAY';
     const needsDaySwap = formData.type === 'DAY_SWAP';
