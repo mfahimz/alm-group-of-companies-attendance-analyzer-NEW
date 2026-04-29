@@ -718,7 +718,18 @@ export default function DailyBreakdownDialog({
                 else if (dateException.type === 'PUBLIC_HOLIDAY') status = 'Public Holiday';
                 else if (dateException.type === 'MANUAL_PRESENT') status = 'Present (Manual)';
                 else if (dateException.type === 'MANUAL_ABSENT') status = 'Absent (Manual)';
-                else if (dateException.type === 'SHIFT_OVERRIDE') status = dayPunches.length > 0 ? 'Present' : 'Absent';
+                else if (dateException.type === 'SHIFT_OVERRIDE') {
+                    // SHIFT_OVERRIDE changes the shift definition — must re-evaluate punch completeness
+                    // using the overridden shift (already applied to `shift` variable above), not just presence.
+                    // This mirrors runAnalysis backend behavior which falls through to punch completeness logic.
+                    if (dayPunches.length === 0) {
+                        status = 'Absent';
+                    } else if (isSingleShift) {
+                        status = dayPunches.length >= 2 ? 'Present' : 'Half Day';
+                    } else {
+                        status = dayPunches.length >= 3 ? 'Present' : 'Half Day';
+                    }
+                }
                 else if (dateException.type === 'SICK_LEAVE') status = 'Sick Leave';
                 else if (dateException.type === 'ANNUAL_LEAVE') status = dayPunches.length > 0 ? 'Present' : 'Annual Leave';
                 else if (dateException.type === 'WORK_FROM_HOME') status = 'Work From Home';
