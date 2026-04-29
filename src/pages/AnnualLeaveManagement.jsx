@@ -569,7 +569,8 @@ export default function AnnualLeaveManagement() {
 
             const leaveData = {
                 ...data,
-                attendance_id: employee.attendance_id,
+                attendance_id: employee.attendance_id ? String(employee.attendance_id) : '',
+                employee_id: String(employee.hrms_id || data.employee_id),
                 company: employee.company,
                 employee_name: employee.name,
                 total_days: totalDays,
