@@ -70,6 +70,18 @@ export default function ChecklistSection({ project, checklistItems = [], current
     const queryClient = useQueryClient();
     // isSyncing: tracks whether the checklist sync operation is in progress to show loading state and prevent double trigger
     const [isSyncing, setIsSyncing] = useState(false);
+    // syncDropdownOpen: controls visibility of the sync options dropdown
+    const [syncDropdownOpen, setSyncDropdownOpen] = useState(false);
+
+    // selectedSyncs: tracks which sync options are checked — all true by default
+    const [selectedSyncs, setSelectedSyncs] = useState({
+        salaryModifications: true,
+        reportTasks: true,
+        annualLeave: true
+    });
+
+    // syncingItem: tracks which individual sync is currently running — null means none
+    const [syncingItem, setSyncingItem] = useState(null);
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -176,26 +188,51 @@ export default function ChecklistSection({ project, checklistItems = [], current
     // 1. Salary modifications sync (always runs)
     // 2. Report checklist tasks sync (only if reportRunId is available)
     // 3. Annual leave checklist sync for all leaves in this project (always runs)
-    const handleSyncAll = async () => {
-        if (isSyncing) return;
-        setIsSyncing(true);
+    // runSalaryModificationsSync: runs only the salary modifications sync
+    const runSalaryModificationsSync = async () => {
+        if (syncingItem) return;
+        setSyncingItem('salaryModifications');
         try {
-            // SYNC 1: Salary modifications — increments and decrements
             await base44.functions.invoke('syncSalaryModificationsChecklist', {
                 project_id: project.id,
                 company: project.company,
                 project_date_to: project.date_to
             });
+            toast.success('Salary modifications synced');
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+        } catch (err) {
+            toast.error('Sync failed: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setSyncingItem(null);
+            setSyncDropdownOpen(false);
+        }
+    };
 
-            // SYNC 2: Report checklist tasks — only if a finalized report run exists
-            if (reportRunId) {
-                await base44.functions.invoke('createReportChecklistTasks', {
-                    reportRunId: reportRunId,
-                    action: 'upsert'
-                });
-            }
+    // runReportTasksSync: runs only the report checklist tasks sync
+    const runReportTasksSync = async () => {
+        if (syncingItem) return;
+        if (!reportRunId) { toast.error('No finalized report available'); return; }
+        setSyncingItem('reportTasks');
+        try {
+            await base44.functions.invoke('createReportChecklistTasks', {
+                reportRunId: reportRunId,
+                action: 'upsert'
+            });
+            toast.success('Report tasks synced');
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+        } catch (err) {
+            toast.error('Sync failed: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setSyncingItem(null);
+            setSyncDropdownOpen(false);
+        }
+    };
 
-            // SYNC 3: Annual leave checklist — fetch all leaves for this project and sync each
+    // runAnnualLeaveSync: runs only the annual leave checklist sync
+    const runAnnualLeaveSync = async () => {
+        if (syncingItem) return;
+        setSyncingItem('annualLeave');
+        try {
             const leaves = await base44.entities.AnnualLeave.filter(
                 { project_id: project.id },
                 null,
@@ -209,9 +246,57 @@ export default function ChecklistSection({ project, checklistItems = [], current
                 });
                 await new Promise(r => setTimeout(r, 300));
             }
+            toast.success('Annual leave synced');
+            queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
+        } catch (err) {
+            toast.error('Sync failed: ' + (err?.message || 'Unknown error'));
+        } finally {
+            setSyncingItem(null);
+            setSyncDropdownOpen(false);
+        }
+    };
+
+    // handleSyncAll: runs all checked sync operations in sequence
+    const handleSyncAll = async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        setSyncDropdownOpen(false);
+        try {
+            // SYNC 1: Salary modifications — only if checked
+            if (selectedSyncs.salaryModifications) {
+                await base44.functions.invoke('syncSalaryModificationsChecklist', {
+                    project_id: project.id,
+                    company: project.company,
+                    project_date_to: project.date_to
+                });
+            }
+
+            // SYNC 2: Report checklist tasks — only if checked and reportRunId available
+            if (selectedSyncs.reportTasks && reportRunId) {
+                await base44.functions.invoke('createReportChecklistTasks', {
+                    reportRunId: reportRunId,
+                    action: 'upsert'
+                });
+            }
+
+            // SYNC 3: Annual leave — only if checked
+            if (selectedSyncs.annualLeave) {
+                const leaves = await base44.entities.AnnualLeave.filter(
+                    { project_id: project.id },
+                    null,
+                    5000
+                );
+                for (const leave of leaves) {
+                    await base44.functions.invoke('syncAnnualLeaveChecklistTasks', {
+                        leaveId: leave.id,
+                        projectId: project.id,
+                        action: 'update'
+                    });
+                    await new Promise(r => setTimeout(r, 300));
+                }
+            }
 
             toast.success('Checklist synced successfully');
-            // Invalidate checklist items query so table refreshes
             queryClient.invalidateQueries({ queryKey: ['checklistItems', project.id] });
         } catch (err) {
             console.error('Sync error:', err);
@@ -236,29 +321,127 @@ export default function ChecklistSection({ project, checklistItems = [], current
                         )}
                     </div>
                     <div className="flex gap-2">
-                        {/* Sync Checklist button — runs all background sync operations to update checklist tasks */}
-                        <button
-                            onClick={handleSyncAll}
-                            disabled={isSyncing}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isSyncing ? (
-                                <>
-                                    <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        {/* Sync Checklist split button with dropdown — left side runs all checked syncs, right side opens dropdown */}
+                        <div className="relative">
+                            <div className="flex items-stretch">
+                                {/* Main Sync All button */}
+                                <button
+                                    onClick={handleSyncAll}
+                                    disabled={isSyncing || !!syncingItem}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-l-lg hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {isSyncing ? (
+                                        <>
+                                            <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                            </svg>
+                                            Syncing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            Sync All
+                                        </>
+                                    )}
+                                </button>
+                                {/* Chevron toggle button */}
+                                <button
+                                    onClick={() => setSyncDropdownOpen(prev => !prev)}
+                                    disabled={isSyncing || !!syncingItem}
+                                    className="flex items-center px-1.5 py-1.5 text-xs font-medium bg-indigo-50 text-indigo-700 border border-l-0 border-indigo-200 rounded-r-lg hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d={syncDropdownOpen ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
                                     </svg>
-                                    Syncing...
-                                </>
-                            ) : (
-                                <>
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    Sync Checklist
-                                </>
+                                </button>
+                            </div>
+
+                            {/* Sync options dropdown panel */}
+                            {syncDropdownOpen && (
+                                <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-white border border-slate-200 rounded-xl shadow-lg p-3 space-y-2">
+                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sync Options</p>
+
+                                    {/* Salary Modifications option */}
+                                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedSyncs.salaryModifications}
+                                                onChange={e => setSelectedSyncs(prev => ({ ...prev, salaryModifications: e.target.checked }))}
+                                                className="h-3.5 w-3.5 accent-indigo-600"
+                                                id="sync-salary"
+                                            />
+                                            <label htmlFor="sync-salary" className="text-xs font-medium text-slate-700 cursor-pointer">Salary Modifications</label>
+                                        </div>
+                                        <button
+                                            onClick={runSalaryModificationsSync}
+                                            disabled={!!syncingItem}
+                                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            {syncingItem === 'salaryModifications' ? '...' : 'Run'}
+                                        </button>
+                                    </div>
+
+                                    {/* Report Tasks option */}
+                                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedSyncs.reportTasks}
+                                                onChange={e => setSelectedSyncs(prev => ({ ...prev, reportTasks: e.target.checked }))}
+                                                className="h-3.5 w-3.5 accent-indigo-600"
+                                                id="sync-report"
+                                            />
+                                            <label htmlFor="sync-report" className="text-xs font-medium text-slate-700 cursor-pointer">
+                                                Report Tasks {!reportRunId && <span className="text-slate-400">(no report)</span>}
+                                            </label>
+                                        </div>
+                                        <button
+                                            onClick={runReportTasksSync}
+                                            disabled={!!syncingItem || !reportRunId}
+                                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            {syncingItem === 'reportTasks' ? '...' : 'Run'}
+                                        </button>
+                                    </div>
+
+                                    {/* Annual Leave option */}
+                                    <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedSyncs.annualLeave}
+                                                onChange={e => setSelectedSyncs(prev => ({ ...prev, annualLeave: e.target.checked }))}
+                                                className="h-3.5 w-3.5 accent-indigo-600"
+                                                id="sync-leave"
+                                            />
+                                            <label htmlFor="sync-leave" className="text-xs font-medium text-slate-700 cursor-pointer">Annual Leave</label>
+                                        </div>
+                                        <button
+                                            onClick={runAnnualLeaveSync}
+                                            disabled={!!syncingItem}
+                                            className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md hover:bg-indigo-100 disabled:opacity-50 transition-colors"
+                                        >
+                                            {syncingItem === 'annualLeave' ? '...' : 'Run'}
+                                        </button>
+                                    </div>
+
+                                    {/* Divider and Sync All button inside dropdown */}
+                                    <div className="pt-2 border-t border-slate-100">
+                                        <button
+                                            onClick={handleSyncAll}
+                                            disabled={isSyncing}
+                                            className="w-full text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors font-medium"
+                                        >
+                                            {isSyncing ? 'Syncing...' : 'Sync All Selected'}
+                                        </button>
+                                    </div>
+                                </div>
                             )}
-                        </button>
+                        </div>
                         {selectedIds.size > 0 && (
                             <Button variant="outline" size="sm" onClick={() => setShowBulkDeleteConfirm(true)} disabled={bulkDeleteTasksMutation.isPending} className="text-red-600 border-red-100 hover:bg-red-50">
                                 <Trash2 className="w-4 h-4 mr-2" />Delete ({selectedIds.size})
