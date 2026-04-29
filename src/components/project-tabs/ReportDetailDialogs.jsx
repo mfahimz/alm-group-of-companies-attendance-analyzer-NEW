@@ -73,7 +73,8 @@ export function SaveConfirmationDialog({ open, onClose, onConfirm, hasEdits, isU
     );
 }
 
-export function FinalizationProgressDialog({ progress }) {
+export function FinalizationProgressDialog({ progress, isAlMaraghiMotors = false }) {
+    const isSalaryMode = isAlMaraghiMotors && progress.total > 0;
     return (
         <Dialog open={progress.open} onOpenChange={() => {}}>
             <DialogContent
@@ -83,16 +84,18 @@ export function FinalizationProgressDialog({ progress }) {
                 onInteractOutside={(e) => e.preventDefault()}
             >
                 <DialogHeader>
-                    <DialogTitle>Creating Salary Snapshots</DialogTitle>
+                    <DialogTitle>{isSalaryMode ? 'Creating Salary Snapshots' : 'Finalizing Report'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-sm text-slate-600 mb-2">
-                            <span>Progress</span>
-                            <span className="font-medium">{progress.current} / {progress.total}</span>
+                    {isSalaryMode && (
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-slate-600 mb-2">
+                                <span>Progress</span>
+                                <span className="font-medium">{progress.current} / {progress.total}</span>
+                            </div>
+                            <Progress value={progress.total > 0 ? (progress.current / progress.total) * 100 : 0} />
                         </div>
-                        <Progress value={progress.total > 0 ? (progress.current / progress.total) * 100 : 0} />
-                    </div>
+                    )}
                     <div className="space-y-1">
                         <div className="text-sm font-medium text-slate-700">{progress.status}</div>
                         {progress.currentEmployee && (
@@ -103,7 +106,11 @@ export function FinalizationProgressDialog({ progress }) {
                         <div className="flex items-start gap-2 text-xs text-amber-800">
                             <div className="animate-spin h-3 w-3 border-2 border-amber-300 border-t-amber-600 rounded-full mt-0.5 flex-shrink-0"></div>
                             <div>
-                                <strong>Creating salary snapshots...</strong> This takes ~2-3 seconds per 20 employees.
+                                {isSalaryMode ? (
+                                    <><strong>Creating salary snapshots for payroll...</strong> This takes ~2-3 seconds per 20 employees.</>
+                                ) : (
+                                    <><strong>Finalizing report and generating checklist tasks...</strong> This will only take a moment.</>
+                                )}
                                 <br />
                                 <span className="text-amber-700">⚠️ Do NOT navigate away or close this dialog until complete!</span>
                             </div>

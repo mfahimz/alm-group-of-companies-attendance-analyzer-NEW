@@ -737,7 +737,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 open: true,
                 current: 0,
                 total: 0,
-                currentEmployee: 'Saving current report values...',
+                currentEmployee: isAlMaraghiMotors ? 'Saving current report values...' : 'Finalizing report...',
                 status: 'Please wait...'
             });
 
@@ -800,7 +800,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 throw new Error(markResult.data?.error || 'Finalization failed');
             }
 
-            // STEP 2: Create all salary snapshots using batch mode (Al Maraghi Motors only)
+            // STEP 2: Create salary snapshots (Al Maraghi Motors only)
             if (isAlMaraghiMotors) {
                 const BATCH_SIZE = 10;
                 let batchStart = 0;
@@ -836,7 +836,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 currentEmployee: currentBatch.length > 0
                                     ? `Processing: ${currentBatch.map(e => e.name).slice(0, 3).join(', ')}${currentBatch.length > 3 ? '...' : ''}`
                                     : 'Processing...',
-                                status: `Creating salary snapshots: ${currentPos} of ${totalEmployees} (${percentage}%)`
+                                status: `Creating salary snapshots for payroll: ${currentPos} of ${totalEmployees} (${percentage}%)`
                             }));
 
                             batchStart = currentPos;
@@ -901,9 +901,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             setFinalizationProgress({ open: false, current: 0, total: 0, currentEmployee: '', status: '' });
-            toast.success('✅ Finalization complete! Salary snapshots created. Go to Salary Tab to generate reports.', {
-                duration: 6000
-            });
+            toast.success(isAlMaraghiMotors ? '✅ Finalization complete! Salary snapshots created. Go to Salary Tab.' : '✅ Report finalized! Checklist tasks auto-generated.', { duration: 6000 });
         },
         onError: async (error) => {
             console.error('[ReportDetailView] Finalization error:', error);
@@ -2002,7 +2000,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     return (
         <div className="space-y-6">
             {/* Finalization Progress Dialog */}
-            <FinalizationProgressDialog progress={finalizationProgress} />
+            <FinalizationProgressDialog progress={finalizationProgress} isAlMaraghiMotors={isAlMaraghiMotors} />
 
             {/* Save Status Banner */}
             {saveProgress && (
