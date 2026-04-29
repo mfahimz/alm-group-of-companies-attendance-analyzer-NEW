@@ -234,6 +234,10 @@ export default function DailyBreakdownDialog({
         const startDate = new Date(reportRun.date_from);
         const endDate = new Date(reportRun.date_to);
 
+        // ecoSkipActive: true if the report-level "Skip All Early Checkout" was applied for this employee
+        // Detected by the presence of [eco:X] tag in AnalysisResult.notes written by handleBulkSkipEarlyCheckout
+        const ecoSkipActive = /\[eco:\d+\]/.test(currentResult.notes || '');
+
         let dayOverrides = {};
         if (currentResult.day_overrides) {
             try { dayOverrides = JSON.parse(currentResult.day_overrides); } catch (e) { dayOverrides = {}; }
@@ -649,6 +653,11 @@ export default function DailyBreakdownDialog({
                             }
                         }
                     }
+                }
+                // ecoSkipActive: if skip all early checkout was applied at report level zero out
+                // early minutes for this day to match the summary report behaviour
+                if (ecoSkipActive) {
+                    dayEarlyMinutes = 0;
                 }
             }
 
