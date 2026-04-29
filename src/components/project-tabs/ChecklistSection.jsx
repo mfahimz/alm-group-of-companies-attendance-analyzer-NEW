@@ -481,7 +481,7 @@ export default function ChecklistSection({ project, checklistItems = [], current
             </CardHeader>
             <CardContent className="p-6 space-y-6">
                 {/* Task Type Filter Bar - CLICKABLE */}
-                {checklistItems.length > 0 && availableTaskTypes.length > 0 && (
+                {availableTaskTypes.length > 0 && (
                     <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
                         <div className="flex items-center gap-3 flex-wrap">
                             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Filter:</span>
