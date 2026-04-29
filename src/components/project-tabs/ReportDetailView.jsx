@@ -2079,19 +2079,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             )}
                         </div>
                         <div className="flex gap-2">
-                            {isAstra && !isDepartmentHead && canModifyAttendance && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleZeroEarlyMinutes}
-                                    disabled={isZeroingEarlyMin || resultsLoading}
-                                    className="text-xs h-8 border-amber-300 text-amber-700 hover:bg-amber-50"
-                                    title={selectedRowIds.length > 0 ? `Zero early minutes for ${selectedRowIds.length} selected` : 'Zero early minutes for all employees'}
-                                >
-                                    {isZeroingEarlyMin
-                                        ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Zeroing...</>
-                                        : <>{selectedRowIds.length > 0 ? `Zero Early (${selectedRowIds.length})` : 'Zero Early Min'}</>
-                                    }
+                            {isAstra && !isDepartmentHead && (
+                                <Button size="sm" variant="outline" onClick={handleZeroEarlyMinutes} disabled={isZeroingEarlyMin || resultsLoading} className="text-xs h-8 border-amber-300 text-amber-700 hover:bg-amber-50" title={selectedRowIds.length > 0 ? `Zero early minutes for ${selectedRowIds.length} selected` : 'Zero early minutes for all employees'}>
+                                    {isZeroingEarlyMin ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Zeroing...</> : <>{selectedRowIds.length > 0 ? `Zero Early (${selectedRowIds.length})` : 'Zero Early Min'}</>}
                                 </Button>
                             )}
                             <Button
@@ -2103,63 +2093,24 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                             </Button>
                             {project.status !== 'closed' && (
                                 <>
-                                    {!reportRun.is_final && canModifyAttendance && (
-                                        <Button
-                                            onClick={handleReanalyze}
-                                            disabled={isReanalyzing || reportRun.is_final}
-                                            className="bg-indigo-600 hover:bg-indigo-700"
-                                            title="Re-runs analysis with latest exceptions and shifts"
-                                        >
-                                            {isReanalyzing ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                    Saving & Reanalyzing...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Zap className="w-4 h-4 mr-2" />
-                                                    Save & Reanalyze
-                                                </>
-                                            )}
+                                    {!reportRun.is_final && (
+                                        <Button onClick={handleReanalyze} disabled={isReanalyzing} className="bg-indigo-600 hover:bg-indigo-700" title="Re-runs analysis with latest exceptions and shifts">
+                                            {isReanalyzing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving & Reanalyzing...</> : <><Zap className="w-4 h-4 mr-2" />Reanalyze Report</>}
                                         </Button>
                                     )}
-
-                                    {canModifyAttendance && !reportRun.is_final && (
-                                        <Button
-                                            onClick={() => finalizeReportMutation.mutate()}
-                                            disabled={finalizeReportMutation.isPending}
-                                            className="bg-purple-600 hover:bg-purple-700"
-                                            title="Finalize report without generating approval links"
-                                        >
-                                            {finalizeReportMutation.isPending ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                    Finalizing...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                                    Finalize Report
-                                                </>
-                                            )}
+                                    {!reportRun.is_final && (
+                                        <Button onClick={() => setShowSaveConfirmation(true)} disabled={isSaving} className="bg-green-600 hover:bg-green-700" title="Save report edits as exceptions">
+                                            {isSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : <><Save className="w-4 h-4 mr-2" />Save Report</>}
                                         </Button>
                                     )}
-                                    {canModifyAttendance && reportRun.is_final && (
-                                        <Button
-                                            onClick={() => unfinalizeReportMutation.mutate()}
-                                            disabled={unfinalizeReportMutation.isPending}
-                                            variant="outline"
-                                            className="border-red-300 text-red-600 hover:bg-red-50"
-                                            title="Un-finalize report (admin only)"
-                                        >
-                                            {unfinalizeReportMutation.isPending ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                    Un-finalizing...
-                                                </>
-                                            ) : (
-                                                <>Un-finalize Report</>
-                                            )}
+                                    {!reportRun.is_final && (
+                                        <Button onClick={() => finalizeReportMutation.mutate()} disabled={finalizeReportMutation.isPending} className="bg-purple-600 hover:bg-purple-700" title="Finalize report for salary calculation">
+                                            {finalizeReportMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Finalizing...</> : <><CheckCircle className="w-4 h-4 mr-2" />Finalize Report</>}
+                                        </Button>
+                                    )}
+                                    {reportRun.is_final && (
+                                        <Button onClick={() => unfinalizeReportMutation.mutate()} disabled={unfinalizeReportMutation.isPending} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+                                            {unfinalizeReportMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Un-finalizing...</> : <>Un-finalize Report</>}
                                         </Button>
                                     )}
                                 </>
@@ -2234,34 +2185,26 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 </Button>
                             </div>
                         )}
-                        {canModifyAttendance && (
-                            <Button
-                                onClick={verifyAllClean}
-                                variant="outline"
-                                size="sm"
-                            >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Verify All Clean
-                            </Button>
-                        )}
-                        {isAdmin && (
-                            <Button
-                                onClick={() => {
-                                    if (!window.confirm(`Verify ALL ${enrichedResults.length} employees? This will mark every employee as verified.`)) return;
-                                    const allIds = enrichedResults.map(r => String(r.attendance_id));
-                                    const newVerified = [...new Set(allIds)];
-                                    setVerifiedEmployees(newVerified);
-                                    updateVerificationMutation.mutate(newVerified);
-                                    toast.success(`All ${newVerified.length} employees verified`);
-                                }}
-                                variant="outline"
-                                size="sm"
-                                className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                            >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Verify All
-                            </Button>
-                        )}
+                        <Button onClick={verifyAllClean} variant="outline" size="sm">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Verify All Clean
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (!window.confirm(`Verify ALL ${enrichedResults.length} employees? This will mark every employee as verified.`)) return;
+                                const allIds = enrichedResults.map(r => String(r.attendance_id));
+                                const newVerified = [...new Set(allIds)];
+                                setVerifiedEmployees(newVerified);
+                                updateVerificationMutation.mutate(newVerified);
+                                toast.success(`All ${newVerified.length} employees verified`);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                        >
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Verify All
+                        </Button>
                         {/* 
                             Change 2 - Calculate Gift Minutes Button
                             Triggers bulk calculation based on deductible minutes rule.
