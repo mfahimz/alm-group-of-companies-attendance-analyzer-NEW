@@ -580,7 +580,7 @@ export default function PunchUploadTab({ project }) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
-            toast.success(`${punchRecords.length} attendance records uploaded successfully.`);
+            toast.success(`${parsedData.length} attendance records uploaded successfully.`);
             setParsedData([]);
             setFile(null);
             setUploadProgress(null);
