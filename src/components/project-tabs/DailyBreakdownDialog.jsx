@@ -193,7 +193,12 @@ export default function DailyBreakdownDialog({
     const shifts = parentShifts.length > 0 ? parentShifts : selfShifts;
     const exceptions = parentExceptions.length > 0 ? parentExceptions : selfExceptions;
 
-    const dataReady = parentPunches.length > 0 || (selfPunchesFetched && selfShiftsFetched && selfExceptionsFetched);
+    // dataReady: true only when we have data that's actually been loaded.
+    // When parent data is empty, we must wait for self-queries to complete (enabled = parentXxx.length === 0).
+    // selfXxxFetched can be true from stale cache even before the query runs, so we also check
+    // that the self-queries were enabled (parent was empty) and have finished fetching.
+    const selfQueriesEnabled = parentPunches.length === 0;
+    const dataReady = parentPunches.length > 0 || (selfQueriesEnabled && selfPunchesFetched && selfShiftsFetched && selfExceptionsFetched);
 
     const isWithinMidnightBuffer = (timestampRaw) => {
         const parsed = parseTime(timestampRaw, includeSeconds);
@@ -688,12 +693,13 @@ export default function DailyBreakdownDialog({
                 dayEarlyMinutes = Math.round(remaining * earlyRatio);
             }
 
-            // Step 4: Handle MANUAL_OTHER_MINUTES where created_from_report is false or null by scanning matchingExceptions and adding their allowed_minutes
+            // Step 4: Handle MANUAL_OTHER_MINUTES where created_from_report is false or null.
+            // These exceptions store their value in other_minutes (not allowed_minutes).
             const manualOtherNonReportEx = matchingExceptions.filter(ex => 
                 ex.type === 'MANUAL_OTHER_MINUTES' && (ex.created_from_report === false || ex.created_from_report === null)
             );
             for (const moEx of manualOtherNonReportEx) {
-                const moMinutes = moEx.allowed_minutes || 0;
+                const moMinutes = moEx.other_minutes || moEx.allowed_minutes || 0;
                 if (moMinutes > 0) {
                     currentOtherMinutes += moMinutes;
                 }
