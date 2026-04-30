@@ -15,8 +15,6 @@ export async function executeSaveReport({
     results,
     setSaveProgress,
 }) {
-    setSaveProgress({ current: 0, total: 100, status: 'Validating date range...' });
-
     setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
 
     await Promise.all([
@@ -24,7 +22,7 @@ export async function executeSaveReport({
         base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
     ]);
 
-    // Delete existing report-generated exceptions for this report to prevent duplicates
+    // Delete ALL existing report-generated exceptions for this report_run_id to prevent duplicates on re-save
     const existingReportExceptions = exceptions.filter(e =>
         (e.created_from_report && e.report_run_id === reportRun.id) ||
         (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
@@ -36,6 +34,30 @@ export async function executeSaveReport({
             await base44.entities.Exception.delete(ex.id);
         }
     }
+
+    // Fetch ALL report-generated exceptions from OTHER saved reports in this project
+    // to deduplicate against — prevents cross-report duplicate exceptions for same employee+date+type
+    let allProjectReportExceptions = [];
+    try {
+        allProjectReportExceptions = await base44.entities.Exception.filter({
+            project_id: project.id,
+            created_from_report: true
+        }, null, 500);
+        // Exclude exceptions from the current report (already deleted above)
+        allProjectReportExceptions = allProjectReportExceptions.filter(e => e.report_run_id !== reportRun.id);
+    } catch (e) {
+        // Non-fatal — proceed without cross-report dedup if fetch fails
+        allProjectReportExceptions = [];
+    }
+
+    const isDuplicateException = (ex) => {
+        return allProjectReportExceptions.some(existing =>
+            existing.attendance_id === ex.attendance_id &&
+            existing.date_from === ex.date_from &&
+            existing.date_to === ex.date_to &&
+            existing.type === ex.type
+        );
+    };
 
     const exceptionsToCreate = [];
 
@@ -120,7 +142,9 @@ export async function executeSaveReport({
                     exceptionData.type = 'MANUAL_OTHER_MINUTES';
                 }
 
-                exceptionsToCreate.push(exceptionData);
+                if (!isDuplicateException(exceptionData)) {
+                    exceptionsToCreate.push(exceptionData);
+                }
             }
         }
 
@@ -137,7 +161,7 @@ export async function executeSaveReport({
                     ex.type === 'MANUAL_OTHER_MINUTES'
                 );
                 if (!alreadyCovered) {
-                    exceptionsToCreate.push({
+                    const otherMinEx = {
                         project_id: project.id,
                         attendance_id: String(result.attendance_id),
                         date_from: dateStr,
@@ -150,7 +174,10 @@ export async function executeSaveReport({
                         report_run_id: reportRun.id,
                         use_in_analysis: true,
                         approval_status: 'pending_dept_head'
-                    });
+                    };
+                    if (!isDuplicateException(otherMinEx)) {
+                        exceptionsToCreate.push(otherMinEx);
+                    }
                 }
             }
         });
