@@ -147,6 +147,37 @@ export async function executeSaveReport({
                 exceptionsToCreate.push(exceptionData);
             }
         }
+
+        // MANUAL_OTHER_MINUTES: For each day override with otherMinutes > 0 that was NOT already
+        // saved as a MANUAL_OTHER_MINUTES exception above, create a dedicated MANUAL_OTHER_MINUTES
+        // exception so runAnalysis on future reports picks up other_minutes from the exceptions table.
+        Object.entries(dayOverrides).forEach(([dateStr, override]) => {
+            if ((override.otherMinutes || 0) > 0) {
+                // Check if this date/employee combo already got a MANUAL_OTHER_MINUTES exception
+                const alreadyCovered = exceptionsToCreate.some(ex =>
+                    ex.attendance_id === String(result.attendance_id) &&
+                    ex.date_from === dateStr &&
+                    ex.date_to === dateStr &&
+                    ex.type === 'MANUAL_OTHER_MINUTES'
+                );
+                if (!alreadyCovered) {
+                    exceptionsToCreate.push({
+                        project_id: project.id,
+                        attendance_id: String(result.attendance_id),
+                        date_from: dateStr,
+                        date_to: dateStr,
+                        type: 'MANUAL_OTHER_MINUTES',
+                        other_minutes: override.otherMinutes,
+                        allowed_minutes: override.otherMinutes,
+                        details: `Report edit: +${override.otherMinutes} other min`,
+                        created_from_report: true,
+                        report_run_id: reportRun.id,
+                        use_in_analysis: true,
+                        approval_status: 'pending_dept_head'
+                    });
+                }
+            }
+        });
     }
 
     if (exceptionsToCreate.length > 0) {
