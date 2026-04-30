@@ -1883,8 +1883,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     </div>
                     <div className="flex justify-end gap-3">
                         <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)}>Cancel</Button>
-                        {/* Must call handleReanalyze not handleReanalyzeOnly — handleReanalyze saves edits as exceptions first then reanalyzes so manual edits are preserved */}
-                        <Button onClick={handleReanalyze} className="bg-indigo-600 hover:bg-indigo-700">Save & Reanalyze</Button>
+                        <Button onClick={handleReanalyzeOnly} className="bg-indigo-600 hover:bg-indigo-700">Save & Reanalyze</Button>
                     </div>
                 </DialogContent>
             </Dialog>
