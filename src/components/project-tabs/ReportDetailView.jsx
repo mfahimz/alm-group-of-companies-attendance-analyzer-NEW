@@ -954,17 +954,37 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             let offset = 0;
             const rebatchSize = 10;
             let isComplete = false;
+            let chunkRetries = 0;
+            const MAX_CHUNK_RETRIES = 4;
 
             while (!isComplete) {
-                const response = await base44.functions.invoke('runAnalysis', {
-                    project_id: project.id,
-                    date_from: reportRun.date_from,
-                    date_to: reportRun.date_to,
-                    report_name: reportRun.report_name || 'Reanalysis',
-                    _existing_report_run_id: reportRun.id,
-                    _chunk_offset: offset,
-                    _chunk_size: rebatchSize
-                });
+                let response;
+                try {
+                    response = await base44.functions.invoke('runAnalysis', {
+                        project_id: project.id,
+                        date_from: reportRun.date_from,
+                        date_to: reportRun.date_to,
+                        report_name: reportRun.report_name || 'Reanalysis',
+                        _existing_report_run_id: reportRun.id,
+                        _chunk_offset: offset,
+                        _chunk_size: rebatchSize
+                    });
+                    chunkRetries = 0; // reset on success
+                } catch (chunkError) {
+                    const isRateLimit = chunkError?.response?.status === 429 || chunkError?.message?.includes('429') || chunkError?.message?.includes('rate limit');
+                    const isServerError = chunkError?.response?.status === 500 || chunkError?.message?.includes('500');
+                    if ((isRateLimit || isServerError) && chunkRetries < MAX_CHUNK_RETRIES) {
+                        chunkRetries++;
+                        const backoff = Math.min(3000 * Math.pow(2, chunkRetries - 1), 20000);
+                        setReanalysisProgress(prev => ({
+                            ...prev,
+                            subStatus: `Rate limited — retrying chunk in ${Math.round(backoff / 1000)}s (attempt ${chunkRetries}/${MAX_CHUNK_RETRIES})...`
+                        }));
+                        await new Promise(resolve => setTimeout(resolve, backoff));
+                        continue; // retry same offset
+                    }
+                    throw chunkError;
+                }
 
                 if (response.data.success) {
                     if (response.data.total_count > 0 && grandTotal === 0) { grandTotal = response.data.total_count; }
@@ -977,7 +997,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         status: 'Reanalyzing...',
                         subStatus: `Reanalyzed ${totalProcessed} of ${grandTotal || '?'} employees`
                     });
-                    if (!isComplete) { await new Promise(resolve => setTimeout(resolve, 300)); }
+                    if (!isComplete) { await new Promise(resolve => setTimeout(resolve, 2000)); }
                 } else {
                     throw new Error(response.data.error || 'Reanalysis chunk failed');
                 }
