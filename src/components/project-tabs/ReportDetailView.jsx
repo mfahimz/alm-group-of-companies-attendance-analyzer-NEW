@@ -1877,13 +1877,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                             <p className="text-sm text-amber-800 font-medium mb-1">⚠️ Note:</p>
                             <p className="text-sm text-amber-700">
-                                In-report edits are NOT saved by this action. Click "Save Report" first to persist your edits as exceptions before reanalyzing.
+                                This will save your current edits and rerun the attendance analysis. Please review your changes before confirming.
                             </p>
                         </div>
                     </div>
                     <div className="flex justify-end gap-3">
                         <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)}>Cancel</Button>
-                        <Button onClick={handleReanalyzeOnly} className="bg-indigo-600 hover:bg-indigo-700">Reanalyze</Button>
+                        {/* Must call handleReanalyze not handleReanalyzeOnly — handleReanalyze saves edits as exceptions first then reanalyzes so manual edits are preserved */}
+                        <Button onClick={handleReanalyze} className="bg-indigo-600 hover:bg-indigo-700">Save & Reanalyze</Button>
                     </div>
                 </DialogContent>
             </Dialog>
