@@ -528,9 +528,13 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
 
             const skipEarlyCheckout = isSkipped(result);
             const adjustedEarlyMin = skipEarlyCheckout ? 0 : earlyMin;
+            // IMPORTANT: approved_minutes is already applied PER DAY in runAnalysis, reducing
+            // late_minutes and early_checkout_minutes before they are stored on AnalysisResult.
+            // Do NOT subtract approved_minutes again here — it causes double deduction in the display.
+            // The stored deductible_minutes on AnalysisResult is the source of truth for salary calculation.
             const effectiveDeductible = result.manual_deductible_minutes !== null && result.manual_deductible_minutes !== undefined
                 ? result.manual_deductible_minutes
-                : Math.max(0, lateMin + earlyMin - graceMin - approvedMin);
+                : Math.max(0, lateMin + earlyMin - graceMin);
 
             return {
                 ...result,
