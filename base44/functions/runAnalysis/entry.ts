@@ -1810,28 +1810,54 @@ Deno.serve(async (req: Request) => {
         console.log('[runAnalysis] Processed employees:', allResults.length);
         console.log('[runAnalysis] Unique attendance IDs processed:', processedAttendanceIds.size);
 
+        // BUG FIX: Universal retry helper for any SDK call that can hit 429.
+        const withRateLimitRetry = async (fn: () => Promise<any>, label: string) => {
+            const delays = [1500, 3000, 6000, 12000, 20000];
+            for (let attempt = 0; attempt <= delays.length; attempt++) {
+                try {
+                    return await fn();
+                } catch (e: any) {
+                    const isRateLimit = e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('rate limit');
+                    if (isRateLimit && attempt < delays.length) {
+                        console.warn(`[runAnalysis] Rate limited at ${label}, retrying in ${delays[attempt]}ms (attempt ${attempt + 1}/${delays.length})...`);
+                        await new Promise(r => setTimeout(r, delays[attempt]));
+                        continue;
+                    }
+                    throw e;
+                }
+            }
+        };
+
         // CHUNK MODE: Only delete results for employees in THIS chunk
         if (_chunk_offset !== undefined && allResults.length > 0) {
             // Use already-fetched existingResultsForReport to avoid per-employee API calls (rate limit fix)
             const attendanceIdsToDelete = new Set(allResults.map(r => String(r.attendance_id)));
             const toDelete = existingResultsForReport.filter(r => attendanceIdsToDelete.has(String(r.attendance_id)));
             if (toDelete.length > 0) {
-                // Delete in batches of 50 to avoid rate limits
-                for (let i = 0; i < toDelete.length; i += 50) {
-                    const batch = toDelete.slice(i, i + 50);
-                    await Promise.all(batch.map(r => base44.asServiceRole.entities.AnalysisResult.delete(r.id)));
-                    if (i + 50 < toDelete.length) {
-                        await new Promise(resolve => setTimeout(resolve, 300));
+                // Delete sequentially in batches of 5 with retry to survive sustained rate limits
+                for (let i = 0; i < toDelete.length; i += 5) {
+                    const batch = toDelete.slice(i, i + 5);
+                    for (const r of batch) {
+                        await withRateLimitRetry(
+                            () => base44.asServiceRole.entities.AnalysisResult.delete(r.id),
+                            `delete AnalysisResult ${r.id}`
+                        );
+                    }
+                    if (i + 5 < toDelete.length) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
                     }
                 }
                 console.log(`[runAnalysis] Deleted ${toDelete.length} existing chunk results`);
             }
         } else if (existingResultsForReport.length > 0 && _chunk_offset === undefined) {
             // Full run - delete all existing
-            await base44.asServiceRole.entities.AnalysisResult.deleteMany({
-                project_id,
-                report_run_id: reportRun.id
-            });
+            await withRateLimitRetry(
+                () => base44.asServiceRole.entities.AnalysisResult.deleteMany({
+                    project_id,
+                    report_run_id: reportRun.id
+                }),
+                'deleteMany AnalysisResult'
+            );
         }
 
         // Save results in batches of 8 with Promise.all and 1500ms delay
@@ -1937,10 +1963,14 @@ Deno.serve(async (req: Request) => {
         // Update project status (only if this is NOT a chunk or it's the final chunk)
         const isFinalChunk = _chunk_offset === undefined || (startIdx + allResults.length >= uniqueEmployeeIds.length);
         if (isFinalChunk) {
-            await base44.asServiceRole.entities.Project.update(project_id, {
-                last_saved_report_id: reportRun.id,
-                status: 'analyzed'
-            });
+            // BUG FIX: Wrap in retry to survive 429 from cumulative SDK pressure at end of chunk.
+            await withRateLimitRetry(
+                () => base44.asServiceRole.entities.Project.update(project_id, {
+                    last_saved_report_id: reportRun.id,
+                    status: 'analyzed'
+                }),
+                'Project.update'
+            );
         }
 
         return Response.json({
