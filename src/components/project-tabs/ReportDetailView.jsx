@@ -1256,8 +1256,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 const newNotes = buildSkipNotes(r);
                 const lateMin = r.late_minutes || 0;
                 const graceMin = r.grace_minutes ?? 15;
-                const approvedMin = r.approved_minutes || 0;
-                const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                // approved_minutes already reduced late/early per-day in runAnalysis — do NOT subtract again
+                const newDeductible = Math.max(0, lateMin - graceMin);
                 await base44.entities.AnalysisResult.update(r.id, {
                     notes: newNotes,
                     manual_deductible_minutes: newDeductible,
@@ -1581,8 +1581,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             if (skip) {
                 const lateMin = result.late_minutes || 0;
                 const graceMin = result.grace_minutes ?? 15;
-                const approvedMin = result.approved_minutes || 0;
-                const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                // approved_minutes already reduced late/early per-day in runAnalysis — do NOT subtract again
+                const newDeductible = Math.max(0, lateMin - graceMin);
                 await base44.entities.AnalysisResult.update(result.id, {
                     early_checkout_minutes: 0,
                     manual_deductible_minutes: newDeductible,
@@ -1613,8 +1613,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (skip) {
                     const lateMin = r.late_minutes || 0;
                     const graceMin = r.grace_minutes ?? 15;
-                    const approvedMin = r.approved_minutes || 0;
-                    const newDeductible = Math.max(0, lateMin - graceMin - approvedMin);
+                    // approved_minutes already reduced late/early per-day in runAnalysis — do NOT subtract again
+                    const newDeductible = Math.max(0, lateMin - graceMin);
                     await base44.entities.AnalysisResult.update(r.id, {
                         early_checkout_minutes: 0,
                         manual_deductible_minutes: newDeductible,
