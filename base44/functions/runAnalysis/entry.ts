@@ -1842,7 +1842,10 @@ Deno.serve(async (req: Request) => {
             const batch = allResults.slice(i, i + SAVE_BATCH_SIZE);
 
             const processResult = async (res: any) => {
-                const retryDelays = [1000, 2000, 4000];
+                // BUG FIX: Increased retry budget for sustained rate limits during reanalysis.
+                // Previous 3-retry/4s-max budget was insufficient — the entire chunk would
+                // throw a 500 if a single record's save kept hitting 429.
+                const retryDelays = [1500, 3000, 6000, 12000, 20000, 30000];
                 for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
                     try {
                         await base44.asServiceRole.entities.AnalysisResult.create(res);
@@ -1851,9 +1854,14 @@ Deno.serve(async (req: Request) => {
                         const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('rate limit');
                         if (isRateLimit && attempt < retryDelays.length) {
                             const delay = retryDelays[attempt];
-                            console.warn(`[runAnalysis] Rate limited saving result for ${res.attendance_id}, retrying in ${delay}ms...`);
+                            console.warn(`[runAnalysis] Rate limited saving result for ${res.attendance_id}, retrying in ${delay}ms (attempt ${attempt + 1}/${retryDelays.length})...`);
                             await new Promise(r => setTimeout(r, delay));
                             continue;
+                        }
+                        if (isRateLimit) {
+                            // Final fallback: log and skip this record rather than failing the whole chunk
+                            console.error(`[runAnalysis] Permanently rate limited for ${res.attendance_id} — skipping to preserve chunk completion.`);
+                            return;
                         }
                         throw error;
                     }
@@ -1874,6 +1882,8 @@ Deno.serve(async (req: Request) => {
         if (otherMinutesExceptionsToCreate.length > 0) {
             console.log(`[runAnalysis] Creating MANUAL_OTHER_MINUTES exceptions (per-date) for ${otherMinutesExceptionsToCreate.length} employees`);
 
+            // BUG FIX: Add retry-with-backoff for exception creation to survive rate limits.
+            const otherMinExceptionRetryDelays = [1500, 3000, 6000, 12000];
             for (const detail of otherMinutesExceptionsToCreate) {
                 try {
                     const breakdown = detail.breakdown || {};
@@ -1883,7 +1893,7 @@ Deno.serve(async (req: Request) => {
                         const minutesForDate = (breakdown as Record<string, number>)[dateStr];
                         if (!minutesForDate || minutesForDate <= 0) continue;
 
-                        await base44.asServiceRole.entities.Exception.create({
+                        const payload = {
                             project_id,
                             attendance_id: detail.attendance_id,
                             date_from: dateStr,
@@ -1895,7 +1905,28 @@ Deno.serve(async (req: Request) => {
                             report_run_id: reportRun.id,
                             use_in_analysis: true,
                             approval_status: 'pending_dept_head'
-                        });
+                        };
+
+                        let saved = false;
+                        for (let attempt = 0; attempt <= otherMinExceptionRetryDelays.length; attempt++) {
+                            try {
+                                await base44.asServiceRole.entities.Exception.create(payload);
+                                saved = true;
+                                break;
+                            } catch (e: any) {
+                                const isRateLimit = e?.status === 429 || e?.message?.includes('429') || e?.message?.includes('rate limit');
+                                if (isRateLimit && attempt < otherMinExceptionRetryDelays.length) {
+                                    const delay = otherMinExceptionRetryDelays[attempt];
+                                    console.warn(`[runAnalysis] Rate limited creating other-min exception for ${detail.attendance_id} ${dateStr}, retrying in ${delay}ms...`);
+                                    await new Promise(r => setTimeout(r, delay));
+                                    continue;
+                                }
+                                throw e;
+                            }
+                        }
+                        if (!saved) {
+                            console.error(`[runAnalysis] Permanently failed to create other-min exception for ${detail.attendance_id} ${dateStr} — skipping.`);
+                        }
                     }
                 } catch (exError) {
                     console.warn(`[runAnalysis] Failed to create other minutes exception for ${detail.attendance_id}:`, exError.message);
