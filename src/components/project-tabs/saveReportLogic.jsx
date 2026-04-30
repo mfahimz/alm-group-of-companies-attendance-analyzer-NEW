@@ -17,30 +17,6 @@ export async function executeSaveReport({
 }) {
     setSaveProgress({ current: 0, total: 100, status: 'Validating date range...' });
 
-    // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
-    const newFrom = new Date(reportRun.date_from);
-    const newTo = new Date(reportRun.date_to);
-    const projectFrom = new Date(project.date_from);
-    const projectTo = new Date(project.date_to);
-
-    const isFullProjectRange =
-        newFrom.toLocaleDateString() === projectFrom.toLocaleDateString() &&
-        newTo.toLocaleDateString() === projectTo.toLocaleDateString();
-
-    if (!isFullProjectRange) {
-        const overlappingReport = allReportRuns.find(run => {
-            if (!run.is_saved || run.id === reportRun.id) return false;
-            const savedFrom = new Date(run.date_from);
-            const savedTo = new Date(run.date_to);
-            return (newFrom <= savedTo) && (newTo >= savedFrom);
-        });
-
-        if (overlappingReport) {
-            const rangeText = `${new Date(overlappingReport.date_from).toLocaleDateString()} - ${new Date(overlappingReport.date_to).toLocaleDateString()}`;
-            throw new Error(`Overlap Detected: A saved report already exists for part of this period (${rangeText}). Save blocked to prevent data conflicts.`);
-        }
-    }
-
     setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
 
     await Promise.all([
