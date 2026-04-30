@@ -230,7 +230,15 @@ export default function DailyBreakdownDialog({
     const getDailyBreakdown = useMemo(() => {
         if (!selectedEmployee) return [];
 
-        const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+        // BUGFIX: enrichedResults may be stale (cached before day_overrides was saved).
+        // Prefer the version that actually has day_overrides populated.
+        // Priority: enrichedResults (if it has day_overrides) > selectedEmployee (if it has day_overrides) > enrichedResults fallback
+        const fromEnriched = enrichedResults.find(r => r.id === selectedEmployee.id);
+        const currentResult = (() => {
+            if (fromEnriched?.day_overrides) return fromEnriched;
+            if (selectedEmployee?.day_overrides) return selectedEmployee;
+            return fromEnriched || selectedEmployee;
+        })();
         const breakdown = [];
         const startDate = new Date(reportRun.date_from);
         const endDate = new Date(reportRun.date_to);
