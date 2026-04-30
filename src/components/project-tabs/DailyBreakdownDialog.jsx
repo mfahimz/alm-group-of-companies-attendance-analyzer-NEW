@@ -612,18 +612,20 @@ export default function DailyBreakdownDialog({
             if (reportGeneratedException && !dayOverrides[dateStr]) {
                 // REPORT GENERATED EXCEPTION: mirrors runAnalysis logic exactly - if HR edited this day in a previous report apply those values directly and skip punch computation.
                 if (['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME'].includes(reportGeneratedException.type)) {
-                    // Status handled in status section, ensure minutes remain 0
+                    // Status handled in status section, ensure late/early minutes remain 0
                     dayLateMinutes = 0;
                     dayEarlyMinutes = 0;
                 } else {
-                    // Read late_minutes, early_checkout_minutes, other_minutes directly from the reportGeneratedException record
+                    // Read late_minutes and early_checkout_minutes directly from the reportGeneratedException record
                     dayLateMinutes = reportGeneratedException.late_minutes || 0;
                     dayEarlyMinutes = reportGeneratedException.early_checkout_minutes || 0;
-                    if (reportGeneratedException.other_minutes > 0) {
-                        currentOtherMinutes = reportGeneratedException.other_minutes;
-                    }
                     isLateOverridden = true;
                     isEarlyOverridden = true;
+                }
+                // Always read other_minutes from reportGeneratedException regardless of exception type
+                // other_minutes must be applied even on MANUAL_PRESENT/SICK_LEAVE days to match summary report
+                if (reportGeneratedException.other_minutes > 0) {
+                    currentOtherMinutes = reportGeneratedException.other_minutes;
                 }
                 // Skip punch-based calculation for this day as report-generated values are applied directly
             } else {
