@@ -17,6 +17,10 @@ import { toast } from 'sonner';
 import { GraceMinutesDialog, SaveConfirmationDialog, FinalizationProgressDialog } from './ReportDetailDialogs';
 import DailyBreakdownDialog from './DailyBreakdownDialog';
 import ReportTableRow from './ReportTableRow';
+import ReportActionButtons from './ReportActionButtons';
+import ReportFilterToolbar from './ReportFilterToolbar';
+import ReportResultsTable from './ReportResultsTable';
+import { executeSaveReport } from './saveReportLogic';
 import * as XLSX from 'xlsx';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 
@@ -930,151 +934,21 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     });
 
-    const handleReanalyzeWithSave = async () => {
+    const handleReanalyzeOnly = async () => {
         setShowReanalyzeConfirm(false);
         setIsReanalyzing(true);
         setReanalysisProgress({ 
             current: 0, 
             total: 0, 
-            status: 'Saving...', 
-            subStatus: 'Saving report edits as exceptions...' 
+            status: 'Reanalyzing...', 
+            subStatus: 'Starting reanalysis...' 
         });
 
         try {
-            // PHASE 1: Write exceptions to DB
-            const existingReportExceptions = exceptions.filter(e =>
-                (e.created_from_report && e.report_run_id === reportRun.id) ||
-                (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
-            );
+            // REANALYSIS ONLY: No save phase. Uses existing saved exceptions only.
+            // Use "Save Report" button beforehand to persist in-report edits as exceptions.
 
-            // Sequential delete with retry and delay
-            for (const ex of existingReportExceptions) {
-                try {
-                    await base44.entities.Exception.delete(ex.id);
-                } catch (err) {
-                    if (err.status === 429 || err.message?.includes('rate limit')) {
-                        await new Promise(r => setTimeout(r, 2000));
-                        await base44.entities.Exception.delete(ex.id);
-                    } else {
-                        throw err;
-                    }
-                }
-                await new Promise(r => setTimeout(r, 150));
-            }
-
-            const exceptionsToCreate = [];
-            for (const result of results) {
-                if (!result.day_overrides) continue;
-                let dayOverrides = {};
-                try {
-                    dayOverrides = JSON.parse(result.day_overrides);
-                } catch (e) {
-                    continue;
-                }
-
-                const datesByType = {};
-                Object.entries(dayOverrides).forEach(([dateStr, override]) => {
-                    const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
-                    if (!datesByType[key]) {
-                        datesByType[key] = {
-                            dates: [],
-                            data: override,
-                            attendance_id: result.attendance_id
-                        };
-                    }
-                    datesByType[key].dates.push(dateStr);
-                });
-
-                for (const group of Object.values(datesByType)) {
-                    const sortedDates = group.dates.sort();
-                    const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
-                    const ranges = [];
-
-                    if (hasTimeMins) {
-                        sortedDates.forEach(d => ranges.push({ start: d, end: d }));
-                    } else {
-                        let currentRange = { start: sortedDates[0], end: sortedDates[0] };
-                        for (let i = 1; i < sortedDates.length; i++) {
-                            const dayDiff = (new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / (1000 * 60 * 60 * 24);
-                            if (dayDiff === 1) { currentRange.end = sortedDates[i]; }
-                            else { ranges.push({ ...currentRange }); currentRange = { start: sortedDates[i], end: sortedDates[i] }; }
-                        }
-                        ranges.push(currentRange);
-                    }
-
-                    for (const range of ranges) {
-                        const needsApproval = true;
-                        const detailsParts = [];
-                        if (group.data.lateMinutes > 0) detailsParts.push(`+${group.data.lateMinutes} late min`);
-                        if (group.data.earlyCheckoutMinutes > 0) detailsParts.push(`+${group.data.earlyCheckoutMinutes} early min`);
-                        if (group.data.otherMinutes > 0) detailsParts.push(`+${group.data.otherMinutes} other min`);
-                        if (group.data.shiftOverride) detailsParts.push('shift override');
-                        if (group.data.details) detailsParts.push(group.data.details);
-
-                        const detailsText = detailsParts.length > 0
-                            ? `Report edit: ${detailsParts.join(' | ')}`
-                            : 'Report edit: Manual adjustment from report';
-
-                        const exceptionData = {
-                            project_id: project.id,
-                            attendance_id: String(group.attendance_id),
-                            date_from: range.start,
-                            date_to: range.end,
-                            type: group.data.type,
-                            details: detailsText,
-                            created_from_report: true,
-                            report_run_id: reportRun.id,
-                            use_in_analysis: true,
-                            approval_status: needsApproval ? 'pending_dept_head' : 'approved'
-                        };
-
-                        if (group.data.lateMinutes && group.data.lateMinutes > 0) exceptionData.late_minutes = group.data.lateMinutes;
-                        if (group.data.earlyCheckoutMinutes && group.data.earlyCheckoutMinutes > 0) exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
-                        if (group.data.otherMinutes && group.data.otherMinutes > 0) exceptionData.other_minutes = group.data.otherMinutes;
-
-                        if (group.data.shiftOverride) {
-                            exceptionData.type = 'SHIFT_OVERRIDE';
-                            exceptionData.new_am_start = group.data.shiftOverride.am_start;
-                            exceptionData.new_am_end = group.data.shiftOverride.am_end;
-                            exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
-                            exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
-                        } else if ((exceptionData.late_minutes || 0) > 0 || (exceptionData.early_checkout_minutes || 0) > 0) {
-                            exceptionData.type = 'MANUAL_LATE';
-                        } else if ((exceptionData.other_minutes || 0) > 0) {
-                            exceptionData.type = 'MANUAL_OTHER_MINUTES';
-                        }
-                        exceptionsToCreate.push(exceptionData);
-                    }
-                }
-            }
-
-            // Batch create with retry and delay
-            const BATCH_SIZE = 5;
-            for (let i = 0; i < exceptionsToCreate.length; i += BATCH_SIZE) {
-                const batch = exceptionsToCreate.slice(i, i + BATCH_SIZE);
-                try {
-                    await base44.entities.Exception.bulkCreate(batch);
-                } catch (err) {
-                    if (err.status === 429 || err.message?.includes('rate limit')) {
-                        await new Promise(r => setTimeout(r, 2000));
-                        await base44.entities.Exception.bulkCreate(batch);
-                    } else {
-                        throw err;
-                    }
-                }
-                if (i + BATCH_SIZE < exceptionsToCreate.length) {
-                    await new Promise(r => setTimeout(r, 300));
-                }
-            }
-
-            setReanalysisProgress({ 
-                current: 0, 
-                total: 0, 
-                status: 'Reanalyzing...', 
-                subStatus: 'Exceptions saved. Starting reanalysis...' 
-            });
-
-            // PHASE 2: REANALYSIS
+            // REANALYSIS
             let grandTotal = 0;
             let totalProcessed = 0;
             let offset = 0;
@@ -1131,244 +1005,15 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const handleReanalyze = async () => {
-        handleReanalyzeWithSave();
+        setShowReanalyzeConfirm(true);
     };
 
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
-            setSaveProgress({ current: 0, total: 100, status: 'Validating date range...' });
-
-            // BUSINESS LOGIC: Date-Range Protection & Conflict Prevention
-            const newFrom = new Date(reportRun.date_from);
-            const newTo = new Date(reportRun.date_to);
-            const projectFrom = new Date(project.date_from);
-            const projectTo = new Date(project.date_to);
-
-            // Exception: If the report covers the entire project range, bypass the blocking rule
-            const isFullProjectRange = 
-                newFrom.toLocaleDateString() === projectFrom.toLocaleDateString() && 
-                newTo.toLocaleDateString() === projectTo.toLocaleDateString();
-
-            if (!isFullProjectRange) {
-                // Blocking Rule: Check for overlaps with already saved reports
-                const overlappingReport = allReportRuns.find(run => {
-                    // Only check reports marked as saved, and exclude the current report
-                    if (!run.is_saved || run.id === reportRun.id) return false;
-                    
-                    const savedFrom = new Date(run.date_from);
-                    const savedTo = new Date(run.date_to);
-                    
-                    // Standard overlap formula: (StartA <= EndB) and (EndA >= StartB)
-                    return (newFrom <= savedTo) && (newTo >= savedFrom);
-                });
-
-                if (overlappingReport) {
-                    const rangeText = `${new Date(overlappingReport.date_from).toLocaleDateString()} - ${new Date(overlappingReport.date_to).toLocaleDateString()}`;
-                    const errorMsg = `Overlap Detected: A saved report already exists for part of this period (${rangeText}). Save blocked to prevent data conflicts.`;
-                    throw new Error(errorMsg);
-                }
-            }
-
-            setSaveProgress({ current: 0, total: 100, status: 'Preparing exceptions...' });
-
-            // Set this as a saved report (persists regardless of newer reports)
-            // Also maintain last_saved_report_id on project for legacy support
-            await Promise.all([
-                base44.entities.ReportRun.update(reportRun.id, { is_saved: true }),
-                base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
-            ]);
-
-            // Delete existing report-generated exceptions for this report to prevent duplicates
-            const existingReportExceptions = exceptions.filter(e =>
-                (e.created_from_report && e.report_run_id === reportRun.id) ||
-                (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
-            );
-
-            if (existingReportExceptions.length > 0) {
-                setSaveProgress({ current: 0, total: 100, status: 'Removing old exceptions...' });
-                for (const ex of existingReportExceptions) {
-                    await base44.entities.Exception.delete(ex.id);
-                }
-            }
-
-            const exceptionsToCreate = [];
-
-            // Determine if current user made any edits that need approval
-            const isCurrentUserRegular = userRole === 'user' && !isSupervisor;
-
-            for (const result of results) {
-                if (!result.day_overrides) continue;
-
-                let dayOverrides = {};
-                try {
-                    dayOverrides = JSON.parse(result.day_overrides);
-                } catch (e) {
-                    continue;
-                }
-
-                // Check if this result's employee belongs to the current user
-                const employee = employees.find(e => Number(e.attendance_id) === Number(result.attendance_id));
-                const isOwnRecord = isCurrentUserRegular && currentUser && employee?.company === currentUser.company;
-
-                const datesByType = {};
-                Object.entries(dayOverrides).forEach(([dateStr, override]) => {
-                    // Group by type, minutes, and shift override to create separate exceptions
-                    const key = `${result.attendance_id}_${override.type}_${override.lateMinutes || 0}_${override.earlyCheckoutMinutes || 0}_${override.otherMinutes || 0}_${JSON.stringify(override.shiftOverride || {})}`;
-                    if (!datesByType[key]) {
-                        datesByType[key] = {
-                            dates: [],
-                            data: override,
-                            attendance_id: result.attendance_id
-                        };
-                    }
-                    datesByType[key].dates.push(dateStr);
-                });
-
-                for (const group of Object.values(datesByType)) {
-                    const sortedDates = group.dates.sort();
-
-                    // CRITICAL FIX: Time-based exceptions (late/early/other min) must be per-date,
-                    // not spanning ranges — otherwise minutes apply to every day in the range.
-                    const hasTimeMins = (group.data.lateMinutes > 0) || (group.data.earlyCheckoutMinutes > 0) || (group.data.otherMinutes > 0);
-                    const ranges = [];
-
-                    if (hasTimeMins) {
-                        sortedDates.forEach(d => ranges.push({ start: d, end: d }));
-                    } else {
-                        let currentRange = { start: sortedDates[0], end: sortedDates[0] };
-                        for (let i = 1; i < sortedDates.length; i++) {
-                            const dayDiff = (new Date(sortedDates[i]) - new Date(sortedDates[i - 1])) / (1000 * 60 * 60 * 24);
-                            if (dayDiff === 1) { currentRange.end = sortedDates[i]; }
-                            else { ranges.push({ ...currentRange }); currentRange = { start: sortedDates[i], end: sortedDates[i] }; }
-                        }
-                        ranges.push(currentRange);
-                    }
-
-                    for (const range of ranges) {
-                        // Edits from reports need department head approval
-                        const needsApproval = true;
-
-                        // Build detailed description
-                        const detailsParts = [];
-                        if (group.data.lateMinutes > 0) {
-                            detailsParts.push(`+${group.data.lateMinutes} late min`);
-                        }
-                        if (group.data.earlyCheckoutMinutes > 0) {
-                            detailsParts.push(`+${group.data.earlyCheckoutMinutes} early min`);
-                        }
-                        if (group.data.otherMinutes > 0) {
-                            detailsParts.push(`+${group.data.otherMinutes} other min`);
-                        }
-                        if (group.data.shiftOverride) {
-                            detailsParts.push('shift override');
-                        }
-                        if (group.data.details) {
-                            detailsParts.push(group.data.details);
-                        }
-
-                        const detailsText = detailsParts.length > 0
-                            ? `Report edit: ${detailsParts.join(' | ')}`
-                            : 'Report edit: Manual adjustment from report';
-
-                        const exceptionData = {
-                            project_id: project.id,
-                            attendance_id: String(group.attendance_id),
-                            date_from: range.start,
-                            date_to: range.end,
-                            type: group.data.type,
-                            details: detailsText,
-                            created_from_report: true,
-                            report_run_id: reportRun.id,
-                            use_in_analysis: true,
-                            approval_status: needsApproval ? 'pending_dept_head' : 'approved'
-                        };
-
-                        // Store ALL time adjustment fields
-                        if (group.data.lateMinutes && group.data.lateMinutes > 0) {
-                            exceptionData.late_minutes = group.data.lateMinutes;
-                        }
-                        if (group.data.earlyCheckoutMinutes && group.data.earlyCheckoutMinutes > 0) {
-                            exceptionData.early_checkout_minutes = group.data.earlyCheckoutMinutes;
-                        }
-                        if (group.data.otherMinutes && group.data.otherMinutes > 0) {
-                            exceptionData.other_minutes = group.data.otherMinutes;
-                        }
-
-                        // Determine type based on what's present (override the initial type)
-                        if (group.data.shiftOverride) {
-                            exceptionData.type = 'SHIFT_OVERRIDE';
-                            exceptionData.new_am_start = group.data.shiftOverride.am_start;
-                            exceptionData.new_am_end = group.data.shiftOverride.am_end;
-                            exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
-                            exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
-                        } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes > 0) {
-                            exceptionData.type = 'MANUAL_LATE';
-                        } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes === 0) {
-                            exceptionData.type = 'MANUAL_LATE';
-                        } else if (exceptionData.early_checkout_minutes > 0 && exceptionData.late_minutes === 0) {
-                            exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
-                        } else if (exceptionData.other_minutes > 0) {
-                            exceptionData.type = 'MANUAL_OTHER_MINUTES';
-                        }
-                        // If none of the time fields are set, keep the original type from group.data.type
-
-                        exceptionsToCreate.push(exceptionData);
-                    }
-                }
-            }
-
-            if (exceptionsToCreate.length > 0) {
-                const batchSize = 10;
-                const totalBatches = Math.ceil(exceptionsToCreate.length / batchSize);
-                const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-                // Retry helper with backoff
-                const retryWithBackoff = async (fn, maxRetries = 3) => {
-                    for (let i = 0; i < maxRetries; i++) {
-                        try {
-                            return await fn();
-                        } catch (error) {
-                            const isRateLimit = error.message?.includes('rate limit') || error.status === 429;
-                            if (isRateLimit && i < maxRetries - 1) {
-                                const backoffTime = Math.min(2000 * Math.pow(2, i), 10000);
-                                await delay(backoffTime);
-                                continue;
-                            }
-                            throw error;
-                        }
-                    }
-                };
-
-                for (let i = 0; i < exceptionsToCreate.length; i += batchSize) {
-                    const batch = exceptionsToCreate.slice(i, i + batchSize);
-                    const batchNumber = Math.floor(i / batchSize) + 1;
-
-                    setSaveProgress({
-                        current: batchNumber,
-                        total: totalBatches,
-                        status: `Saving exceptions ${batchNumber}/${totalBatches}...`
-                    });
-
-                    try {
-                        await retryWithBackoff(() => base44.entities.Exception.bulkCreate(batch));
-                        await delay(1500); // Delay between batches
-                    } catch (error) {
-                        console.error(`Batch ${batchNumber} failed, trying individual saves:`, error);
-                        // Fallback to individual saves
-                        for (const ex of batch) {
-                            try {
-                                await retryWithBackoff(() => base44.entities.Exception.create(ex));
-                                await delay(500);
-                            } catch (exError) {
-                                console.error('Failed to save exception:', ex, exError);
-                            }
-                        }
-                    }
-                }
-            }
-
-            return exceptionsToCreate.length;
+            return executeSaveReport({
+                reportRun, project, allReportRuns, exceptions, results, setSaveProgress
+            });
         },
         onSuccess: async (exceptionCount) => {
             queryClient.invalidateQueries(['exceptions', project.id]);
@@ -2076,170 +1721,52 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 </p>
                             )}
                         </div>
-                        <div className="flex gap-2">
-                            {isAstra && !isDepartmentHead && (
-                                <Button size="sm" variant="outline" onClick={handleZeroEarlyMinutes} disabled={isZeroingEarlyMin || resultsLoading} className="text-xs h-8 border-amber-300 text-amber-700 hover:bg-amber-50" title={selectedRowIds.length > 0 ? `Zero early minutes for ${selectedRowIds.length} selected` : 'Zero early minutes for all employees'}>
-                                    {isZeroingEarlyMin ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Zeroing...</> : <>{selectedRowIds.length > 0 ? `Zero Early (${selectedRowIds.length})` : 'Zero Early Min'}</>}
-                                </Button>
-                            )}
-                            <Button
-                                onClick={exportToExcel}
-                                variant="outline"
-                            >
-                                <Download className="w-4 h-4 mr-2" />
-                                Export
-                            </Button>
-                            {project.status !== 'closed' && (
-                                <>
-                                    {!reportRun.is_final && (
-                                        <Button onClick={handleReanalyze} disabled={isReanalyzing} className="bg-indigo-600 hover:bg-indigo-700" title="Re-runs analysis with latest exceptions and shifts">
-                                            {isReanalyzing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving & Reanalyzing...</> : <><Zap className="w-4 h-4 mr-2" />Save & Reanalyze</>}
-                                        </Button>
-                                    )}
-
-                                    {!reportRun.is_final && (
-                                        <Button onClick={() => finalizeReportMutation.mutate()} disabled={finalizeReportMutation.isPending} className="bg-purple-600 hover:bg-purple-700" title="Finalize report for salary calculation">
-                                            {finalizeReportMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Finalizing...</> : <><CheckCircle className="w-4 h-4 mr-2" />Finalize Report</>}
-                                        </Button>
-                                    )}
-                                    {reportRun.is_final && (
-                                        <Button onClick={() => unfinalizeReportMutation.mutate()} disabled={unfinalizeReportMutation.isPending} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
-                                            {unfinalizeReportMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Un-finalizing...</> : <>Un-finalize Report</>}
-                                        </Button>
-                                    )}
-                                </>
-                            )}
-                        </div>
+                        <ReportActionButtons
+                            isAstra={isAstra}
+                            isDepartmentHead={isDepartmentHead}
+                            isZeroingEarlyMin={isZeroingEarlyMin}
+                            resultsLoading={resultsLoading}
+                            selectedRowIds={selectedRowIds}
+                            onZeroEarlyMinutes={handleZeroEarlyMinutes}
+                            onExport={exportToExcel}
+                            project={project}
+                            reportRun={reportRun}
+                            isSaving={isSaving}
+                            isReanalyzing={isReanalyzing}
+                            onSaveReport={() => setShowSaveConfirmation(true)}
+                            onReanalyze={handleReanalyze}
+                            onFinalize={() => finalizeReportMutation.mutate()}
+                            onUnfinalize={() => unfinalizeReportMutation.mutate()}
+                            isFinalizing={finalizeReportMutation.isPending}
+                            isUnfinalizing={unfinalizeReportMutation.isPending}
+                        />
                     </div>
                 </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                    <div className="flex gap-3 items-center">
-                        <div className="relative flex-1 max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <Input
-                                placeholder="Search by ID or name..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                        <Select value={riskFilter} onValueChange={setRiskFilter}>
-                            <SelectTrigger className="w-48">
-                                <Filter className="w-4 h-4 mr-2" />
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Employees</SelectItem>
-                                <SelectItem value="high-risk">High Risk ({`>`}2 LOP or {`>`}120 min)</SelectItem>
-                                <SelectItem value="clean">Clean Records (0 issues)</SelectItem>
-                                <SelectItem value="unverified">Unverified Only</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {isAstra && (
-                            <div className="flex items-center gap-2 border-l pl-3 ml-1">
-                                <span className="text-xs text-slate-500 font-medium">Early Checkout:</span>
-                                {selectedRowIds.length > 0 && (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 text-xs border-amber-200 text-amber-700 hover:bg-amber-50"
-                                            onClick={() => handleBulkSkipEarlyCheckout(true, selectedResults)}
-                                        >
-                                            Skip Selected ({selectedRowIds.length})
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
-                                            onClick={() => handleBulkSkipEarlyCheckout(false, selectedResults)}
-                                        >
-                                            Restore Selected ({selectedRowIds.length})
-                                        </Button>
-                                    </>
-                                )}
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-xs border-amber-200 text-amber-700 hover:bg-amber-50"
-                                    onClick={() => handleBulkSkipEarlyCheckout(true)}
-                                >
-                                    Skip All
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-xs border-slate-200 text-slate-600 hover:bg-slate-50"
-                                    onClick={() => handleBulkSkipEarlyCheckout(false)}
-                                >
-                                    Restore All
-                                </Button>
-                            </div>
-                        )}
-                        <Button onClick={verifyAllClean} variant="outline" size="sm">
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Verify All Clean
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                if (!window.confirm(`Verify ALL ${enrichedResults.length} employees? This will mark every employee as verified.`)) return;
-                                const allIds = enrichedResults.map(r => String(r.attendance_id));
-                                const newVerified = [...new Set(allIds)];
-                                setVerifiedEmployees(newVerified);
-                                updateVerificationMutation.mutate(newVerified);
-                                toast.success(`All ${newVerified.length} employees verified`);
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="border-purple-300 text-purple-700 hover:bg-purple-50"
-                        >
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Verify All
-                        </Button>
-                        {/* 
-                            Change 2 - Calculate Gift Minutes Button
-                            Triggers bulk calculation based on deductible minutes rule.
-                        */}
-                        {/* 
-                            Change 2 - Calculate Gift Minutes Button Gate Logic
-                            Button is gated by project settings and report date overlap.
-                        */}
-                        {!isDepartmentHead && project?.use_gift_minutes && (() => {
-                            const hasGiftDates = project.gift_minutes_date_from && project.gift_minutes_date_to;
-                            const overlaps = hasGiftDates && 
-                                             reportRun.date_from <= project.gift_minutes_date_to && 
-                                             reportRun.date_to >= project.gift_minutes_date_from;
-                            const isLocked = reportRun.is_final || project.status === 'closed';
-                            const isDisabled = !overlaps || isLocked;
-                            
-                            const tooltipTitle = !hasGiftDates 
-                                ? "Set gift minutes date range in project settings first" 
-                                : !overlaps 
-                                ? "Report period does not overlap with gift minutes date range" 
-                                : isLocked 
-                                ? "Cannot calculate for finalized reports" 
-                                : "Apply gift minutes rule to all employees (Calculation logic: < 30 mins = full, >= 30 mins = 15 mins capped)";
-
-                            return (
-                                <Button
-                                    onClick={handleCalculateAllGiftMinutes}
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={isDisabled}
-                                    title={tooltipTitle}
-                                    className={`border-indigo-200 text-indigo-600 font-bold ${isDisabled ? 'opacity-50' : 'hover:bg-indigo-50'}`}
-                                >
-                                    <Zap className="w-4 h-4 mr-2" />
-                                    Calculate Gift Minutes
-                                </Button>
-                            );
-                        })()}
-                    </div>
-                </CardContent>
-            </Card>
+            <ReportFilterToolbar
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                riskFilter={riskFilter}
+                setRiskFilter={setRiskFilter}
+                isAstra={isAstra}
+                selectedRowIds={selectedRowIds}
+                selectedResults={selectedResults}
+                onBulkSkipEarlyCheckout={handleBulkSkipEarlyCheckout}
+                onVerifyAllClean={verifyAllClean}
+                onVerifyAll={() => {
+                    if (!window.confirm(`Verify ALL ${enrichedResults.length} employees? This will mark every employee as verified.`)) return;
+                    const allIds = enrichedResults.map(r => String(r.attendance_id));
+                    const newVerified = [...new Set(allIds)];
+                    setVerifiedEmployees(newVerified);
+                    updateVerificationMutation.mutate(newVerified);
+                    toast.success(`All ${newVerified.length} employees verified`);
+                }}
+                isDepartmentHead={isDepartmentHead}
+                project={project}
+                reportRun={reportRun}
+                onCalculateAllGiftMinutes={handleCalculateAllGiftMinutes}
+            />
 
             <DetectionPanel
                 shiftMismatchDetections={shiftMismatchDetections}
@@ -2254,117 +1781,32 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 rawDataLoaded={rawDataRequested && allRawDataLoaded}
             />
             
-            <Card className="border-0 shadow-sm">
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle>Attendance Report</CardTitle>
-                        {(resultsLoading || employeesLoading) && (
-                            <div className="flex items-center gap-2 text-sm text-slate-500">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Loading data...
-                            </div>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0 sm:p-6">
-                    <div className="border rounded-lg relative overflow-x-auto overflow-y-auto max-h-[600px]">
-                        <table className="w-full min-w-max caption-bottom text-sm">
-                            <thead className="sticky top-0 z-10 bg-slate-50">
-                                <tr className="border-b">
-                                    {isAstra && (
-                                        <th className="w-8 px-2 py-3 bg-slate-50">
-                                            <input
-                                                type="checkbox"
-                                                className="rounded border-slate-300 text-amber-500 focus:ring-amber-400 cursor-pointer"
-                                                checked={filteredResults.length > 0 && selectedRowIds.length === filteredResults.length}
-                                                onChange={toggleSelectAll}
-                                                title="Select all visible rows"
-                                            />
-                                        </th>
-                                    )}
-                                    {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground w-12 bg-slate-50 sticky left-0 z-20">Verified</th>}
-                                    <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[48px] z-20">
-                                        ID
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="name" currentSort={sort} onSort={setSort} className="bg-slate-50 sticky left-[120px] z-20">
-                                        Name
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="working_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Working Days
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="present_days" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Present Days
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="annual_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Annual Leave
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="sick_leave_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Sick Leave
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="full_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        LOP Days
-                                    </SortableTableHead>
-                                    {isAlMaraghiMotors && (
-                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50 text-rose-600 text-[11px]" title="Weekly off days adjacent to LOP, counted as additional LOP">
-                                            +Weekly Off LOP
-                                        </th>
-                                    )}
-                                    <SortableTableHead sortKey="half_absence_count" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Half Days
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="late_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Late Minutes
-                                    </SortableTableHead>
-                                    <SortableTableHead sortKey="early_checkout_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Early Checkout
-                                    </SortableTableHead>
-                                    {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
-                                        <SortableTableHead sortKey="approved_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                            Approved Minutes
-                                        </SortableTableHead>
-                                    )}
-                                    <SortableTableHead sortKey="other_minutes" currentSort={sort} onSort={setSort} className="bg-slate-50">
-                                        Other Minutes
-                                    </SortableTableHead>
-                                    {!isDepartmentHead && <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Grace</th>}
-                                    {showGiftMinutesColumn && (
-                                        <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Gift Minutes (min)</th>
-                                    )}
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Deductible</th>
-                                    <th className="h-10 px-2 text-left align-middle font-medium text-muted-foreground bg-slate-50">Notes</th>
-                                    <th className="h-10 px-2 text-right align-middle font-medium text-muted-foreground bg-slate-50">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="[&_tr:last-child]:border-0">
-                                {filteredResults.map((result) => (
-                                    <ReportTableRow
-                                        key={result.id}
-                                        result={result}
-                                        isAdmin={isAdmin}
-                                        isSupervisor={isSupervisor}
-                                        isDepartmentHead={isDepartmentHead}
-                                        // Change 1 - Passing role-based edit permission for gift minutes (Admin/CEO/HR)
-                                        canEditGiftMinutes={canEditGiftMinutes} 
-                                        project={project}
-                                        reportRun={reportRun}
-                                        showGiftMinutesColumn={showGiftMinutesColumn}
-                                        onToggleVerification={toggleVerification}
-                                        onEditGrace={setEditingGraceMinutes}
-                                        onShowBreakdown={showDailyBreakdown}
-                                        onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
-                                        onSaveGiftMinutes={onSaveGiftMinutes}
-                                        isAstra={isAstra}
-                                        isSelected={selectedRowIds.includes(result.id)}
-                                        onToggleSelect={() => toggleRowSelection(result.id)}
-                                        skipEarlyCheckout={isSkipped(result)}
-                                        onSkipEarlyCheckout={isAstra ? (skip) => skipEarlyCheckoutMutation.mutate({ result, skip }) : null}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </CardContent>
-            </Card>
+            <ReportResultsTable
+                filteredResults={filteredResults}
+                sort={sort}
+                setSort={setSort}
+                isAstra={isAstra}
+                isDepartmentHead={isDepartmentHead}
+                isAdmin={isAdmin}
+                isSupervisor={isSupervisor}
+                canEditGiftMinutes={canEditGiftMinutes}
+                project={project}
+                reportRun={reportRun}
+                showGiftMinutesColumn={showGiftMinutesColumn}
+                isAlMaraghiMotors={isAlMaraghiMotors}
+                selectedRowIds={selectedRowIds}
+                toggleSelectAll={toggleSelectAll}
+                toggleRowSelection={toggleRowSelection}
+                onToggleVerification={toggleVerification}
+                onEditGrace={setEditingGraceMinutes}
+                onShowBreakdown={showDailyBreakdown}
+                onUpdateManualOverride={(args) => updateManualOverrideMutation.mutate(args)}
+                onSaveGiftMinutes={onSaveGiftMinutes}
+                onSkipEarlyCheckout={(args) => skipEarlyCheckoutMutation.mutate(args)}
+                isSkipped={isSkipped}
+                resultsLoading={resultsLoading}
+                employeesLoading={employeesLoading}
+            />
 
             <DailyBreakdownDialog
                 open={showBreakdown}
@@ -2406,22 +1848,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <p className="text-slate-700">
-                            This will first save your current in-report edits as report exceptions, 
-                            then re-run analysis for all employees using the latest exceptions and shifts.
+                            This will re-run analysis for all employees using the latest saved exceptions and shifts.
                         </p>
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                            <p className="text-sm text-blue-800 font-medium mb-1">ℹ️ Note:</p>
-                            <p className="text-sm text-blue-700">
-                                Any edits you have made in this report will be preserved and applied 
-                                globally during this process. This ensures reanalysis respects your manual corrections.
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p className="text-sm text-amber-800 font-medium mb-1">⚠️ Note:</p>
+                            <p className="text-sm text-amber-700">
+                                In-report edits are NOT saved by this action. Click "Save Report" first to persist your edits as exceptions before reanalyzing.
                             </p>
                         </div>
                     </div>
                     <div className="flex justify-end gap-3">
-                        <Button variant="outline" className="border-slate-200 hover:bg-slate-50 transition-all duration-200" onClick={() => setShowReanalyzeConfirm(false)}>Cancel</Button>
-                        <Button onClick={handleReanalyzeWithSave} className="bg-indigo-600 hover:bg-indigo-700">
-                            Reanalyze
-                        </Button>
+                        <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)}>Cancel</Button>
+                        <Button onClick={handleReanalyzeOnly} className="bg-indigo-600 hover:bg-indigo-700">Reanalyze</Button>
                     </div>
                 </DialogContent>
             </Dialog>
