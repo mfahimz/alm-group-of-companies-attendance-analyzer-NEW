@@ -672,8 +672,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             ).catch(e => console.error('Failed to log audit:', e));
         },
         onSuccess: () => {
-            // Invalidate results (summary table) + employee-level caches + project-level exceptions
-            queryClient.invalidateQueries({ queryKey: ['results'] });
+            // BUG 1 FIX: Force active refetch on the results query so the summary table
+            // in ReportDetailView updates immediately after a day edit save.
+            // The broad ['results'] prefix match invalidates all variants.
+            queryClient.invalidateQueries({ queryKey: ['results'], refetchType: 'active' });
             queryClient.invalidateQueries({ queryKey: ['employeeExceptions', project.id] });
             queryClient.invalidateQueries({ queryKey: ['projectExceptions', project.id] });
             toast.success((isUser && !isSupervisor) ? 'Edit saved - will be submitted for approval when report is saved' : 'Day record updated for this report');

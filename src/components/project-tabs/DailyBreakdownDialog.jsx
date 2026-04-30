@@ -128,7 +128,8 @@ export default function DailyBreakdownDialog({
                 other_minutes: totalOther,
                 deductible_minutes: deductible
             });
-            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id] });
+            // BUG 1 FIX: Force active refetch so summary table updates without page reload
+            queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' });
             queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
             setSelectedDays(new Set());
             setShowBulkPanel(false);
@@ -1340,7 +1341,15 @@ export default function DailyBreakdownDialog({
             <EditDayRecordDialog
                 open={!!editingDay}
                 onClose={() => setEditingDay(null)}
-                onSave={() => queryClient.invalidateQueries(['results', reportRun.id])}
+                onSave={() => {
+                    // BUG 1 FIX: Invalidate the EXACT query key used by ReportDetailView
+                    // (['results', reportRun.id, project.id]) so the parent summary table
+                    // refreshes immediately when a day edit is saved from inside this dialog.
+                    queryClient.invalidateQueries({
+                        queryKey: ['results', reportRun.id, project.id],
+                        refetchType: 'active'
+                    });
+                }}
                 dayRecord={editingDay}
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}

@@ -2438,7 +2438,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             <EditDayRecordDialog
                 open={!!editingDay}
                 onClose={() => setEditingDay(null)}
-                onSave={() => queryClient.invalidateQueries({ queryKey: ['results', reportRun.id] })}
+                onSave={() => queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' })}
                 dayRecord={editingDay}
                 project={project}
                 attendanceId={selectedEmployee?.attendance_id}
