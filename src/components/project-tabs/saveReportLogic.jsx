@@ -132,18 +132,32 @@ export async function executeSaveReport({
                     exceptionData.new_am_end = group.data.shiftOverride.am_end;
                     exceptionData.new_pm_start = group.data.shiftOverride.pm_start;
                     exceptionData.new_pm_end = group.data.shiftOverride.pm_end;
-                } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes > 0) {
-                    exceptionData.type = 'MANUAL_LATE';
-                } else if (exceptionData.late_minutes > 0 && exceptionData.early_checkout_minutes === 0) {
-                    exceptionData.type = 'MANUAL_LATE';
-                } else if (exceptionData.early_checkout_minutes > 0 && exceptionData.late_minutes === 0) {
-                    exceptionData.type = 'MANUAL_EARLY_CHECKOUT';
-                } else if (exceptionData.other_minutes > 0) {
+                } else if (exceptionData.late_minutes > 0 || exceptionData.early_checkout_minutes > 0) {
+                    // Status-preserving logic: convert generic MANUAL_PRESENT to LATE/EARLY, 
+                    // but preserve specific overrides like MANUAL_ABSENT or SICK_LEAVE.
+                    if (['MANUAL_PRESENT', 'MANUAL_LATE', 'MANUAL_EARLY_CHECKOUT'].includes(group.data.type)) {
+                        exceptionData.type = exceptionData.late_minutes > 0 ? 'MANUAL_LATE' : 'MANUAL_EARLY_CHECKOUT';
+                    }
+                } else if (exceptionData.other_minutes > 0 && !['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE'].includes(group.data.type)) {
                     exceptionData.type = 'MANUAL_OTHER_MINUTES';
                 }
 
-                if (!isDuplicateException(exceptionData)) {
-                    exceptionsToCreate.push(exceptionData);
+                // If this is a status override AND has other minutes, we split it into two exceptions
+                // because backend runAnalysis drops minutes from status-override exceptions due to a 'continue' statement.
+                const isStatusOverride = ['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE'].includes(exceptionData.type);
+                
+                if (isStatusOverride && exceptionData.other_minutes > 0) {
+                    // 1. Primary status exception (remove other_minutes to keep it clean)
+                    const statusEx = { ...exceptionData };
+                    delete statusEx.other_minutes;
+                    if (!isDuplicateException(statusEx)) {
+                        exceptionsToCreate.push(statusEx);
+                    }
+                    // 2. Secondary MANUAL_OTHER_MINUTES exception will be handled below in the dedicated loop at line 154
+                } else {
+                    if (!isDuplicateException(exceptionData)) {
+                        exceptionsToCreate.push(exceptionData);
+                    }
                 }
             }
         }

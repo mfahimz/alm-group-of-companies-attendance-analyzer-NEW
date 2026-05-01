@@ -1032,6 +1032,36 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         setShowReanalyzeConfirm(true);
     };
 
+    const handleSaveAndReanalyze = async () => {
+        setShowReanalyzeConfirm(false);
+        try {
+            // Step 1: Save current edits to exceptions first
+            // This ensures in-report manual edits are persisted before re-analysis runs
+            await saveReportMutation.mutateAsync();
+            
+            // Step 2: Show intermediate loading state to account for DB latency
+            setIsReanalyzing(true);
+            setReanalysisProgress({
+                current: 0,
+                total: 100,
+                status: 'Preparing analysis...',
+                subStatus: 'Please wait while we sync your changes...'
+            });
+            
+            // 2 second hard delay to ensure Deno backend reads latest exceptions
+            // Addressing read-after-write latency between frontend and backend
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Step 3: Trigger actual reanalysis
+            await handleReanalyzeOnly();
+        } catch (error) {
+            console.error('Save & Reanalyze failed:', error);
+            // Error toast is already handled by saveReportMutation or handleReanalyzeOnly
+            setIsReanalyzing(false);
+            setReanalysisProgress(null);
+        }
+    };
+
     const saveReportMutation = useMutation({
         mutationFn: async () => {
             setIsSaving(true);
@@ -1883,7 +1913,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     </div>
                     <div className="flex justify-end gap-3">
                         <Button variant="outline" onClick={() => setShowReanalyzeConfirm(false)}>Cancel</Button>
-                        <Button onClick={handleReanalyzeOnly} className="bg-indigo-600 hover:bg-indigo-700">Save & Reanalyze</Button>
+                        {/* Must call handleReanalyze not handleReanalyzeOnly — handleReanalyze saves edits as exceptions first then reanalyzes so manual edits are preserved */}
+                        <Button onClick={handleSaveAndReanalyze} className="bg-indigo-600 hover:bg-indigo-700">Save & Reanalyze</Button>
                     </div>
                 </DialogContent>
             </Dialog>
