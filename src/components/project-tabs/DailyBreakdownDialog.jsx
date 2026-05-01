@@ -120,7 +120,8 @@ export default function DailyBreakdownDialog({
                 totalEarly += Math.max(0, Number(ov.earlyCheckoutMinutes) || 0);
                 totalOther += Math.max(0, Number(ov.otherMinutes) || 0);
             }
-            const deductible = totalLate + totalEarly + totalOther;
+            // Fix: other_minutes should NOT be included in deductible_minutes (matches backend runAnalysis)
+            const deductible = totalLate + totalEarly;
             await base44.entities.AnalysisResult.update(currentResult.id, {
                 day_overrides: JSON.stringify(overrides),
                 late_minutes: totalLate,
@@ -578,7 +579,9 @@ export default function DailyBreakdownDialog({
                 ...p,
                 _isNextDayPunch: p.punch_date === nextDateStr
             }));
-            const dayPunches = filterMultiplePunches(taggedRawPunches, shift);
+            // Fix: Use filtered/deduplicated punches for all completeness and status logic to avoid badge mismatch
+            const filteredPunches = filterMultiplePunches(taggedRawPunches, shift);
+            const dayPunches = filteredPunches; // Maintain reference for existing code compatibility
 
             // hasMiddleTimes: checks if shift has valid middle times to determine single vs split shift
             // Must match backend runAnalysis check exactly — includes 'null' string check
@@ -864,8 +867,9 @@ export default function DailyBreakdownDialog({
             }
 
             // Count punches that actually belong to THIS date (exclude crossover from next day)
-            const ownDatePunchCount = rawDayPunches.filter(p => p.punch_date === dateStr).length;
-            const crossoverPunchCount = rawDayPunches.filter(p => p.punch_date === nextDateStr).length;
+            // Fix: Use filteredPunches to ensure display counts match the status calculation
+            const ownDatePunchCount = filteredPunches.filter(p => p.punch_date === dateStr).length;
+            const crossoverPunchCount = filteredPunches.filter(p => p.punch_date === nextDateStr).length;
 
             breakdown.push({
                 date: formatDate(dateStr),
