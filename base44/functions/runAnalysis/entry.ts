@@ -1290,17 +1290,6 @@ Deno.serve(async (req: Request) => {
                     };
                 }
 
-                // TASK 1 FIX: Accumulate ALL reportOtherMinutesExceptions independently,
-                // regardless of whether a status exception also exists for this day.
-                // This ensures MANUAL_PRESENT + MANUAL_OTHER_MINUTES on the same day both apply.
-                for (const omEx of reportOtherMinutesExceptions) {
-                    const omValue = omEx.other_minutes || omEx.allowed_minutes || 0;
-                    if (omValue > 0) {
-                        otherMinutes += omValue;
-                        otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + omValue;
-                    }
-                }
-
                 if (effectiveReportException && effectiveReportException.type !== 'SHIFT_OVERRIDE') {
                     // REPORT GENERATED EXCEPTION: apply values directly, skip punch computation.
                     if (effectiveReportException.type === 'MANUAL_PRESENT') {
@@ -1447,6 +1436,25 @@ Deno.serve(async (req: Request) => {
                     abnormal_dates_set.add(dateStr);
                 }
                 } // end: if (!statusOverrideApplied) else block
+
+                // ================================================================
+                // UNCONDITIONAL: Aggregate MANUAL_OTHER_MINUTES for this day.
+                // Runs regardless of statusOverrideApplied so MANUAL_PRESENT +
+                // MANUAL_OTHER_MINUTES on the same day both apply (Highlander Fix).
+                // Uses otherMinutesFromExceptions map to prevent double-counting.
+                // ================================================================
+                const allOtherMinExForDay = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
+                for (const omEx of allOtherMinExForDay) {
+                    const omId = omEx.id || `${omEx.attendance_id}_${omEx.date_from}_${omEx.type}`;
+                    const alreadyCounted = otherMinutesFromExceptions[`${dateStr}_${omId}`];
+                    if (!alreadyCounted) {
+                        const omValue = omEx.other_minutes || omEx.allowed_minutes || 0;
+                        if (omValue > 0) {
+                            otherMinutes += omValue;
+                            otherMinutesFromExceptions[`${dateStr}_${omId}`] = omValue;
+                        }
+                    }
+                }
             }
 
             // ================================================================

@@ -739,7 +739,7 @@ export default function RunAnalysisTab({ project }) {
             // Step 4: Handle MANUAL_OTHER_MINUTES (The Highlander Fix)
             // Sum other_minutes from ALL exceptions of type MANUAL_OTHER_MINUTES for this day.
             // This ensures split exceptions (Status + Minutes) are both captured correctly.
-            const allManualOtherEx = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
+            const allManualOtherEx = employeeExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES' && new Date(ex.date_from) <= currentDate && new Date(ex.date_to) >= currentDate);
             for (const moEx of allManualOtherEx) {
                 const moMinutes = moEx.other_minutes || moEx.allowed_minutes || 0;
                 if (moMinutes > 0) {
