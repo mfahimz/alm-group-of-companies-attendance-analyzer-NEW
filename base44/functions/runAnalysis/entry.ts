@@ -958,9 +958,11 @@ Deno.serve(async (req: Request) => {
                     : null;
 
                 // Step 1: Check for report-generated exceptions (created_from_report === true)
-                // Among all report-generated exceptions for this day, select the one with the highest priority.
+                // TASK 1 FIX: If _scope_report_run_id is provided, only consider report-generated
+                // exceptions from that specific run. This prevents cross-run pollution where a
+                // stale exception from a prior run contaminates the current reanalysis.
                 const reportGeneratedException = matchingExceptions
-                    .filter(ex => ex.created_from_report === true)
+                    .filter(ex => ex.created_from_report === true && (!_scope_report_run_id || ex.report_run_id === _scope_report_run_id))
                     .sort((a: any, b: any) => {
                         const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
                         const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
@@ -1371,20 +1373,6 @@ Deno.serve(async (req: Request) => {
 
                 lateMinutes += dayLateMinutes;
                 earlyCheckoutMinutes += dayEarlyMinutes;
-
-                // Step 5: Handle MANUAL_OTHER_MINUTES exceptions that are NOT report-generated separately.
-                // This handles manually created other minutes exceptions that were not from report edits.
-                const manualOtherNonReportEx = matchingExceptions.filter(ex =>
-                    ex.type === 'MANUAL_OTHER_MINUTES' && (ex.created_from_report === false || ex.created_from_report === null)
-                );
-                for (const moEx of manualOtherNonReportEx) {
-                    const moMinutes = moEx.allowed_minutes || 0;
-                    if (moMinutes > 0) {
-                        otherMinutes += moMinutes;
-                        otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + moMinutes;
-                        console.log(`[runAnalysis] MANUAL_OTHER_MINUTES (Non-Report): Employee ${attendanceIdStr}, Date ${dateStr}: adding ${moMinutes} to other_minutes`);
-                    }
-                }
 
                 const expectedPunches = isSingleShift ? 2 : 4;
 
