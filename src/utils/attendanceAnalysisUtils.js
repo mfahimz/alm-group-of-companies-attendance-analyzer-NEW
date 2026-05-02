@@ -172,10 +172,31 @@ export const filterMultiplePunches = (punchList, includeSeconds = false) => {
 };
 
 /**
- * Formats a Date object back to a display time string.
+ * Formats a Date object (or timestamp string / number) back to a display time string.
+ * Accepts: Date instance, ISO/timestamp string, number (ms), or null.
  */
-export const formatTime = (date) => {
-    if (!date || isNaN(date.getTime())) return '—';
+export const formatTime = (input) => {
+    if (!input) return '—';
+
+    let date;
+    if (input instanceof Date) {
+        date = input;
+    } else if (typeof input === 'number') {
+        date = new Date(input);
+    } else if (typeof input === 'string') {
+        // Try parseTime first (handles "HH:MM AM/PM" formats)
+        date = parseTime(input);
+        // Fallback: try native Date parsing for full timestamps
+        if (!date) {
+            const parsed = new Date(input);
+            if (!isNaN(parsed.getTime())) date = parsed;
+        }
+    } else {
+        return '—';
+    }
+
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) return '—';
+
     let hours = date.getHours();
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
