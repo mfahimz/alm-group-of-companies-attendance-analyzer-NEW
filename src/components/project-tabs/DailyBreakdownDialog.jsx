@@ -1,13 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Edit, Loader2 } from 'lucide-react';
+import { Edit, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import TimePicker from '../ui/QuickTimePicker';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { parseTime, matchPunchesToShiftPoints, filterMultiplePunches, extractTime, formatTime } from '@/utils/attendanceAnalysisUtils';
 
 /**
  * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
@@ -44,11 +46,7 @@ export default function DailyBreakdownDialog({
     exceptions: parentExceptions,
     employees,
     reportRun,
-    project,
-    parseTime,
-    formatTime,
-    matchPunchesToShiftPoints,
-    filterMultiplePunches
+    project
 }) {
     const [editingDay, setEditingDay] = useState(null);
     const [selectedDays, setSelectedDays] = useState(new Set());
@@ -214,24 +212,8 @@ export default function DailyBreakdownDialog({
         return date.toLocaleDateString('en-GB'); // DD/MM/YYYY
     };
 
-    const extractTime = (ts) => {
-        if (project.company === 'Al Maraghi Automotive') {
-            const matchWithSeconds = ts.match(/(\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM))/i);
-            if (matchWithSeconds) return matchWithSeconds[1];
-        }
-        const match = ts.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
-        if (match) return match[1];
-        const dateTimeMatch = ts.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})/);
-        if (dateTimeMatch) {
-            let hours = parseInt(dateTimeMatch[1]);
-            const minutes = dateTimeMatch[2];
-            const period = hours >= 12 ? 'PM' : 'AM';
-            if (hours > 12) hours -= 12;
-            if (hours === 0) hours = 12;
-            return `${hours}:${minutes} ${period}`;
-        }
-        return ts;
-    };
+    // MIDNIGHT BUFFER: moved into the previous day unless the current day has an early shift start.
+    const MIDNIGHT_BUFFER_MINUTES = 180;
 
     const getDailyBreakdown = useMemo(() => {
         if (!selectedEmployee) return [];
@@ -1349,10 +1331,58 @@ export default function DailyBreakdownDialog({
                                     </TableRow>
                                 ))}
                             </TableBody>
+                            <TableFooter className="bg-slate-50/80 sticky bottom-0 z-10 border-t-2">
+                                <TableRow>
+                                    <TableCell colSpan={7} className="text-right font-bold text-slate-700">Authoritative Summary (from Report):</TableCell>
+                                    <TableCell className="font-bold text-orange-700">
+                                        {selectedEmployee?.late_minutes || 0} min
+                                    </TableCell>
+                                    <TableCell className="font-bold text-blue-700">
+                                        {selectedEmployee?.early_checkout_minutes || 0} min
+                                    </TableCell>
+                                    <TableCell className="font-bold text-purple-700">
+                                        {selectedEmployee?.other_minutes || 0} min
+                                    </TableCell>
+                                    {project?.company === 'Al Maraghi Motors' && (
+                                        <TableCell className="font-bold text-blue-600">
+                                            {selectedEmployee?.approved_minutes || 0} min
+                                        </TableCell>
+                                    )}
+                                    <TableCell colSpan={2}></TableCell>
+                                </TableRow>
+                            </TableFooter>
                         </Table>
                         )}
                         </div>
+
+                        {/* Reconciliation Status Banner */}
+                        <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Info className="w-4 h-4 text-indigo-500" />
+                                <span className="text-xs text-indigo-700 font-medium">
+                                    Summary totals are sourced directly from the AnalysisResult record. 
+                                    Manual edits in this dialog are immediately reflected in the parent report summary.
+                                </span>
+                            </div>
+                            <div className="flex gap-4 items-center">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Report Status</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Badge variant={selectedEmployee?.isVerified ? "default" : "outline"} className={selectedEmployee?.isVerified ? "bg-green-600" : "text-slate-500 border-slate-300"}>
+                                            {selectedEmployee?.isVerified ? "Verified" : "Unverified"}
+                                        </Badge>
+                                        <Badge variant="outline" className="bg-white border-indigo-200 text-indigo-700">
+                                            {selectedEmployee?.present_days || 0} / {selectedEmployee?.working_days || 0} Present
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         </DialogContent>
+                        <DialogFooter className="bg-slate-50/50 p-4 border-t">
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>Close Breakdown</Button>
+                        </DialogFooter>
             </Dialog>
 
             <EditDayRecordDialog

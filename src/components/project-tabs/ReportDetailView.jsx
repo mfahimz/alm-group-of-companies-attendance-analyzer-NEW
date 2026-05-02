@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import useDetectionAnalysis, { extractTime } from './useDetectionAnalysis';
+import useDetectionAnalysis from './useDetectionAnalysis';
 import { Download, Search, Save, Filter, Loader2, CheckCircle, Zap, AlertCircle } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import DetectionPanel from './DetectionPanel';
@@ -23,6 +23,7 @@ import ReportResultsTable from './ReportResultsTable';
 import { executeSaveReport } from './saveReportLogic';
 import * as XLSX from 'xlsx';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
+import { parseTime, formatTime, extractTime, matchPunchesToShiftPoints, filterMultiplePunches } from '@/utils/attendanceAnalysisUtils';
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -267,236 +268,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const MIDNIGHT_BUFFER_MINUTES = 120;
 
     // Dismissed mismatch state now managed inside DetectionPanel component
-
-    const formatTime = (timeStr) => {
-        if (!timeStr || timeStr === '—' || timeStr.trim() === '') return '—';
-        if (/AM|PM/i.test(timeStr)) return timeStr;
-
-        const match = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-        if (!match) return '—';
-
-        let hours = parseInt(match[1]);
-        const minutes = match[2];
-
-        const period = hours >= 12 ? 'PM' : 'AM';
-        if (hours > 12) hours -= 12;
-        if (hours === 0) hours = 12;
-
-        return `${hours}:${minutes} ${period}`;
-    };
-
-    const parseTime = (timeStr) => {
-        try {
-            if (!timeStr || timeStr === '—' || timeStr === '-') return null;
-
-            // Priority 1: Format with seconds
-            let timeMatch = timeStr.match(/(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)/i);
-            if (timeMatch) {
-                let hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const seconds = parseInt(timeMatch[3]);
-                const period = timeMatch[4].toUpperCase();
-                if (period === 'PM' && hours !== 12) hours += 12;
-                if (period === 'AM' && hours === 12) hours = 0;
-                const date = new Date();
-                date.setHours(hours, minutes, seconds, 0);
-                return date;
-            }
-
-            // Priority 2: Standard AM/PM
-            timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (timeMatch) {
-                let hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const period = timeMatch[3].toUpperCase();
-                if (period === 'PM' && hours !== 12) hours += 12;
-                if (period === 'AM' && hours === 12) hours = 0;
-                const date = new Date();
-                date.setHours(hours, minutes, 0, 0);
-                return date;
-            }
-
-            // Priority 3: 24-hour with optional seconds
-            timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-            if (timeMatch) {
-                const hours = parseInt(timeMatch[1]);
-                const minutes = parseInt(timeMatch[2]);
-                const seconds = timeMatch[3] ? parseInt(timeMatch[3]) : 0;
-                const date = new Date();
-                date.setHours(hours, minutes, seconds, 0);
-                return date;
-            }
-
-            // Handle timestamp_raw format: "1/16/2026 8:37"
-            const dateTimeMatch = timeStr.match(/\d{1,2}\/\d{1,2}\/\d{4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-            if (dateTimeMatch) {
-                const hours = parseInt(dateTimeMatch[1]);
-                const minutes = parseInt(dateTimeMatch[2]);
-                const seconds = dateTimeMatch[3] ? parseInt(dateTimeMatch[3]) : 0;
-                const date = new Date();
-                date.setHours(hours, minutes, seconds, 0);
-                return date;
-            }
-
-            // Handles Astra Auto Parts YYYY-MM-DD HH:MM:SS punch timestamp format
-            const isoDateTimeMatch = timeStr.match(/^\d{4}-\d{2}-\d{2}\s+(\d{1,2}):(\d{2}):(\d{2})/);
-            if (isoDateTimeMatch) {
-                const hours = parseInt(isoDateTimeMatch[1]);
-                const minutes = parseInt(isoDateTimeMatch[2]);
-                const seconds = parseInt(isoDateTimeMatch[3]);
-                const date = new Date();
-                date.setHours(hours, minutes, seconds, 0);
-                return date;
-            }
-
-            return null;
-        } catch {
-            return null;
-        }
-    };
+    // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
+    const MIDNIGHT_BUFFER_MINUTES = 120;
 
     const isWithinMidnightBuffer = (timestampRaw) => {
-        const parsed = parseTime(timestampRaw);
-        if (!parsed) return false;
-        const minutesSinceMidnight = parsed.getHours() * 60 + parsed.getMinutes();
-        return minutesSinceMidnight <= MIDNIGHT_BUFFER_MINUTES;
-    };
-
-    const matchPunchesToShiftPoints = (dayPunches, shift, nextDateStr = null) => {
-        if (!shift || dayPunches.length === 0) return [];
-
-        // Enable seconds parsing for Al Maraghi Automotive
-        const includeSeconds = project.company === 'Al Maraghi Automotive' || project.company === 'Al Maraghi Motors';
-
-        const punchesWithTime = dayPunches.map(p => {
-            const time = parseTime(p.timestamp_raw);
-            if (!time) return null;
-
-            // MIDNIGHT SHIFT FIX: If this punch is from next day (midnight crossover),
-            // add 24 hours to its time so it matches correctly against PM_END
-            const isNextDayPunch = nextDateStr && p.punch_date === nextDateStr;
-            const adjustedTime = isNextDayPunch ? new Date(time.getTime() + 24 * 60 * 60 * 1000) : time;
-
-            return {
-                ...p,
-                time: adjustedTime,
-                _isNextDayPunch: isNextDayPunch
-            };
-        }).filter(p => p).sort((a, b) => a.time - b.time);
-
-        if (punchesWithTime.length === 0) return [];
-
-        // MIDNIGHT SHIFT FIX: If shift ends at midnight (0:00), adjust PM_END to 24:00 (next day)
-        const pmEndTime = parseTime(shift.pm_end);
-        let adjustedPmEnd = pmEndTime;
-        if (pmEndTime && pmEndTime.getHours() === 0 && pmEndTime.getMinutes() === 0) {
-            adjustedPmEnd = new Date(pmEndTime.getTime() + 24 * 60 * 60 * 1000);
-        }
-
-        const shiftPoints = [
-            { type: 'AM_START', time: parseTime(shift.am_start), label: shift.am_start },
-            { type: 'AM_END', time: parseTime(shift.am_end), label: shift.am_end },
-            { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
-            { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
-        ].filter(sp => sp.time);
-
-        const matches = [];
-        const usedShiftPoints = new Set();
-
-        for (const punch of punchesWithTime) {
-            let closestMatch = null;
-            let minDistance = Infinity;
-            let isExtendedMatch = false;
-            let isFarExtendedMatch = false;
-
-            for (const shiftPoint of shiftPoints) {
-                if (usedShiftPoints.has(shiftPoint.type)) continue;
-
-                const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-
-                if (distance <= 60 && distance < minDistance) {
-                    minDistance = distance;
-                    closestMatch = shiftPoint;
-                }
-            }
-
-            if (!closestMatch) {
-                for (const shiftPoint of shiftPoints) {
-                    if (usedShiftPoints.has(shiftPoint.type)) continue;
-
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-
-                    if (distance <= 120 && distance < minDistance) {
-                        minDistance = distance;
-                        closestMatch = shiftPoint;
-                        isExtendedMatch = true;
-                    }
-                }
-            }
-
-            if (!closestMatch) {
-                for (const shiftPoint of shiftPoints) {
-                    if (usedShiftPoints.has(shiftPoint.type)) continue;
-
-                    const distance = Math.abs(punch.time - shiftPoint.time) / (1000 * 60);
-
-                    if (distance <= 180 && distance < minDistance) {
-                        minDistance = distance;
-                        closestMatch = shiftPoint;
-                        isFarExtendedMatch = true;
-                    }
-                }
-            }
-
-            if (closestMatch) {
-                matches.push({
-                    punch,
-                    matchedTo: closestMatch.type,
-                    shiftTime: closestMatch.time,
-                    distance: minDistance,
-                    isExtendedMatch,
-                    isFarExtendedMatch
-                });
-                usedShiftPoints.add(closestMatch.type);
-            } else {
-                matches.push({
-                    punch,
-                    matchedTo: null,
-                    shiftTime: null,
-                    distance: null,
-                    isExtendedMatch: false,
-                    isFarExtendedMatch: false
-                });
-            }
-        }
-
-        return matches;
-    };
-
-
-
-
-    const filterMultiplePunches = (punchList, shift) => {
-        if (punchList.length <= 1) return punchList;
-
-        const punchesWithTime = punchList.map(p => ({
-            ...p,
-            time: parseTime(p.timestamp_raw)
-        })).filter(p => p.time);
-
-        if (punchesWithTime.length === 0) return punchList;
-
-        const deduped = [];
-        for (let i = 0; i < punchesWithTime.length; i++) {
-            const current = punchesWithTime[i];
-            const isDuplicate = deduped.some(p => Math.abs(current.time - p.time) / (1000 * 60) < 10);
-            if (!isDuplicate) {
-                deduped.push(current);
-            }
-        }
-
-        const sortedPunches = deduped.sort((a, b) => a.time - b.time);
-        return sortedPunches.map(p => punchList.find(punch => punch.id === p.id)).filter(Boolean);
+        const pt = parseTime(timestampRaw);
+        if (!pt) return false;
+        const h = pt.getHours();
+        return h === 0 || h === 1 || h === 2;
     };
 
     // calculateEmployeeTotals removed — summary table now uses stored AnalysisResult values.
