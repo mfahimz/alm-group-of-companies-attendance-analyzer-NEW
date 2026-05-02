@@ -25,12 +25,23 @@ Deno.serve(async (req: Request) => {
             _chunk_offset,
             _chunk_size,
             _day_overrides,
-            _scope_report_run_id   // TASK 1: If provided, only fetch exceptions for this specific report run
+            _scope_report_run_id: _scope_report_run_id_raw   // TASK 1: If provided, only fetch exceptions for this specific report run
         } = await req.json();
+
+        // CRITICAL FIX: _scope_report_run_id must ONLY be applied when reanalyzing an EXISTING report.
+        // For new reports, _existing_report_run_id is undefined, so _scope_report_run_id must also be
+        // undefined — otherwise chunk 2+ would filter out all report-generated exceptions because the
+        // new report run ID won't match any saved exceptions yet.
+        // Rule: scope filtering is active only when both args point to the same existing run.
+        const _scope_report_run_id = (_scope_report_run_id_raw && _existing_report_run_id && _scope_report_run_id_raw === _existing_report_run_id)
+            ? _scope_report_run_id_raw
+            : undefined;
 
         if (!project_id || !date_from || !date_to) {
             return Response.json({ error: 'Missing required parameters' }, { status: 400 });
         }
+
+        console.log(`[runAnalysis] Args: existing_run=${_existing_report_run_id || 'none'}, scope_raw=${_scope_report_run_id_raw || 'none'}, scope_effective=${_scope_report_run_id || 'DISABLED (new report or mismatch)'}`);
 
         // BUG FIX #1: Support updating existing reports after shift/exception changes
         let reportRun;
