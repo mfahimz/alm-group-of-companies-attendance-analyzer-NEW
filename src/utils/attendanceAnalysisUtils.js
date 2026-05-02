@@ -1,6 +1,15 @@
- * Shared Attendance Analysis Utilities
  * Unified logic for time parsing, punch matching, and status detection.
  */
+
+export const MIDNIGHT_BUFFER_MINUTES = 120;
+
+export const isWithinMidnightBuffer = (timestampRaw) => {
+    if (!timestampRaw || timestampRaw === '—' || timestampRaw === '-') return false;
+    const pt = parseTime(String(timestampRaw));
+    if (!pt) return false;
+    const h = pt.getHours();
+    return h === 0 || h === 1 || h === 2;
+};
 
 export const formatTime = (timeStr) => {
     if (!timeStr || timeStr === '—' || timeStr === '-') return '-';

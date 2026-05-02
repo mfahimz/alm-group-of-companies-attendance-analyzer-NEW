@@ -264,19 +264,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         }
     }, [reportRun]);
 
-    // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
-    const MIDNIGHT_BUFFER_MINUTES = 120;
-
     // Dismissed mismatch state now managed inside DetectionPanel component
-    // Midnight buffer: 2 hours (120 minutes) for Ramadan night shifts crossover
-    const MIDNIGHT_BUFFER_MINUTES = 120;
-
-    const isWithinMidnightBuffer = (timestampRaw) => {
-        const pt = parseTime(timestampRaw);
-        if (!pt) return false;
-        const h = pt.getHours();
-        return h === 0 || h === 1 || h === 2;
-    };
 
     // calculateEmployeeTotals removed — summary table now uses stored AnalysisResult values.
     // Backend recalcEmployeeTotals handles recalculation after day edits.
@@ -412,7 +400,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // ==========================================================================================
 
     // Detection analysis hook - only runs when raw data is loaded
-    const { shiftMismatchDetections, noMatchDetections, localParseTime, localIsWithinMidnightBuffer } = useDetectionAnalysis({
+    const { shiftMismatchDetections, noMatchDetections } = useDetectionAnalysis({
         results, employees, punches, shifts, exceptions, reportRun, project
     });
 
