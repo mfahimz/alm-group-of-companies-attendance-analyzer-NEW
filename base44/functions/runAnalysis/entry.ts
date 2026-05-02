@@ -1229,6 +1229,42 @@ Deno.serve(async (req: Request) => {
                 }
 
                 // ================================================================
+                // LAYER 2.5 — PENALTY OVERRIDE LAYER
+                // Forcefully applies MANUAL_LATE / MANUAL_EARLY_CHECKOUT exceptions
+                // from any source (DB or report-generated) on top of dayState.
+                // Skipped only when the day is in an absence-class status (LOP/SICK)
+                // that already zeroed minutes. PRESENT / WORK_FROM_HOME do not block.
+                // Runs BEFORE the Forgiveness Layer so waivers still apply on top.
+                // ================================================================
+                const isAbsenceClassStatus = activeStatusException && (
+                    activeStatusException.type === 'MANUAL_ABSENT' ||
+                    activeStatusException.type === 'SICK_LEAVE'
+                );
+                if (!isAbsenceClassStatus) {
+                    const manualLateExceptions = matchingExceptions.filter(ex => ex.type === 'MANUAL_LATE');
+                    const manualEarlyExceptions = matchingExceptions.filter(ex => ex.type === 'MANUAL_EARLY_CHECKOUT');
+
+                    if (manualLateExceptions.length > 0) {
+                        // Pick the newest one (created_date desc) when multiple exist
+                        const newestLate = manualLateExceptions.sort((a: any, b: any) =>
+                            new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
+                        )[0];
+                        const overrideLate = Math.abs(Number(newestLate.late_minutes) || 0);
+                        console.log(`[runAnalysis] PENALTY_OVERRIDE: Employee ${attendanceIdStr}, Date ${dateStr}: MANUAL_LATE override (was=${dayState.late}, now=${overrideLate})`);
+                        dayState.late = overrideLate;
+                    }
+
+                    if (manualEarlyExceptions.length > 0) {
+                        const newestEarly = manualEarlyExceptions.sort((a: any, b: any) =>
+                            new Date(b.created_date).getTime() - new Date(a.created_date).getTime()
+                        )[0];
+                        const overrideEarly = Math.abs(Number(newestEarly.early_checkout_minutes) || 0);
+                        console.log(`[runAnalysis] PENALTY_OVERRIDE: Employee ${attendanceIdStr}, Date ${dateStr}: MANUAL_EARLY_CHECKOUT override (was=${dayState.early}, now=${overrideEarly})`);
+                        dayState.early = overrideEarly;
+                    }
+                }
+
+                // ================================================================
                 // LAYER 3 — FORGIVENESS LAYER
                 // Zeros specific penalties without touching status.
                 // SKIP_PUNCH: forgives the specific shift point.
