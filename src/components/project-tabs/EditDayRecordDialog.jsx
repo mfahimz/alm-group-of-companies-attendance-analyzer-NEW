@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import TimePicker from '../ui/QuickTimePicker';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
+import { calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
 
 export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData }) {
     const [formData, setFormData] = useState({
@@ -483,26 +484,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         let calculatedLate = 0;
         let calculatedEarlyCheckout = 0;
 
-        for (const match of punchMatches) {
-            if (!match.matchedTo) continue;
-
-            const punchTime = match.punch.time;
-            const shiftTime = match.shiftTime;
-
-            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                if (punchTime.getTime() > shiftTime.getTime()) {
-                    const minutes = Math.round((punchTime.getTime() - shiftTime.getTime()) / (1000 * 60));
-                    calculatedLate += minutes;
-                }
-            }
-
-            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                if (punchTime.getTime() < shiftTime.getTime()) {
-                    const minutes = Math.round((shiftTime.getTime() - punchTime.getTime()) / (1000 * 60));
-                    calculatedEarlyCheckout += minutes;
-                }
-            }
-        }
+        const penalties = calculateDailyPenalties(punchMatches);
+        calculatedLate = penalties.late;
+        calculatedEarlyCheckout = penalties.early;
 
         setFormData(prev => ({
             ...prev,

@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner';
 import { Progress } from "@/components/ui/progress";
 
+import { parseTime, formatTime, calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
 // Extended midnight crossover window (120 minutes for Ramadan night shifts)
 const MIDNIGHT_BUFFER_MINUTES = 120;
 
@@ -667,7 +668,7 @@ export default function RunAnalysisTab({ project }) {
             );
 
             const shouldSkipTimeCalculation = dateException && [
-                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'WAIVE'
             ].includes(dateException.type);
 
             // Use manual exception minutes if present, otherwise calculate from punches
@@ -688,26 +689,9 @@ export default function RunAnalysisTab({ project }) {
                 let dayLateMinutes = 0;
                 let dayEarlyMinutes = 0;
 
-                for (const match of punchMatches) {
-                    if (!match.matchedTo) continue;
-
-                    const punchTime = match.punch.time;
-                    const shiftTime = match.shiftTime;
-
-                    if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                        if (punchTime > shiftTime) {
-                            const minutes = Math.round((punchTime - shiftTime) / (1000 * 60));
-                            dayLateMinutes += minutes;
-                        }
-                    }
-
-                    if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                        if (punchTime < shiftTime) {
-                            const minutes = Math.round((shiftTime - punchTime) / (1000 * 60));
-                            dayEarlyMinutes += minutes;
-                        }
-                    }
-                }
+                const penalties = calculateDailyPenalties(punchMatches);
+                dayLateMinutes = penalties.late;
+                dayEarlyMinutes = penalties.early;
 
                 // NEW LOGIC for Al Maraghi Auto Repairs:
                 // 1. Calculate total actual late+early minutes

@@ -288,13 +288,40 @@ Deno.serve(async (req: Request) => {
                 employee_count: uniqueEmployeeIds.length
             });
             console.log('[runAnalysis] Created new report run with', uniqueEmployeeIds.length, 'employees');
-        } else {
-            // Update employee count if it changed
-            await base44.asServiceRole.entities.ReportRun.update(reportRun.id, {
-                employee_count: uniqueEmployeeIds.length
-            });
-            console.log('[runAnalysis] Updating existing report run with', uniqueEmployeeIds.length, 'employees');
         }
+        console.log('[runAnalysis] Updating existing report run with', uniqueEmployeeIds.length, 'employees');
+        }
+
+        /**
+         * CALCULATE DAILY PENALTIES
+         * Synchronized math for late and early checkout minutes.
+         */
+        const calculateDailyPenalties = (punchMatches: any[]) => {
+            let late = 0;
+            let early = 0;
+
+            for (const match of punchMatches) {
+                if (!match.matchedTo) continue;
+
+                const punchTime = match.punch.time;
+                const shiftTime = match.shiftTime;
+
+                if (!punchTime || !shiftTime) continue;
+
+                const minutesDifference = Math.round(Math.abs((punchTime.getTime() - shiftTime.getTime()) / (1000 * 60)));
+
+                if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                    if (punchTime.getTime() > shiftTime.getTime()) {
+                        late += minutesDifference;
+                    }
+                } else if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                    if (punchTime.getTime() < shiftTime.getTime()) {
+                        early += minutesDifference;
+                    }
+                }
+            }
+            return { late, early };
+        };
 
         // Helper functions (moved from frontend)
         const parseTime = (timeStr: any) => {
@@ -1161,17 +1188,9 @@ Deno.serve(async (req: Request) => {
 
                 // Calculate raw late/early from punch matches (always runs — Status Layer may zero them)
                 if (shift && punchMatches.length > 0) {
-                    for (const match of punchMatches) {
-                        if (!match.matchedTo) continue;
-                        const punchTime = match.punch.time;
-                        const shiftTime = match.shiftTime;
-                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                            if (punchTime > shiftTime) dayState.late += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
-                        }
-                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                            if (punchTime < shiftTime) dayState.early += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
-                        }
-                    }
+                    const penalties = calculateDailyPenalties(punchMatches);
+                    dayState.late = penalties.late;
+                    dayState.early = penalties.early;
                 }
 
                 // ================================================================
@@ -1206,7 +1225,7 @@ Deno.serve(async (req: Request) => {
                 // punch-calculated values. Only applies when no status exception is in play.
                 if (!activeStatusException && effectiveReportException && effectiveReportException.type !== 'SHIFT_OVERRIDE') {
                     const rtype = effectiveReportException.type;
-                    if (!['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'WORK_FROM_HOME'].includes(rtype)) {
+                    if (!['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'WORK_FROM_HOME', 'WAIVE'].includes(rtype)) {
                         // e.g., MANUAL_LATE — use stored values from the report edit
                         dayState.late = Math.abs(effectiveReportException.late_minutes || 0);
                         dayState.early = Math.abs(effectiveReportException.early_checkout_minutes || 0);
@@ -1220,7 +1239,7 @@ Deno.serve(async (req: Request) => {
                 // Also zero late/early for DB-level absence exceptions (no report exception present)
                 if (!activeStatusException && !effectiveReportException) {
                     const shouldZeroMinutes = dateException && [
-                        'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                        'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'WAIVE'
                     ].includes(dateException.type);
                     if (shouldZeroMinutes) {
                         dayState.late = 0;

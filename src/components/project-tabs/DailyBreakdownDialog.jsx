@@ -9,7 +9,7 @@ import { base44 } from '@/api/base44Client';
 import TimePicker from '../ui/QuickTimePicker';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { parseTime, matchPunchesToShiftPoints, filterMultiplePunches, extractTime, formatTime } from '@/utils/attendanceAnalysisUtils';
+import { parseTime, matchPunchesToShiftPoints, filterMultiplePunches, extractTime, formatTime, calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
 
 /**
  * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
@@ -606,7 +606,7 @@ export default function DailyBreakdownDialog({
 
             if (reportGeneratedException && !dayOverrides[dateStr]) {
                 // REPORT GENERATED EXCEPTION: mirrors runAnalysis logic exactly - if HR edited this day in a previous report apply those values directly and skip punch computation.
-                if (['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME'].includes(reportGeneratedException.type)) {
+                if (['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME', 'WAIVE'].includes(reportGeneratedException.type)) {
                     // Status handled in status section, ensure late/early minutes remain 0
                     dayLateMinutes = 0;
                     dayEarlyMinutes = 0;
@@ -626,34 +626,13 @@ export default function DailyBreakdownDialog({
             } else {
                 // If no reportGeneratedException exists: Run punch-based calculation if shift and punchMatches exist and shouldSkipTimeCalc is false
                 const shouldSkipTimeCalc = (dateException && [
-                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME'
+                    'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY', 'WORK_FROM_HOME', 'WAIVE'
                 ].includes(dateException.type));
 
                 if (!shouldSkipTimeCalc && shift && punchMatches.length > 0) {
-                    for (const match of punchMatches) {
-                        if (!match.matchedTo) continue;
-                        // Skip late/early calculation for the forgiven punch point
-                        if (activeSkipValue === 'FULL_SKIP') continue;
-                        const skipTypeMap2 = { 'AM_PUNCH_IN': 'AM_START', 'AM_PUNCH_OUT': 'AM_END', 'PM_PUNCH_IN': 'PM_START', 'PM_PUNCH_OUT': 'PM_END' };
-                        if (activeSkipValue && match.matchedTo === skipTypeMap2[activeSkipValue]) continue;
-
-                        const punchTime = match.punch.time;
-                        const shiftTime = match.shiftTime;
-
-                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                            if (punchTime > shiftTime) {
-                                const minutes = Math.abs(Math.round((punchTime - shiftTime) / (1000 * 60)));
-                                dayLateMinutes += minutes;
-                            }
-                        }
-
-                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                            if (punchTime < shiftTime) {
-                                const minutes = Math.abs(Math.round((shiftTime - punchTime) / (1000 * 60)));
-                                dayEarlyMinutes += minutes;
-                            }
-                        }
-                    }
+                    const penalties = calculateDailyPenalties(punchMatches);
+                    dayLateMinutes = penalties.late;
+                    dayEarlyMinutes = penalties.early;
                 }
                 // ecoSkipActive: if skip all early checkout was applied at report level zero out
                 // early minutes for this day to match the summary report behaviour
