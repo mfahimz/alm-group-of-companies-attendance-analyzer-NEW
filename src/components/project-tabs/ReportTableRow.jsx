@@ -127,7 +127,7 @@ export default function ReportTableRow({
             </td>
             {project.company !== 'Naser Mohsin Auto Parts' && project.company !== 'Al Maraghi Automotive' && (
                 <td className="p-2 align-middle">
-                    <span className={`${result.approved_minutes > 0 ? 'text-blue-600 font-medium' : 'text-slate-400'}`}>
+                    <span className={`${result.approved_minutes > 0 ? 'text-teal-600 font-medium' : 'text-slate-400'}`}>
                         {Math.max(0, result.approved_minutes || 0)}
                     </span>
                 </td>

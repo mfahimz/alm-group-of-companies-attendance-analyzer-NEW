@@ -1311,7 +1311,7 @@ export default function DailyBreakdownDialog({
                                         {project?.company === 'Al Maraghi Motors' && (
                                             <TableCell className="text-xs">
                                                 {day.allowedMinutes > 0 ? (
-                                                    <span className="text-blue-600 font-medium">{day.allowedMinutes} min</span>
+                                                    <span className="text-teal-600 font-medium">{day.allowedMinutes} min ✓</span>
                                                 ) : (
                                                     <span className="text-slate-400">-</span>
                                                 )}
@@ -1344,9 +1344,9 @@ export default function DailyBreakdownDialog({
                                         {selectedEmployee?.other_minutes || 0} min
                                     </TableCell>
                                     {project?.company === 'Al Maraghi Motors' && (
-                                        <TableCell className="font-bold text-blue-600">
-                                            {selectedEmployee?.approved_minutes || 0} min
-                                        </TableCell>
+                                    <TableCell className="font-bold text-teal-600">
+                                        {selectedEmployee?.approved_minutes || 0} min
+                                    </TableCell>
                                     )}
                                     <TableCell colSpan={2}></TableCell>
                                 </TableRow>
