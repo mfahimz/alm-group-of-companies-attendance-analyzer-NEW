@@ -23,7 +23,8 @@ import ReportResultsTable from './ReportResultsTable';
 import { executeSaveReport } from './saveReportLogic';
 import * as XLSX from 'xlsx';
 import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
-import { parseTime, formatTime, extractTime, matchPunchesToShiftPoints, filterMultiplePunches } from '@/utils/attendanceAnalysisUtils';
+import { parseTime, formatTime, extractTime, matchPunchesToShiftPoints, filterMultiplePunches, isWithinMidnightBuffer, MIDNIGHT_BUFFER_MINUTES } from '@/utils/attendanceAnalysisUtils';
+const localIsWithinMidnightBuffer = isWithinMidnightBuffer;
 
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -1458,7 +1459,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         const nextDateStr = nextDayObj.toISOString().split('T')[0];
         const combinedPunches = [
             ...empPunches.filter(p => p.punch_date === dateStr),
-            ...empPunches.filter(p => p.punch_date === nextDateStr && localIsWithinMidnightBuffer(p.timestamp_raw))
+            ...empPunches.filter(p => p.punch_date === nextDateStr && isWithinMidnightBuffer(p.timestamp_raw))
         ];
         const dayPunches = filterMultiplePunches(combinedPunches, shift);
         return { [attId]: { daily_details: { [dateStr]: { punches: dayPunches } } } };
