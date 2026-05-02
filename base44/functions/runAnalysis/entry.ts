@@ -972,14 +972,20 @@ Deno.serve(async (req: Request) => {
                 // TASK 1 FIX: If _scope_report_run_id is provided, only consider report-generated
                 // exceptions from that specific run. This prevents cross-run pollution where a
                 // stale exception from a prior run contaminates the current reanalysis.
-                const reportGeneratedException = matchingExceptions
-                    .filter(ex => ex.created_from_report === true && (!_scope_report_run_id || ex.report_run_id === _scope_report_run_id))
+                const scopedReportExceptions = matchingExceptions.filter(ex =>
+                    ex.created_from_report === true && (!_scope_report_run_id || ex.report_run_id === _scope_report_run_id)
+                );
+                const STATUS_TYPES_FOR_REPORT = ['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'WORK_FROM_HOME', 'ANNUAL_LEAVE'];
+                const reportGeneratedException = scopedReportExceptions
+                    .filter(ex => STATUS_TYPES_FOR_REPORT.includes(ex.type))
                     .sort((a: any, b: any) => {
                         const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
                         const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
                         if (priA !== priB) return priB - priA;
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0];
+                const reportShiftOverrideException = scopedReportExceptions.find(ex => ex.type === 'SHIFT_OVERRIDE') || null;
+                const reportOtherMinutesExceptions = scopedReportExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
 
                 // Resolve status override — uses the independently-resolved reportGeneratedException (status only).
                 let statusOverrideApplied = false;
@@ -1663,18 +1669,12 @@ Deno.serve(async (req: Request) => {
             };
         };
 
-        // CHUNK PROCESSING: If chunk params provided, only process that subset
-        // We calculate this early to know which employees need gift minutes persistence lookup
         const employeeIdsArray = [...uniqueEmployeeIds];
         const startIdx = _chunk_offset !== undefined ? _chunk_offset : 0;
         const endIdx = _chunk_size !== undefined ? Math.min(startIdx + _chunk_size, employeeIdsArray.length) : employeeIdsArray.length;
         const employeesToProcess = employeeIdsArray.slice(startIdx, endIdx);
 
-        // ============================================================================
-        // GIFT MINUTES PERSISTENCE (Step 1 & 2)
-        // ============================================================================
-        // PRIMARY PERSISTENCE: Look for gift minutes within the current report run
-        // (Handles updates to an existing report run)
+        // Fetch existing results for this report run (gift minutes persistence + eco note preservation)
         const existingResultsForReport = await fetchAllPages(base44.asServiceRole.entities.AnalysisResult, {
             project_id,
             report_run_id: reportRun.id
@@ -1788,6 +1788,10 @@ Deno.serve(async (req: Request) => {
                     }
                 } catch (e: any) {
                     console.error(`[runAnalysis] ERROR: Failed to analyze employee ${idStr}:`, e.message);
+                    // Re-throw rate limit errors — these must not be silently swallowed
+                    // A silent skip causes partial saves that look successful but are missing data
+                    const isRateLimit = (e as any)?.status === 429 || (e as any)?.message?.includes('429') || (e as any)?.message?.includes('rate limit') || (e as any)?.message?.includes('Permanently rate limited');
+                    if (isRateLimit) throw e;
                 }
             }
 
@@ -1878,9 +1882,8 @@ Deno.serve(async (req: Request) => {
                             continue;
                         }
                         if (isRateLimit) {
-                            // Final fallback: log and skip this record rather than failing the whole chunk
-                            console.error(`[runAnalysis] Permanently rate limited for ${res.attendance_id} — skipping to preserve chunk completion.`);
-                            return;
+                            // Do NOT silently skip — throw so the chunk is marked failed and can be retried
+                            throw new Error(`Permanently rate limited saving result for ${res.attendance_id} after ${retryDelays.length} retries`);
                         }
                         throw error;
                     }
