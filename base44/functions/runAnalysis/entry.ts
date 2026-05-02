@@ -24,7 +24,8 @@ Deno.serve(async (req: Request) => {
             _existing_report_run_id,
             _chunk_offset,
             _chunk_size,
-            _day_overrides
+            _day_overrides,
+            _scope_report_run_id   // TASK 1: If provided, only fetch exceptions for this specific report run
         } = await req.json();
 
         if (!project_id || !date_from || !date_to) {
@@ -967,57 +968,51 @@ Deno.serve(async (req: Request) => {
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0];
 
-                if (dateException) {
-                    if (dateException.type === 'MANUAL_PRESENT') {
+                // TASK 2 FIX: Resolve status override from dateException or reportGeneratedException.
+                // We NO LONGER use `continue` here. Instead we set statusOverrideApplied flag so
+                // punch/shift processing is skipped, but the minutes block (Third Gate) still runs —
+                // allowing a secondary MANUAL_OTHER_MINUTES exception on the same day to accumulate
+                // other_minutes correctly (fixes Drop Zone A data loss).
+                let statusOverrideApplied = false;
+
+                const activeStatusException = (() => {
+                    const STATUS_TYPES = ['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'WORK_FROM_HOME'];
+                    if (dateException && STATUS_TYPES.includes(dateException.type)) return dateException;
+                    if (reportGeneratedException && STATUS_TYPES.includes(reportGeneratedException.type) &&
+                        (!dateException || dateException.type !== reportGeneratedException.type)) {
+                        return reportGeneratedException;
+                    }
+                    return null;
+                })();
+
+                if (activeStatusException) {
+                    if (activeStatusException.type === 'MANUAL_PRESENT') {
                         presentDays++;
                         dateStatusMap[dateStr] = 'PRESENT';
-                        continue;  // Skip punch-based counting to prevent double-counting
-                    } else if (dateException.type === 'WORK_FROM_HOME') {
-                        // WORK_FROM_HOME marks present with zero deductible minutes regardless of punches.
+                        statusOverrideApplied = true;
+                    } else if (activeStatusException.type === 'WORK_FROM_HOME') {
                         presentDays++;
                         dateStatusMap[dateStr] = 'WORK_FROM_HOME';
-                        continue;
-                    } else if (dateException.type === 'MANUAL_ABSENT') {
+                        statusOverrideApplied = true;
+                    } else if (activeStatusException.type === 'MANUAL_ABSENT') {
                         fullAbsenceCount++;
                         dateStatusMap[dateStr] = 'LOP';
                         lopDatesSet.add(dateStr);
-                        continue;
-                    } else if (dateException.type === 'SICK_LEAVE') {
-                        // Sick leave counts as WORKING DAY (no deduction from working_days)
-                        // Day is tracked separately as sick_leave_count
-                        // No LOP deduction, no late/early calculation for this day
+                        statusOverrideApplied = true;
+                    } else if (activeStatusException.type === 'SICK_LEAVE') {
                         sickLeaveCount++;
                         dateStatusMap[dateStr] = 'SICK_LEAVE';
-                        continue;
+                        statusOverrideApplied = true;
                     }
                 }
 
-                // BUG 2 FIX: Apply report-generated status overrides BEFORE punch-completeness logic.
-                // When a previous report's saved edit set the day's status (e.g. MANUAL_PRESENT,
-                // MANUAL_ABSENT, SICK_LEAVE, ANNUAL_LEAVE, WORK_FROM_HOME) but `dateException`
-                // resolved to a different (lower-priority) exception, the reportGeneratedException
-                // must still take effect — otherwise the new report would re-count the day as
-                // Half Day from raw punches and ignore the prior edit.
-                if (reportGeneratedException && (!dateException || dateException.type !== reportGeneratedException.type)) {
-                    if (reportGeneratedException.type === 'MANUAL_PRESENT') {
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'PRESENT';
-                        continue;
-                    } else if (reportGeneratedException.type === 'WORK_FROM_HOME') {
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'WORK_FROM_HOME';
-                        continue;
-                    } else if (reportGeneratedException.type === 'MANUAL_ABSENT') {
-                        fullAbsenceCount++;
-                        dateStatusMap[dateStr] = 'LOP';
-                        lopDatesSet.add(dateStr);
-                        continue;
-                    } else if (reportGeneratedException.type === 'SICK_LEAVE') {
-                        sickLeaveCount++;
-                        dateStatusMap[dateStr] = 'SICK_LEAVE';
-                        continue;
-                    }
-                }
+                // statusOverrideApplied=true: skip all punch/shift processing below.
+                // dayLateMinutes/dayEarlyMinutes remain 0. The minutes block still executes
+                // so MANUAL_OTHER_MINUTES exceptions on this same day are still accumulated.
+                if (statusOverrideApplied) {
+                    // Status override already set presentDays/fullAbsenceCount/sickLeaveCount above.
+                    // Skip straight to the annual leave check and minutes block.
+                } else {
 
                 // Check for ANNUAL_LEAVE - already counted as calendar days upfront
                 // Just skip this day if employee is on annual leave and didn't work
@@ -1441,6 +1436,7 @@ Deno.serve(async (req: Request) => {
                 if (rules.date_rules?.always_mark_first_date_abnormal && currentDate.getTime() === startDate.getTime()) {
                     abnormal_dates_set.add(dateStr);
                 }
+                } // end: if (!statusOverrideApplied) else block
             }
 
             // ================================================================

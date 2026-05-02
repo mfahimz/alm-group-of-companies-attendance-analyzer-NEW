@@ -970,6 +970,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                         date_to: reportRun.date_to,
                         report_name: reportRun.report_name || 'Reanalysis',
                         _existing_report_run_id: reportRun.id,
+                        _scope_report_run_id: reportRun.id,  // TASK 1: scope exceptions to this run only
                         _chunk_offset: offset,
                         _chunk_size: rebatchSize
                     });
