@@ -1355,29 +1355,7 @@ export default function DailyBreakdownDialog({
                         )}
                         </div>
 
-                        {/* Reconciliation Status Banner */}
-                        <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Info className="w-4 h-4 text-indigo-500" />
-                                <span className="text-xs text-indigo-700 font-medium">
-                                    Summary totals are sourced directly from the AnalysisResult record. 
-                                    Manual edits in this dialog are immediately reflected in the parent report summary.
-                                </span>
-                            </div>
-                            <div className="flex gap-4 items-center">
-                                <div className="flex flex-col items-end">
-                                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Report Status</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <Badge variant={selectedEmployee?.isVerified ? "default" : "outline"} className={selectedEmployee?.isVerified ? "bg-green-600" : "text-slate-500 border-slate-300"}>
-                                            {selectedEmployee?.isVerified ? "Verified" : "Unverified"}
-                                        </Badge>
-                                        <Badge variant="outline" className="bg-white border-indigo-200 text-indigo-700">
-                                            {selectedEmployee?.present_days || 0} / {selectedEmployee?.working_days || 0} Present
-                                        </Badge>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+
 
                         </DialogContent>
                         <DialogFooter className="bg-slate-50/50 p-4 border-t">
