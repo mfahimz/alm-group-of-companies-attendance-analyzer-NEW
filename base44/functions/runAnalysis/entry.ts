@@ -981,11 +981,7 @@ Deno.serve(async (req: Request) => {
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0];
 
-                // TASK 2 FIX: Resolve status override from dateException or reportGeneratedException.
-                // We NO LONGER use `continue` here. Instead we set statusOverrideApplied flag so
-                // punch/shift processing is skipped, but the minutes block (Third Gate) still runs —
-                // allowing a secondary MANUAL_OTHER_MINUTES exception on the same day to accumulate
-                // other_minutes correctly (fixes Drop Zone A data loss).
+                // Resolve status override — uses the independently-resolved reportGeneratedException (status only).
                 let statusOverrideApplied = false;
 
                 const activeStatusException = (() => {
@@ -1075,23 +1071,27 @@ Deno.serve(async (req: Request) => {
 
                 // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
 
-                if (dateException && dateException.type === 'SHIFT_OVERRIDE') {
+                // Apply SHIFT_OVERRIDE: DB-level exception takes priority, then report-generated SHIFT_OVERRIDE.
+                // These are resolved independently of the status exception (TASK 1 fix).
+                const activeShiftOverride = (dateException && dateException.type === 'SHIFT_OVERRIDE')
+                    ? dateException
+                    : reportShiftOverrideException;
+
+                if (activeShiftOverride) {
                     try {
                         const isFriday = dayOfWeek === 5;
-                        const shouldApplyOverride = dateException.include_friday || !isFriday;
+                        const shouldApplyOverride = activeShiftOverride.include_friday || !isFriday;
 
                         if (shouldApplyOverride) {
                             shift = {
-                                am_start: dateException.new_am_start,
-                                am_end: dateException.new_am_end,
-                                pm_start: dateException.new_pm_start,
-                                pm_end: dateException.new_pm_end
+                                am_start: activeShiftOverride.new_am_start,
+                                am_end: activeShiftOverride.new_am_end,
+                                pm_start: activeShiftOverride.new_pm_start,
+                                pm_end: activeShiftOverride.new_pm_end
                             };
                         }
                     } catch (e: any) {
-                        let errorMessageStr = e.message;
                         console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
-                        // Continue with existing shift
                     }
                 }
 
@@ -1272,7 +1272,6 @@ Deno.serve(async (req: Request) => {
 
                 // _DAY_OVERRIDES: Use in-memory day override as substitute for reportGeneratedException
                 // Only applies to non-SHIFTOVERRIDE types (SHIFTOVERRIDE is handled via shift variable above)
-                // If _day_overrides has an entry for this employee+date, it takes priority over DB exceptions
                 let effectiveReportException: any = reportGeneratedException;
                 if (dayOverrideEntry && dayOverrideEntry.type !== 'SHIFT_OVERRIDE') {
                     effectiveReportException = {
@@ -1285,35 +1284,41 @@ Deno.serve(async (req: Request) => {
                     };
                 }
 
+                // TASK 1 FIX: Accumulate ALL reportOtherMinutesExceptions independently,
+                // regardless of whether a status exception also exists for this day.
+                // This ensures MANUAL_PRESENT + MANUAL_OTHER_MINUTES on the same day both apply.
+                for (const omEx of reportOtherMinutesExceptions) {
+                    const omValue = omEx.other_minutes || omEx.allowed_minutes || 0;
+                    if (omValue > 0) {
+                        otherMinutes += omValue;
+                        otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + omValue;
+                    }
+                }
+
                 if (effectiveReportException && effectiveReportException.type !== 'SHIFT_OVERRIDE') {
-                    // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
+                    // REPORT GENERATED EXCEPTION: apply values directly, skip punch computation.
                     if (effectiveReportException.type === 'MANUAL_PRESENT') {
-                        // Mark present, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else if (effectiveReportException.type === 'MANUAL_ABSENT') {
-                        // Mark absent LOP, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else if (effectiveReportException.type === 'SICK_LEAVE') {
-                        // Mark sick leave, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else if (effectiveReportException.type === 'ANNUAL_LEAVE') {
-                        // Handle as annual leave, ensure minutes remain 0
                         dayLateMinutes = 0;
                         dayEarlyMinutes = 0;
                     } else {
-                        // Read late_minutes, early_checkout_minutes, other_minutes directly from the effectiveReportException record.
-                        // REPORT GENERATED EXCEPTION: if HR edited this day in a previous report, apply those values directly and skip punch computation entirely.
+                        // Non-status report exception (e.g. MANUAL_LATE): read minutes directly.
+                        // NOTE: MANUAL_OTHER_MINUTES already accumulated above — do not double-count here.
                         dayLateMinutes = Math.abs(effectiveReportException.late_minutes || 0);
                         dayEarlyMinutes = Math.abs(effectiveReportException.early_checkout_minutes || 0);
-                        if (effectiveReportException.other_minutes > 0) {
+                        if (effectiveReportException.type !== 'MANUAL_OTHER_MINUTES' && effectiveReportException.other_minutes > 0) {
                             otherMinutes += effectiveReportException.other_minutes;
                             otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + effectiveReportException.other_minutes;
                         }
                     }
-                    // Skip punch-based calculation for this day as report-generated values are applied directly
                 } else {
                     // If no reportGeneratedException exists for this day: apply existing logic.
                     // Check shouldSkipTimeCalculation using specific type list.
@@ -1606,31 +1611,8 @@ Deno.serve(async (req: Request) => {
                 }
             }
 
-            // ============================================================================
-            // CRITICAL: DEDUCTIBLE_MINUTES CALCULATION (IMMUTABLE FOR SALARY)
-            // ============================================================================
-            // RULE: Other minutes are COMPLETELY EXCLUDED from deductible calculation
-            // RULE: Grace minutes reduce ONLY late+early
-            // RULE: Approved minutes are ALREADY applied per-day during punch calculation
-            //       (reducing late/early minutes for the specific day). They are NOT subtracted
-            //       again from the final total — that would be double-dipping.
-            //       totalApprovedMinutes is tracked for REPORTING/DISPLAY purposes only.
-            // 
-            // FORMULA:
-            //   1. base = lateMinutes + earlyCheckoutMinutes (EXCLUDE other_minutes)
-            //      NOTE: lateMinutes/earlyCheckoutMinutes already have per-day approved offsets applied
-            //   2. deductibleMinutes = max(0, base - totalGraceMinutes)
-            // 
-            // CRITICAL FIX: Force positive values at EVERY step to prevent negative data corruption
-            // Grace = baseGrace + carriedGrace
-            // Other minutes are NOT part of deductible calculation at all
-            // ============================================================================
-            // ============================================================================
-            // GRACE CARRY-FORWARD FORMULA (used by closeProject / previewGraceCarryForward):
-            //   unusedGrace = max(0, effectiveGrace - (late_minutes + early_checkout_minutes))
-            //   Where late_minutes and early_checkout_minutes are the RAW values stored here.
-            //   No other fields (approved, other, deductible, ramadan_gift) are involved.
-            // ============================================================================
+            // DEDUCTIBLE: base = late+early (approved already applied per-day). Other minutes excluded.
+            // Grace = baseGrace + carriedGrace. deductible = max(0, base - grace).
             const totalGraceMinutes = Math.max(0, baseGrace) + Math.max(0, carriedGrace);
             // lateMinutes and earlyCheckoutMinutes are ALREADY net of per-day approved reductions.
             // Do NOT subtract totalApprovedMinutes again — that would be double-dipping.
@@ -1704,6 +1686,16 @@ Deno.serve(async (req: Request) => {
                 .map(r => [String(r.attendance_id), Math.max(0, Number(r.ramadan_gift_minutes || 0))])
         );
 
+        // TASK 2: Preserve [eco:X] skip-early-checkout notes before old records are deleted.
+        const existingEcoNotesByAttendanceId = new Map<string, string>(
+            existingResultsForReport
+                .filter(r => r.attendance_id != null && /\[eco:\d+\]/.test(r.notes || ''))
+                .map(r => [String(r.attendance_id), String(r.notes)])
+        );
+        if (existingEcoNotesByAttendanceId.size > 0) {
+            console.log(`[runAnalysis] TASK2: [eco:] notes preserved for ${existingEcoNotesByAttendanceId.size} employees`);
+        }
+
         // SECONDARY PERSISTENCE: If no gift minutes found for an employee in this run,
         // lookup their most recently saved gift minutes from ANY prior run in this project.
         const employeesNeedingLookup = employeesToProcess.filter(attendance_id => {
@@ -1774,12 +1766,18 @@ Deno.serve(async (req: Request) => {
                     const result = await analyzeEmployee(attendance_id);
                     const preservedRamadanGiftMinutes = existingRamadanGiftMinutesByAttendanceId.get(String(attendance_id)) || 0;
 
+                    // TASK 2: If a previous [eco:X] note exists, carry it forward and zero early checkout.
+                    const idStr2 = String(attendance_id);
+                    const ecoNote = existingEcoNotesByAttendanceId.get(idStr2);
+                    if (ecoNote) {
+                        result.notes = ecoNote;
+                        result.early_checkout_minutes = 0;
+                        console.log(`[runAnalysis] TASK2: Restored [eco:] for ${idStr2}, early_checkout zeroed`);
+                    }
+
                     allResults.push({
                         project_id,
                         report_run_id: reportRun.id,
-                        // Step 3: Write the preserved Ramadan gift minutes value. 
-                        // This value is carried forward from either the primary lookup (same report run update) 
-                        // or the secondary lookup (different report run within the same project).
                         ramadan_gift_minutes: preservedRamadanGiftMinutes,
                         ...result
                     });
