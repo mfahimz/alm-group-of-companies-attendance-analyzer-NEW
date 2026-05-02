@@ -22,33 +22,32 @@ export async function executeSaveReport({
         base44.entities.Project.update(project.id, { last_saved_report_id: reportRun.id })
     ]);
 
-    // Delete ALL existing report-generated exceptions for this report_run_id to prevent duplicates on re-save
-    const existingReportExceptions = exceptions.filter(e =>
-        (e.created_from_report && e.report_run_id === reportRun.id) ||
-        (e.type === 'SHIFT_OVERRIDE' && e.report_run_id === reportRun.id)
-    );
-
-    if (existingReportExceptions.length > 0) {
-        setSaveProgress({ current: 0, total: 100, status: 'Removing old exceptions...' });
-        for (const ex of existingReportExceptions) {
-            await base44.entities.Exception.delete(ex.id);
-        }
-    }
-
-    // Fetch ALL report-generated exceptions from OTHER saved reports in this project
-    // to deduplicate against — prevents cross-report duplicate exceptions for same employee+date+type
-    let allProjectReportExceptions = [];
+    // ALWAYS fetch fresh from DB — never rely on stale in-memory cache.
+    // This guarantees we delete ALL existing report-generated exceptions for this run,
+    // even if the frontend cache didn't have them (e.g. after re-mount or prior partial save).
+    setSaveProgress({ current: 0, total: 100, status: 'Removing old exceptions...' });
+    let freshProjectExceptions = [];
     try {
-        allProjectReportExceptions = await base44.entities.Exception.filter({
+        freshProjectExceptions = await base44.entities.Exception.filter({
             project_id: project.id,
             created_from_report: true
         }, null, 500);
-        // Exclude exceptions from the current report (already deleted above)
-        allProjectReportExceptions = allProjectReportExceptions.filter(e => e.report_run_id !== reportRun.id);
     } catch (e) {
-        // Non-fatal — proceed without cross-report dedup if fetch fails
-        allProjectReportExceptions = [];
+        freshProjectExceptions = [];
     }
+
+    const toDelete = freshProjectExceptions.filter(e => e.report_run_id === reportRun.id);
+    if (toDelete.length > 0) {
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        for (let i = 0; i < toDelete.length; i += 10) {
+            const batch = toDelete.slice(i, i + 10);
+            await Promise.all(batch.map(ex => base44.entities.Exception.delete(ex.id)));
+            if (i + 10 < toDelete.length) await delay(500);
+        }
+    }
+
+    // Use the fresh fetch for cross-report dedup (excluding current run which we just deleted)
+    const allProjectReportExceptions = freshProjectExceptions.filter(e => e.report_run_id !== reportRun.id);
 
     const isDuplicateException = (ex) => {
         return allProjectReportExceptions.some(existing =>
