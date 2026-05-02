@@ -16,6 +16,24 @@ import { base44 } from '@/api/base44Client';
  */
 
 /**
+ * Number of minutes after midnight that count as belonging to the previous day's shift.
+ * E.g., a 12:30 AM punch is treated as part of the previous calendar day's PM_END.
+ */
+export const MIDNIGHT_BUFFER_MINUTES = 180;
+
+/**
+ * Returns true if the given timestamp falls within the post-midnight buffer
+ * (00:00 → MIDNIGHT_BUFFER_MINUTES). Used to roll back early-AM punches to the
+ * previous day's shift for night/late shift handling.
+ */
+export const isWithinMidnightBuffer = (timestampRaw) => {
+    const t = parseTime(timestampRaw);
+    if (!t) return false;
+    const minutesSinceMidnight = t.getHours() * 60 + t.getMinutes();
+    return minutesSinceMidnight >= 0 && minutesSinceMidnight < MIDNIGHT_BUFFER_MINUTES;
+};
+
+/**
  * Parses various time string formats into a JavaScript Date object.
  * Returns a Date object with hours/minutes set today, or null if invalid.
  */
