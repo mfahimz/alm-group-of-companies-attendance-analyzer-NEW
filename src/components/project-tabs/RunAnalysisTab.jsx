@@ -679,7 +679,9 @@ export default function RunAnalysisTab({ project }) {
                 if (dateException.early_checkout_minutes && dateException.early_checkout_minutes > 0) {
                     early_checkout_minutes += dateException.early_checkout_minutes;
                 }
-                if (dateException.other_minutes && dateException.other_minutes > 0) {
+                // Only add other_minutes here if this isn't a MANUAL_OTHER_MINUTES exception
+                // (we sum all MANUAL_OTHER_MINUTES exceptions separately below to fix the "Highlander" bug)
+                if (dateException.type !== 'MANUAL_OTHER_MINUTES' && dateException.other_minutes && dateException.other_minutes > 0) {
                     other_minutes += dateException.other_minutes;
                 }
             } else if (shift && punchMatches.length > 0 && !shouldSkipTimeCalculation) {
@@ -732,6 +734,17 @@ export default function RunAnalysisTab({ project }) {
 
                 late_minutes += dayLateMinutes;
                 early_checkout_minutes += dayEarlyMinutes;
+            }
+            
+            // Step 4: Handle MANUAL_OTHER_MINUTES (The Highlander Fix)
+            // Sum other_minutes from ALL exceptions of type MANUAL_OTHER_MINUTES for this day.
+            // This ensures split exceptions (Status + Minutes) are both captured correctly.
+            const allManualOtherEx = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
+            for (const moEx of allManualOtherEx) {
+                const moMinutes = moEx.other_minutes || moEx.allowed_minutes || 0;
+                if (moMinutes > 0) {
+                    other_minutes += moMinutes;
+                }
             }
 
             const expectedPunches = isSingleShift ? 2 : 4;

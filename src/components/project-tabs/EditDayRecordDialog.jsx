@@ -366,23 +366,44 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                 const dateStr = `${year}-${month}-${day}`;
                 const currentDateObj = new Date(dateStr);
                 
-                const dateException = exceptions.find(ex => {
+                const matchingExceptions = exceptions.filter(ex => {
                     const exFrom = new Date(ex.date_from);
                     const exTo = new Date(ex.date_to);
                     return currentDateObj >= exFrom && currentDateObj <= exTo &&
                            (ex.attendance_id === 'ALL' || String(ex.attendance_id) === String(attendanceId));
                 });
+                
+                // Sort by priority to find the "main" exception for status/late/early
+                const priorityMap = {
+                    'MANUAL_PRESENT': 10, 'MANUAL_ABSENT': 10, 'ANNUAL_LEAVE': 9, 'SICK_LEAVE': 9,
+                    'OFF': 8, 'PUBLIC_HOLIDAY': 8, 'WORK_FROM_HOME': 7, 'DAY_SWAP': 7,
+                    'MANUAL_LATE': 5, 'MANUAL_EARLY_CHECKOUT': 5, 'MANUAL_OTHER_MINUTES': 4, 'ALLOWED_MINUTES': 3
+                };
+                const dateException = matchingExceptions.sort((a, b) => (priorityMap[b.type] || 0) - (priorityMap[a.type] || 0))[0];
 
                 // If exception has manual time values, use those exclusively
                 let lateMinutes = 0;
                 let earlyCheckoutMinutes = 0;
                 let otherMinutes = 0;
 
-                if (dateException && (dateException.late_minutes != null || dateException.early_checkout_minutes != null || dateException.other_minutes != null)) {
-                    // Use exception values directly
+                if (dateException) {
+                    // Use main exception values directly for late/early
                     lateMinutes = dateException.late_minutes ?? '';
                     earlyCheckoutMinutes = dateException.early_checkout_minutes ?? '';
-                    otherMinutes = dateException.other_minutes ?? '';
+                    
+                    // Highlander Fix: Sum other_minutes from ALL matching MANUAL_OTHER_MINUTES exceptions
+                    // Plus the other_minutes from the main exception if it's not a manual minutes type
+                    let sumOtherMinutes = 0;
+                    if (dateException.type !== 'MANUAL_OTHER_MINUTES') {
+                        sumOtherMinutes = dateException.other_minutes || 0;
+                    }
+                    
+                    matchingExceptions.forEach(ex => {
+                        if (ex.type === 'MANUAL_OTHER_MINUTES') {
+                            sumOtherMinutes += (ex.other_minutes || ex.allowed_minutes || 0);
+                        }
+                    });
+                    otherMinutes = sumOtherMinutes || '';
                 } else {
                     // Parse from display values
                     if (dayRecord.lateInfo && dayRecord.lateInfo !== '-') {

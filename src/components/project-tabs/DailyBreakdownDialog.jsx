@@ -617,9 +617,9 @@ export default function DailyBreakdownDialog({
                     isLateOverridden = true;
                     isEarlyOverridden = true;
                 }
-                // Always read other_minutes from reportGeneratedException regardless of exception type
-                // other_minutes must be applied even on MANUAL_PRESENT/SICK_LEAVE days to match summary report
-                if (reportGeneratedException.other_minutes > 0) {
+                // Start with other_minutes from the top report-generated exception (if it's not a manual minutes exception)
+                // We'll sum all manual minutes exceptions separately below to fix the "Highlander" bug.
+                if (reportGeneratedException && reportGeneratedException.type !== 'MANUAL_OTHER_MINUTES' && reportGeneratedException.other_minutes > 0) {
                     currentOtherMinutes = reportGeneratedException.other_minutes;
                 }
                 // Skip punch-based calculation for this day as report-generated values are applied directly
@@ -678,12 +678,11 @@ export default function DailyBreakdownDialog({
                 dayEarlyMinutes = Math.round(remaining * earlyRatio);
             }
 
-            // Step 4: Handle MANUAL_OTHER_MINUTES where created_from_report is false or null.
-            // These exceptions store their value in other_minutes (not allowed_minutes).
-            const manualOtherNonReportEx = matchingExceptions.filter(ex => 
-                ex.type === 'MANUAL_OTHER_MINUTES' && (ex.created_from_report === false || ex.created_from_report === null)
-            );
-            for (const moEx of manualOtherNonReportEx) {
+            // Step 4: Handle MANUAL_OTHER_MINUTES (The Highlander Fix)
+            // Sum other_minutes from ALL exceptions of type MANUAL_OTHER_MINUTES for this day.
+            // This ensures split exceptions (Status + Minutes) are both captured correctly.
+            const allManualOtherEx = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
+            for (const moEx of allManualOtherEx) {
                 const moMinutes = moEx.other_minutes || moEx.allowed_minutes || 0;
                 if (moMinutes > 0) {
                     currentOtherMinutes += moMinutes;
