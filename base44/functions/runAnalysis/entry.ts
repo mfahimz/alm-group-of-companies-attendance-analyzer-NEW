@@ -936,42 +936,30 @@ Deno.serve(async (req: Request) => {
                 // Now it's safe to count as a working day
                 workingDays++;
 
-                // PRIORITY-BASED EXCEPTION SORTING: Higher numbers win.
-                // GIFT_MINUTES is always the lowest priority at 1. Unknown types default to 5, 
-                // which is above GIFT_MINUTES but below most active operational exceptions.
+                // ================================================================
+                // DIMENSIONAL PIPELINE (Reducer Pattern) — Phase 1
+                // Each layer operates on dayState independently.
+                // No layer can gate a later layer from running.
+                // ================================================================
+
+                // --- Exception resolution (shared inputs for all layers) ---
                 const EXCEPTION_PRIORITY: Record<string, number> = {
-                    'MANUAL_ABSENT': 10,
-                    'MANUAL_PRESENT': 10,
-                    'SICK_LEAVE': 10,
-                    'ANNUAL_LEAVE': 10,
-                    'SHIFT_OVERRIDE': 9,
-                    'SKIP_PUNCH': 9,
-                    'ALLOWED_MINUTES': 8,
-                    'MANUAL_LATE': 8,
-                    'MANUAL_EARLY_CHECKOUT': 8,
-                    'MANUAL_OTHER_MINUTES': 7,
-                    'DAY_SWAP': 7,
-                    'WEEKLY_OFF_OVERRIDE': 7,
-                    'HALF_DAY_HOLIDAY': 6,
-                    'CUSTOM': 5,
-                    'DISMISSED_MISMATCH': 3,
-                    'GIFT_MINUTES': 1,
+                    'MANUAL_ABSENT': 10, 'MANUAL_PRESENT': 10, 'SICK_LEAVE': 10, 'ANNUAL_LEAVE': 10,
+                    'SHIFT_OVERRIDE': 9, 'SKIP_PUNCH': 9,
+                    'ALLOWED_MINUTES': 8, 'MANUAL_LATE': 8, 'MANUAL_EARLY_CHECKOUT': 8,
+                    'MANUAL_OTHER_MINUTES': 7, 'DAY_SWAP': 7, 'WEEKLY_OFF_OVERRIDE': 7,
+                    'HALF_DAY_HOLIDAY': 6, 'CUSTOM': 5, 'DISMISSED_MISMATCH': 3, 'GIFT_MINUTES': 1,
                 };
 
                 const dateException = matchingExceptions.length > 0
                     ? matchingExceptions.sort((a: any, b: any) => {
                         const priA = EXCEPTION_PRIORITY[a.type] ?? 5;
                         const priB = EXCEPTION_PRIORITY[b.type] ?? 5;
-                        if (priA !== priB) return priB - priA; // Higher number wins
-                        // Within same priority level, newest (by creation date) wins
+                        if (priA !== priB) return priB - priA;
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0]
                     : null;
 
-                // Step 1: Check for report-generated exceptions (created_from_report === true)
-                // TASK 1 FIX: If _scope_report_run_id is provided, only consider report-generated
-                // exceptions from that specific run. This prevents cross-run pollution where a
-                // stale exception from a prior run contaminates the current reanalysis.
                 const scopedReportExceptions = matchingExceptions.filter(ex =>
                     ex.created_from_report === true && (!_scope_report_run_id || ex.report_run_id === _scope_report_run_id)
                 );
@@ -985,299 +973,9 @@ Deno.serve(async (req: Request) => {
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0];
                 const reportShiftOverrideException = scopedReportExceptions.find(ex => ex.type === 'SHIFT_OVERRIDE') || null;
-                const reportOtherMinutesExceptions = scopedReportExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
 
-                // Resolve status override — uses the independently-resolved reportGeneratedException (status only).
-                let statusOverrideApplied = false;
-
-                const activeStatusException = (() => {
-                    const STATUS_TYPES = ['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'WORK_FROM_HOME'];
-                    if (dateException && STATUS_TYPES.includes(dateException.type)) return dateException;
-                    if (reportGeneratedException && STATUS_TYPES.includes(reportGeneratedException.type) &&
-                        (!dateException || dateException.type !== reportGeneratedException.type)) {
-                        return reportGeneratedException;
-                    }
-                    return null;
-                })();
-
-                if (activeStatusException) {
-                    if (activeStatusException.type === 'MANUAL_PRESENT') {
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'PRESENT';
-                        statusOverrideApplied = true;
-                    } else if (activeStatusException.type === 'WORK_FROM_HOME') {
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'WORK_FROM_HOME';
-                        statusOverrideApplied = true;
-                    } else if (activeStatusException.type === 'MANUAL_ABSENT') {
-                        fullAbsenceCount++;
-                        dateStatusMap[dateStr] = 'LOP';
-                        lopDatesSet.add(dateStr);
-                        statusOverrideApplied = true;
-                    } else if (activeStatusException.type === 'SICK_LEAVE') {
-                        sickLeaveCount++;
-                        dateStatusMap[dateStr] = 'SICK_LEAVE';
-                        statusOverrideApplied = true;
-                    }
-                }
-
-                // statusOverrideApplied=true: skip all punch/shift processing below.
-                // dayLateMinutes/dayEarlyMinutes remain 0. The minutes block still executes
-                // so MANUAL_OTHER_MINUTES exceptions on this same day are still accumulated.
-                if (statusOverrideApplied) {
-                    // Status override already set presentDays/fullAbsenceCount/sickLeaveCount above.
-                    // Skip straight to the annual leave check and minutes block.
-                } else {
-
-                // Check for ANNUAL_LEAVE - already counted as calendar days upfront
-                // Just skip this day if employee is on annual leave and didn't work
-                const annualLeaveException = employeeExceptions.find(ex => {
-                    try {
-                        const exFrom = new Date(ex.date_from);
-                        const exTo = new Date(ex.date_to);
-                        return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
-                    } catch (dateError) {
-                        // CRITICAL FIX: Log invalid exception dates
-                        console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE DATE in daily loop - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
-                        return false;
-                    }
-                });
-
-                if (annualLeaveException) {
-                    // Check if employee worked on this day despite annual leave
-                    const dayPunchesForLeave = employeePunches.filter((p: any) => p.punch_date === dateStr);
-                    if (dayPunchesForLeave.length === 0) {
-                        // Skip this day for attendance counting - annual leave already counted as calendar days upfront
-                        // Decrement working days since this is a leave day (not a working day to count)
-                        workingDays--;
-                        dateStatusMap[dateStr] = 'ANNUAL_LEAVE';
-                        continue;
-                    }
-                    // If employee worked, continue normal analysis
-                }
-                let shift = getShiftForDate(dateStr, currentDate);
-
-                // _DAY_OVERRIDES: Apply in-memory SHIFT_OVERRIDE from Reanalyze (not saved to DB)
+                // _DAY_OVERRIDES: in-memory override from Reanalyze (not saved to DB)
                 const dayOverrideEntry = (_day_overrides as any)?.[attendanceIdStr]?.[dateStr];
-                if (dayOverrideEntry?.type === 'SHIFT_OVERRIDE' && dayOverrideEntry?.shiftOverride) {
-                    try {
-                        const ov = dayOverrideEntry.shiftOverride;
-                        if (ov.am_start && ov.pm_end) {
-                            shift = {
-                                am_start: ov.am_start,
-                                am_end: ov.am_end || '',
-                                pm_start: ov.pm_start || '',
-                                pm_end: ov.pm_end
-                            };
-                        }
-                    } catch (ovErr: any) {
-                        console.warn(`[runAnalysis] Failed to apply day_overrides SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, ovErr.message);
-                    }
-                }
-
-                // CRITICAL FIX: Log missing shift will happen after filteredPunches is computed below
-
-                // Apply SHIFT_OVERRIDE: DB-level exception takes priority, then report-generated SHIFT_OVERRIDE.
-                // These are resolved independently of the status exception (TASK 1 fix).
-                const activeShiftOverride = (dateException && dateException.type === 'SHIFT_OVERRIDE')
-                    ? dateException
-                    : reportShiftOverrideException;
-
-                if (activeShiftOverride) {
-                    try {
-                        const isFriday = dayOfWeek === 5;
-                        const shouldApplyOverride = activeShiftOverride.include_friday || !isFriday;
-
-                        if (shouldApplyOverride) {
-                            shift = {
-                                am_start: activeShiftOverride.new_am_start,
-                                am_end: activeShiftOverride.new_am_end,
-                                pm_start: activeShiftOverride.new_pm_start,
-                                pm_end: activeShiftOverride.new_pm_end
-                            };
-                        }
-                    } catch (e: any) {
-                        console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
-                    }
-                }
-
-                // ================================================================
-                // UNIVERSAL 3:00 AM MIDNIGHT ROLLBACK (CORE LOGIC)
-                // ================================================================
-                const currentShiftStartsEarly = shiftStartsNearMidnight(shift);
-                const nextDateObj = new Date(currentDate);
-                nextDateObj.setDate(nextDateObj.getDate() + 1);
-                const nextDateStr = toDateStr(nextDateObj);
-
-                let dayPunches = employeePunches.filter(p => {
-                    if (p.punch_date === dateStr) {
-                        return !isWithinMidnightBuffer(p.timestamp_raw) || currentShiftStartsEarly;
-                    }
-                    return false;
-                });
-
-                const nextDayShift = getShiftForDate(nextDateStr, nextDateObj);
-                const nextShiftStartsEarly = shiftStartsNearMidnight(nextDayShift);
-
-                const nextDayEarlyPunches = employeePunches.filter(p => {
-                    if (p.punch_date === nextDateStr) {
-                        return isWithinMidnightBuffer(p.timestamp_raw) && !nextShiftStartsEarly;
-                    }
-                    return false;
-                });
-
-                dayPunches = [...dayPunches, ...nextDayEarlyPunches].sort((a, b) => {
-                    if (a.punch_date !== b.punch_date) return a.punch_date < b.punch_date ? -1 : 1;
-                    const tA = parseTime(a.timestamp_raw)?.getTime() || 0;
-                    const tB = parseTime(b.timestamp_raw)?.getTime() || 0;
-                    return tA - tB;
-                });
-
-
-                let filteredPunches: any[] = filterMultiplePunches(dayPunches, shift, includeSeconds);
-
-                // Log missing shift AFTER filteredPunches is computed
-                if (!shift && filteredPunches.length > 0 && !dateException) {
-                    console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
-                    abnormal_dates_set.add(dateStr);
-                    critical_abnormal_dates_set.add(dateStr);
-                }
-
-                // ================================================================
-                // SKIP_PUNCH: Determine if skip applies and what type
-                // ================================================================
-                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
-                const isOnLeave = dateException && (
-                    dateException.type === 'SICK_LEAVE' ||
-                    dateException.type === 'ANNUAL_LEAVE' ||
-                    dateException.type === 'PUBLIC_HOLIDAY'
-                );
-                const isNonWorkingStatus = isOnLeave || (dateException && (dateException.type === 'OFF' || dateException.type === 'MANUAL_ABSENT'));
-
-                let hasSkipPunchApplied = false;
-                let skipType = null; // 'AM_PUNCH_IN' | 'PM_PUNCH_OUT' | 'FULL_SKIP'
-                let skipPunchForced0PunchPresent = false; // Tracks the "LOP Saver" case
-
-                if (skipPunchException && !isNonWorkingStatus && skipPunchException.punch_to_skip) {
-                    skipType = skipPunchException.punch_to_skip; // 'AM_PUNCH_IN', 'PM_PUNCH_OUT', or 'FULL_SKIP'
-                    hasSkipPunchApplied = true;
-
-                    // LOP SAVER: 0 punches + FULL_SKIP → force Present (Skip Punch)
-                    // This handles company-wide half-days where people didn't come in at all
-                    if (filteredPunches.length === 0 && skipType === 'FULL_SKIP') {
-                        filteredPunches = [{ _fake_skip_punch: true }];
-                        skipPunchForced0PunchPresent = true;
-                        console.log(`[runAnalysis] SKIP_PUNCH LOP SAVER: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + FULL_SKIP → Present (Skip Punch)`);
-                    } else if (filteredPunches.length === 0) {
-                        // AM_PUNCH_IN or PM_PUNCH_OUT with 0 punches: still mark present to avoid LOP
-                        // but this is a less common case — employee should have SOME punches
-                        filteredPunches = [{ _fake_skip_punch: true }];
-                        console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + ${skipType} → adding fake punch`);
-                    }
-                }
-
-                let punchMatches: any[] = [];
-                let hasUnmatchedPunch = false;
-                // Allow punch matching even when skip is applied (we'll zero out specific minutes after)
-                // Only skip matching if we have a fake-only punch list
-                const hasOnlyFakePunches = filteredPunches.length > 0 && filteredPunches.every((p: any) => p._fake_skip_punch);
-                if (shift && filteredPunches.length > 0 && !hasOnlyFakePunches) {
-                    punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
-                    hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
-                }
-
-                // ================================================================
-                // PUNCH COMPLETENESS RULE (REPLACED detectPartialDay)
-                // ================================================================
-                // This logic determines Present, Half Day, or Absent status based on punch counts.
-                // 1. Single Shift (2 expected): 0=LOP, 1=Half, 2=Present
-                // 2. Split Shift (4 expected): 0=LOP, 1=Half, 2=Half, 3=Present, 4=Present
-                // Bypasses: SKIP_PUNCH or FULL_SKIP exceptions only.
-                // ================================================================
-
-                const punchCount = filteredPunches.length;
-                const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
-                    String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
-                    shift.am_end !== '—' && shift.pm_start !== '—' &&
-                    shift.am_end !== '-' && shift.pm_start !== '-' &&
-                    shift.am_end !== 'null' && shift.pm_start !== 'null';
-                const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
-
-                if (punchCount > 0) {
-                    if (skipPunchForced0PunchPresent) {
-                        // LOP SAVER: If presence was forced via SKIP_PUNCH + 0 punches
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                    } else if (!hasSkipPunchApplied) {
-                        // NORMAL PUNCH COMPLETENESS LOGIC
-                        if (isSingleShift) {
-                            if (punchCount === 1) {
-                                // CHANGE 2: Single shift, 1 punch = Half Day
-                                presentDays++;
-                                halfAbsenceCount++;
-                                dateStatusMap[dateStr] = 'PRESENT';
-                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Single shift, 1 punch → Half Day`);
-                            } else {
-                                // 2 or more punches = Present
-                                presentDays++;
-                                dateStatusMap[dateStr] = 'PRESENT';
-                            }
-                        } else {
-                            // SPLIT SHIFT (4 expected)
-                            if (punchCount === 1 || punchCount === 2) {
-                                // CHANGE 2: Split shift, 1 or 2 punches = Half Day
-                                presentDays++;
-                                halfAbsenceCount++;
-                                dateStatusMap[dateStr] = 'PRESENT';
-                                console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Split shift, ${punchCount} punch(es) → Half Day`);
-                            } else {
-                                // 3 or 4 punches = Present
-                                presentDays++;
-                                dateStatusMap[dateStr] = 'PRESENT';
-                            }
-                        }
-                    } else {
-                        // SKIP_PUNCH is applied, always Present
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'PRESENT_SKIP_PUNCH';
-                    }
-                } else {
-                    // Zero punches
-                    if (!dateException || (dateException.type !== 'MANUAL_PRESENT')) {
-                        fullAbsenceCount++;
-                        dateStatusMap[dateStr] = 'LOP';
-                        lopDatesSet.add(dateStr);
-                    } else {
-                        presentDays++;
-                        dateStatusMap[dateStr] = 'PRESENT';
-                    }
-                }
-
-                // Check for approved minutes (Al Maraghi Motors only).
-                // RULES:
-                // 1. Only applies if employee was PRESENT (has punches) — not on absent/LOP days.
-                // 2. Applied PER-DAY: reduces that specific day's late+early BEFORE accumulating.
-                //    This means the raw late/early stored in AnalysisResult are ALREADY reduced.
-                //    totalApprovedMinutes is the SUM of per-day reductions, tracked for DISPLAY only.
-                // ALLOWED_MINUTES must be applied independently of dateException priority because it can coexist with other exception types on the same day.
-                let approvedMinutesForDay = 0;
-                try {
-                    if (rules.approved_minutes_enabled && filteredPunches.length > 0) {
-                        const amEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
-                        if (amEx) {
-                            approvedMinutesForDay = amEx.allowed_minutes || 0;
-                        }
-                    }
-                } catch {
-                    approvedMinutesForDay = 0;
-                }
-
-                // Step 2: Unified calculation logic for time minutes
-                let dayLateMinutes = 0;
-                let dayEarlyMinutes = 0;
-
-                // _DAY_OVERRIDES: Use in-memory day override as substitute for reportGeneratedException
-                // Only applies to non-SHIFTOVERRIDE types (SHIFTOVERRIDE is handled via shift variable above)
                 let effectiveReportException: any = reportGeneratedException;
                 if (dayOverrideEntry && dayOverrideEntry.type !== 'SHIFT_OVERRIDE') {
                     effectiveReportException = {
@@ -1290,158 +988,295 @@ Deno.serve(async (req: Request) => {
                     };
                 }
 
-                if (effectiveReportException && effectiveReportException.type !== 'SHIFT_OVERRIDE') {
-                    // REPORT GENERATED EXCEPTION: apply values directly, skip punch computation.
-                    if (effectiveReportException.type === 'MANUAL_PRESENT') {
-                        dayLateMinutes = 0;
-                        dayEarlyMinutes = 0;
-                    } else if (effectiveReportException.type === 'MANUAL_ABSENT') {
-                        dayLateMinutes = 0;
-                        dayEarlyMinutes = 0;
-                    } else if (effectiveReportException.type === 'SICK_LEAVE') {
-                        dayLateMinutes = 0;
-                        dayEarlyMinutes = 0;
-                    } else if (effectiveReportException.type === 'ANNUAL_LEAVE') {
-                        dayLateMinutes = 0;
-                        dayEarlyMinutes = 0;
+                // The active status exception: report-generated takes precedence over DB exception
+                // for status types; both sources are checked.
+                const activeStatusException = (() => {
+                    const STATUS_TYPES = ['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'WORK_FROM_HOME'];
+                    if (effectiveReportException && STATUS_TYPES.includes(effectiveReportException.type)) return effectiveReportException;
+                    if (dateException && STATUS_TYPES.includes(dateException.type)) return dateException;
+                    return null;
+                })();
+
+                // ================================================================
+                // ANNUAL_LEAVE: handled before dayState (causes a `continue`)
+                // ================================================================
+                if (!activeStatusException) {
+                    const annualLeaveException = employeeExceptions.find(ex => {
+                        try {
+                            const exFrom = new Date(ex.date_from);
+                            const exTo = new Date(ex.date_to);
+                            return ex.type === 'ANNUAL_LEAVE' && currentDate >= exFrom && currentDate <= exTo;
+                        } catch (dateError) {
+                            console.warn(`[runAnalysis] ⚠️ INVALID ANNUAL_LEAVE DATE - Employee: ${employee?.name || attendanceIdStr}, Exception ID: ${ex.id}, date_from: ${ex.date_from}, date_to: ${ex.date_to}, Error: ${dateError.message}`);
+                            return false;
+                        }
+                    });
+                    if (annualLeaveException) {
+                        const dayPunchesForLeave = employeePunches.filter((p: any) => p.punch_date === dateStr);
+                        if (dayPunchesForLeave.length === 0) {
+                            workingDays--;
+                            dateStatusMap[dateStr] = 'ANNUAL_LEAVE';
+                            continue;
+                        }
+                    }
+                }
+
+                // ================================================================
+                // DAILY STATE OBJECT — flows through each layer below
+                // ================================================================
+                const dayState = {
+                    status: 'PENDING' as string,   // set by Status Layer
+                    late: 0,                        // set by Base Layer, may be zeroed by Status/Forgiveness
+                    early: 0,                       // same
+                    isHalfDay: false,               // set by Base Layer punch-completeness
+                    approvedReduction: 0,           // set by Forgiveness Layer (ALLOWED_MINUTES)
+                };
+
+                // ================================================================
+                // LAYER 1 — BASE LAYER
+                // Resolves shift, collects punches, runs punch matching, calculates
+                // raw late/early minutes and punch-completeness status.
+                // Runs unconditionally — Status Layer may zero the minutes afterward.
+                // ================================================================
+
+                let shift = getShiftForDate(dateStr, currentDate);
+
+                // Apply in-memory SHIFT_OVERRIDE (from Reanalyze, not saved to DB)
+                if (dayOverrideEntry?.type === 'SHIFT_OVERRIDE' && dayOverrideEntry?.shiftOverride) {
+                    try {
+                        const ov = dayOverrideEntry.shiftOverride;
+                        if (ov.am_start && ov.pm_end) {
+                            shift = { am_start: ov.am_start, am_end: ov.am_end || '', pm_start: ov.pm_start || '', pm_end: ov.pm_end };
+                        }
+                    } catch (ovErr: any) {
+                        console.warn(`[runAnalysis] Failed to apply day_overrides SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, ovErr.message);
+                    }
+                }
+
+                // Apply DB or report-generated SHIFT_OVERRIDE (independent of status exception)
+                const activeShiftOverride = (dateException && dateException.type === 'SHIFT_OVERRIDE')
+                    ? dateException : reportShiftOverrideException;
+                if (activeShiftOverride) {
+                    try {
+                        const isFriday = dayOfWeek === 5;
+                        if (activeShiftOverride.include_friday || !isFriday) {
+                            shift = { am_start: activeShiftOverride.new_am_start, am_end: activeShiftOverride.new_am_end, pm_start: activeShiftOverride.new_pm_start, pm_end: activeShiftOverride.new_pm_end };
+                        }
+                    } catch (e: any) {
+                        console.warn(`[runAnalysis] Failed to apply SHIFT_OVERRIDE for ${attendanceIdStr} on ${dateStr}:`, e.message);
+                    }
+                }
+
+                // Midnight rollback: collect punches for this calendar day
+                const currentShiftStartsEarly = shiftStartsNearMidnight(shift);
+                const nextDateObj = new Date(currentDate);
+                nextDateObj.setDate(nextDateObj.getDate() + 1);
+                const nextDateStr = toDateStr(nextDateObj);
+
+                let dayPunches = employeePunches.filter(p => {
+                    if (p.punch_date === dateStr) return !isWithinMidnightBuffer(p.timestamp_raw) || currentShiftStartsEarly;
+                    return false;
+                });
+                const nextDayShift = getShiftForDate(nextDateStr, nextDateObj);
+                const nextShiftStartsEarly = shiftStartsNearMidnight(nextDayShift);
+                const nextDayEarlyPunches = employeePunches.filter(p => {
+                    if (p.punch_date === nextDateStr) return isWithinMidnightBuffer(p.timestamp_raw) && !nextShiftStartsEarly;
+                    return false;
+                });
+                dayPunches = [...dayPunches, ...nextDayEarlyPunches].sort((a, b) => {
+                    if (a.punch_date !== b.punch_date) return a.punch_date < b.punch_date ? -1 : 1;
+                    return (parseTime(a.timestamp_raw)?.getTime() || 0) - (parseTime(b.timestamp_raw)?.getTime() || 0);
+                });
+
+                let filteredPunches: any[] = filterMultiplePunches(dayPunches, shift, includeSeconds);
+
+                if (!shift && filteredPunches.length > 0 && !dateException) {
+                    console.warn(`[runAnalysis] ⚠️ MISSING SHIFT - Employee: ${employee?.name || attendanceIdStr} (${attendanceIdStr}), Date: ${dateStr}, Punches: ${filteredPunches.length}, Day: ${currentDayName}`);
+                    abnormal_dates_set.add(dateStr);
+                    critical_abnormal_dates_set.add(dateStr);
+                }
+
+                // SKIP_PUNCH exception handling (presence enforcement + forgiveness setup)
+                const skipPunchException = matchingExceptions.find(ex => ex.type === 'SKIP_PUNCH');
+                const isNonWorkingStatus = dateException && (
+                    dateException.type === 'SICK_LEAVE' || dateException.type === 'ANNUAL_LEAVE' ||
+                    dateException.type === 'PUBLIC_HOLIDAY' || dateException.type === 'OFF' || dateException.type === 'MANUAL_ABSENT'
+                );
+                let hasSkipPunchApplied = false;
+                let skipType: string | null = null;
+                let skipPunchForced0PunchPresent = false;
+
+                if (skipPunchException && !isNonWorkingStatus && skipPunchException.punch_to_skip) {
+                    skipType = skipPunchException.punch_to_skip;
+                    hasSkipPunchApplied = true;
+                    if (filteredPunches.length === 0 && skipType === 'FULL_SKIP') {
+                        filteredPunches = [{ _fake_skip_punch: true }];
+                        skipPunchForced0PunchPresent = true;
+                        console.log(`[runAnalysis] SKIP_PUNCH LOP SAVER: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + FULL_SKIP → Present`);
+                    } else if (filteredPunches.length === 0) {
+                        filteredPunches = [{ _fake_skip_punch: true }];
+                        console.log(`[runAnalysis] SKIP_PUNCH: Employee ${attendanceIdStr}, Date ${dateStr}: 0 punches + ${skipType} → adding fake punch`);
+                    }
+                }
+
+                // Punch matching
+                let punchMatches: any[] = [];
+                let hasUnmatchedPunch = false;
+                const hasOnlyFakePunches = filteredPunches.length > 0 && filteredPunches.every((p: any) => p._fake_skip_punch);
+                if (shift && filteredPunches.length > 0 && !hasOnlyFakePunches) {
+                    punchMatches = matchPunchesToShiftPoints(filteredPunches, shift, includeSeconds, nextDateStr);
+                    hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
+                }
+
+                const punchCount = filteredPunches.length;
+                const hasMiddleTimes = shift?.am_end && shift?.pm_start &&
+                    String(shift.am_end).trim() !== '' && String(shift.pm_start).trim() !== '' &&
+                    shift.am_end !== '—' && shift.pm_start !== '—' && shift.am_end !== '-' && shift.pm_start !== '-' &&
+                    shift.am_end !== 'null' && shift.pm_start !== 'null';
+                const isSingleShift = shift?.is_single_shift === true || !hasMiddleTimes;
+
+                // Punch-completeness: derive status and half-day flag from raw punches
+                if (punchCount > 0) {
+                    if (skipPunchForced0PunchPresent || hasSkipPunchApplied) {
+                        dayState.status = 'PRESENT_SKIP_PUNCH';
+                    } else if (isSingleShift) {
+                        dayState.status = 'PRESENT';
+                        if (punchCount === 1) {
+                            dayState.isHalfDay = true;
+                            console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Single shift, 1 punch → Half Day`);
+                        }
                     } else {
-                        // Non-status report exception (e.g. MANUAL_LATE): read minutes directly.
-                        // NOTE: MANUAL_OTHER_MINUTES already accumulated above — do not double-count here.
-                        dayLateMinutes = Math.abs(effectiveReportException.late_minutes || 0);
-                        dayEarlyMinutes = Math.abs(effectiveReportException.early_checkout_minutes || 0);
-                        if (effectiveReportException.type !== 'MANUAL_OTHER_MINUTES' && effectiveReportException.other_minutes > 0) {
+                        dayState.status = 'PRESENT';
+                        if (punchCount === 1 || punchCount === 2) {
+                            dayState.isHalfDay = true;
+                            console.log(`[runAnalysis] PUNCH COMPLETENESS: Employee ${attendanceIdStr}, Date ${dateStr}: Split shift, ${punchCount} punch(es) → Half Day`);
+                        }
+                    }
+                } else {
+                    // Zero punches — default LOP unless overridden by Status Layer
+                    dayState.status = 'LOP';
+                }
+
+                // Calculate raw late/early from punch matches (always runs — Status Layer may zero them)
+                if (shift && punchMatches.length > 0) {
+                    for (const match of punchMatches) {
+                        if (!match.matchedTo) continue;
+                        const punchTime = match.punch.time;
+                        const shiftTime = match.shiftTime;
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            if (punchTime > shiftTime) dayState.late += Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
+                        }
+                        if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
+                            if (punchTime < shiftTime) dayState.early += Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
+                        }
+                    }
+                }
+
+                // ================================================================
+                // LAYER 2 — STATUS LAYER
+                // Sets the authoritative attendance status for the day.
+                // ABSENCE-CLASS (SICK/ABSENT/ANNUAL): zero late+early (employee wasn't there).
+                // PRESENCE-CLASS (MANUAL_PRESENT/WFH): set status only — DO NOT zero minutes
+                // (an admin marking someone present doesn't erase their actual lateness).
+                // ================================================================
+                if (activeStatusException) {
+                    const st = activeStatusException.type;
+                    if (st === 'MANUAL_ABSENT') {
+                        dayState.status = 'LOP';
+                        dayState.late = 0;
+                        dayState.early = 0;
+                    } else if (st === 'SICK_LEAVE') {
+                        dayState.status = 'SICK_LEAVE';
+                        dayState.late = 0;
+                        dayState.early = 0;
+                    } else if (st === 'MANUAL_PRESENT') {
+                        // Presence-class: override status, preserve calculated late/early
+                        dayState.status = 'PRESENT';
+                        // late/early intentionally NOT zeroed here (pipeline fix vs. old MANUAL_PRESENT bug)
+                    } else if (st === 'WORK_FROM_HOME') {
+                        dayState.status = 'WORK_FROM_HOME';
+                        // late/early intentionally NOT zeroed here
+                    }
+                }
+
+                // If a non-status reportGeneratedException provides explicit minute values
+                // (e.g., MANUAL_LATE from a saved report edit), use those directly instead of
+                // punch-calculated values. Only applies when no status exception is in play.
+                if (!activeStatusException && effectiveReportException && effectiveReportException.type !== 'SHIFT_OVERRIDE') {
+                    const rtype = effectiveReportException.type;
+                    if (!['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'ANNUAL_LEAVE', 'WORK_FROM_HOME'].includes(rtype)) {
+                        // e.g., MANUAL_LATE — use stored values from the report edit
+                        dayState.late = Math.abs(effectiveReportException.late_minutes || 0);
+                        dayState.early = Math.abs(effectiveReportException.early_checkout_minutes || 0);
+                        if (rtype !== 'MANUAL_OTHER_MINUTES' && (effectiveReportException.other_minutes || 0) > 0) {
                             otherMinutes += effectiveReportException.other_minutes;
                             otherMinutesFromExceptions[dateStr] = (otherMinutesFromExceptions[dateStr] || 0) + effectiveReportException.other_minutes;
                         }
                     }
-                } else {
-                    // If no reportGeneratedException exists for this day: apply existing logic.
-                    // Check shouldSkipTimeCalculation using specific type list.
-                    const shouldSkipTimeCalculation = dateException && [
-                        'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_PRESENT', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
+                }
+
+                // Also zero late/early for DB-level absence exceptions (no report exception present)
+                if (!activeStatusException && !effectiveReportException) {
+                    const shouldZeroMinutes = dateException && [
+                        'SICK_LEAVE', 'ANNUAL_LEAVE', 'MANUAL_ABSENT', 'OFF', 'PUBLIC_HOLIDAY'
                     ].includes(dateException.type);
-
-                    if (!shouldSkipTimeCalculation && shift && punchMatches.length > 0) {
-                        // Track which shift points had actual punches matched
-                        const matchedShiftPoints = new Set(punchMatches.filter(m => m.matchedTo).map(m => m.matchedTo));
-
-                        for (const match of punchMatches) {
-                            if (!match.matchedTo) continue;
-
-                            const punchTime = match.punch.time;
-                            const shiftTime = match.shiftTime;
-
-                            if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                                if (punchTime > shiftTime) {
-                                    const minutes = Math.round(Math.abs((punchTime - shiftTime) / (1000 * 60)));
-                                    dayLateMinutes += minutes;
-                                }
-                            }
-
-                            if (match.matchedTo === 'AM_END' || match.matchedTo === 'PM_END') {
-                                if (punchTime < shiftTime) {
-                                    const minutes = Math.round(Math.abs((shiftTime - punchTime) / (1000 * 60)));
-                                    dayEarlyMinutes += minutes;
-                                }
-                            }
-                        }
-
-                        // SKIP_PUNCH: Zero out minutes for the forgiven punch point
-                        // Applies regardless of whether the punch was present or missing
-                        if (hasSkipPunchApplied && skipType) {
-                            const skipTypeToShiftPoint: Record<string, string> = {
-                                'AM_PUNCH_IN':  'AM_START',
-                                'AM_PUNCH_OUT': 'AM_END',
-                                'PM_PUNCH_IN':  'PM_START',
-                                'PM_PUNCH_OUT': 'PM_END',
-                            };
-                            if (skipType === 'FULL_SKIP') {
-                                dayLateMinutes = 0;
-                                dayEarlyMinutes = 0;
-                            } else {
-                                const forgiven = skipTypeToShiftPoint[skipType];
-                                if (forgiven === 'AM_START' || forgiven === 'PM_START') dayLateMinutes = 0;
-                                if (forgiven === 'AM_END' || forgiven === 'PM_END') dayEarlyMinutes = 0;
-                            }
-                        }
+                    if (shouldZeroMinutes) {
+                        dayState.late = 0;
+                        dayState.early = 0;
                     }
                 }
-
-                // FIX: Apply approved minutes PER-DAY before accumulating.
-                // approvedMinutesForDay runs independently of punch calculation if punches are present.
-                if (filteredPunches.length > 0 && approvedMinutesForDay > 0) {
-                    const dayTotal = dayLateMinutes + dayEarlyMinutes;
-                    if (dayTotal > 0) {
-                        const reduction = Math.min(approvedMinutesForDay, dayTotal);
-                        const lateRatio = dayLateMinutes / dayTotal;
-                        const earlyRatio = dayEarlyMinutes / dayTotal;
-                        dayLateMinutes = Math.max(0, dayLateMinutes - Math.round(reduction * lateRatio));
-                        dayEarlyMinutes = Math.max(0, dayEarlyMinutes - Math.round(reduction * earlyRatio));
-                        totalApprovedMinutes += reduction; // track actual reduction for display
-                        console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayLateMinutes}, early: ${dayEarlyMinutes})`);
-                    }
-                }
-
-                lateMinutes += dayLateMinutes;
-                earlyCheckoutMinutes += dayEarlyMinutes;
-
-                const expectedPunches = isSingleShift ? 2 : 4;
-
-                const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
-                const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
-                if (hasUnmatchedPunch) {
-                    abnormal_dates_set.add(dateStr);
-                    critical_abnormal_dates_set.add(dateStr);
-                }
-                if (hasFarExtendedMatch) {
-                    abnormal_dates_set.add(dateStr);
-                    critical_abnormal_dates_set.add(dateStr);
-                }
-                if (hasExtendedMatch) {
-                    abnormal_dates_set.add(dateStr);
-                }
-                if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
-                    abnormal_dates_set.add(dateStr);
-                    critical_abnormal_dates_set.add(dateStr);
-                }
-                if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) {
-                    abnormal_dates_set.add(dateStr);
-                }
-
-                // Check for extreme lateness - ONLY on matched start punches (not all punches)
-                if (shift && punchMatches.length > 0) {
-                    for (const match of punchMatches) {
-                        // Only check punches matched to start times
-                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
-                            const latenessMinutes = match.distance; // Distance already calculated in minutes
-                            if (latenessMinutes > 120 && latenessMinutes < 480) {
-                                critical_abnormal_dates_set.add(dateStr);
-                                const shiftType = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
-                                auto_resolutions.push({
-                                    date: dateStr,
-                                    type: 'EXTREME_LATENESS',
-                                    details: `${shiftType} start: ${Math.round(latenessMinutes)} minutes late`
-                                });
-                            }
-                        }
-                    }
-                }
-
-                const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
-                if (rules.date_rules?.special_abnormal_dates?.includes(dateFormatted)) {
-                    abnormal_dates_set.add(dateStr);
-                }
-
-                if (rules.date_rules?.always_mark_first_date_abnormal && currentDate.getTime() === startDate.getTime()) {
-                    abnormal_dates_set.add(dateStr);
-                }
-                } // end: if (!statusOverrideApplied) else block
 
                 // ================================================================
-                // UNCONDITIONAL: Aggregate MANUAL_OTHER_MINUTES for this day.
-                // Runs regardless of statusOverrideApplied so MANUAL_PRESENT +
-                // MANUAL_OTHER_MINUTES on the same day both apply (Highlander Fix).
-                // Uses otherMinutesFromExceptions map to prevent double-counting.
+                // LAYER 3 — FORGIVENESS LAYER
+                // Zeros specific penalties without touching status.
+                // SKIP_PUNCH: forgives the specific shift point.
+                // ALLOWED_MINUTES: reduces late+early proportionally.
+                // ================================================================
+
+                // SKIP_PUNCH forgiveness
+                if (hasSkipPunchApplied && skipType) {
+                    const skipTypeToShiftPoint: Record<string, string> = {
+                        'AM_PUNCH_IN': 'AM_START', 'AM_PUNCH_OUT': 'AM_END',
+                        'PM_PUNCH_IN': 'PM_START', 'PM_PUNCH_OUT': 'PM_END',
+                    };
+                    if (skipType === 'FULL_SKIP') {
+                        dayState.late = 0;
+                        dayState.early = 0;
+                    } else {
+                        const forgiven = skipTypeToShiftPoint[skipType];
+                        if (forgiven === 'AM_START' || forgiven === 'PM_START') dayState.late = 0;
+                        if (forgiven === 'AM_END' || forgiven === 'PM_END') dayState.early = 0;
+                    }
+                }
+
+                // ALLOWED_MINUTES (dept-head approved forgiveness)
+                let approvedMinutesForDay = 0;
+                try {
+                    if (rules.approved_minutes_enabled && filteredPunches.length > 0) {
+                        const amEx = matchingExceptions.find(ex => ex.type === 'ALLOWED_MINUTES' && ex.approval_status === 'approved_dept_head');
+                        if (amEx) approvedMinutesForDay = amEx.allowed_minutes || 0;
+                    }
+                } catch { approvedMinutesForDay = 0; }
+
+                if (filteredPunches.length > 0 && approvedMinutesForDay > 0) {
+                    const dayTotal = dayState.late + dayState.early;
+                    if (dayTotal > 0) {
+                        const reduction = Math.min(approvedMinutesForDay, dayTotal);
+                        const lateRatio = dayState.late / dayTotal;
+                        const earlyRatio = dayState.early / dayTotal;
+                        dayState.late = Math.max(0, dayState.late - Math.round(reduction * lateRatio));
+                        dayState.early = Math.max(0, dayState.early - Math.round(reduction * earlyRatio));
+                        dayState.approvedReduction = reduction;
+                        console.log(`[runAnalysis] ALLOWED_MINUTES: Employee ${attendanceIdStr}, Date ${dateStr}: approved=${approvedMinutesForDay}, reduced by ${reduction} (late: ${dayState.late}, early: ${dayState.early})`);
+                    }
+                }
+
+                // ================================================================
+                // LAYER 4 — ADDITIVE LAYER
+                // Runs unconditionally. Aggregates MANUAL_OTHER_MINUTES from ALL
+                // matching exceptions. Preserves the Highlander Fix — this block
+                // never gates on status and handles MANUAL_PRESENT + OTHER_MINUTES
+                // on the same day correctly.
                 // ================================================================
                 const allOtherMinExForDay = matchingExceptions.filter(ex => ex.type === 'MANUAL_OTHER_MINUTES');
                 for (const omEx of allOtherMinExForDay) {
@@ -1455,6 +1290,68 @@ Deno.serve(async (req: Request) => {
                         }
                     }
                 }
+
+                // ================================================================
+                // MAP dayState → aggregation variables
+                // Everything below this point (LOP-adjacent, deductible, DB save)
+                // is untouched and reads from these existing accumulators.
+                // ================================================================
+
+                // Commit status
+                const finalStatus = dayState.status;
+                if (finalStatus === 'LOP') {
+                    if (punchCount === 0 && !activeStatusException) {
+                        // Punch-derived LOP (0 punches, no override)
+                        fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
+                    } else if (activeStatusException?.type === 'MANUAL_ABSENT') {
+                        fullAbsenceCount++;
+                        dateStatusMap[dateStr] = 'LOP';
+                        lopDatesSet.add(dateStr);
+                    }
+                } else if (finalStatus === 'SICK_LEAVE') {
+                    sickLeaveCount++;
+                    dateStatusMap[dateStr] = 'SICK_LEAVE';
+                } else if (finalStatus === 'PRESENT' || finalStatus === 'PRESENT_SKIP_PUNCH' || finalStatus === 'WORK_FROM_HOME') {
+                    presentDays++;
+                    if (dayState.isHalfDay) halfAbsenceCount++;
+                    dateStatusMap[dateStr] = finalStatus === 'WORK_FROM_HOME' ? 'WORK_FROM_HOME' : 'PRESENT';
+                }
+
+                // Commit minutes
+                lateMinutes += dayState.late;
+                earlyCheckoutMinutes += dayState.early;
+                totalApprovedMinutes += dayState.approvedReduction;
+
+                // Abnormality flags (unchanged logic, now outside the old if-gate)
+                const expectedPunches = isSingleShift ? 2 : 4;
+                const hasExtendedMatch = punchMatches.some(m => m.isExtendedMatch);
+                const hasFarExtendedMatch = punchMatches.some(m => m.isFarExtendedMatch);
+                if (hasUnmatchedPunch) { abnormal_dates_set.add(dateStr); critical_abnormal_dates_set.add(dateStr); }
+                if (hasFarExtendedMatch) { abnormal_dates_set.add(dateStr); critical_abnormal_dates_set.add(dateStr); }
+                if (hasExtendedMatch) { abnormal_dates_set.add(dateStr); }
+                if (rules.abnormality_rules?.detect_missing_punches && filteredPunches.length > 0 && filteredPunches.length < expectedPunches) {
+                    abnormal_dates_set.add(dateStr); critical_abnormal_dates_set.add(dateStr);
+                }
+                if (rules.abnormality_rules?.detect_extra_punches && filteredPunches.length > expectedPunches) { abnormal_dates_set.add(dateStr); }
+
+                if (shift && punchMatches.length > 0) {
+                    for (const match of punchMatches) {
+                        if (match.matchedTo === 'AM_START' || match.matchedTo === 'PM_START') {
+                            const latenessMinutes = match.distance;
+                            if (latenessMinutes > 120 && latenessMinutes < 480) {
+                                critical_abnormal_dates_set.add(dateStr);
+                                const shiftType = match.matchedTo === 'AM_START' ? 'AM' : 'PM';
+                                auto_resolutions.push({ date: dateStr, type: 'EXTREME_LATENESS', details: `${shiftType} start: ${Math.round(latenessMinutes)} minutes late` });
+                            }
+                        }
+                    }
+                }
+
+                const dateFormatted = `${String(currentDate.getDate()).padStart(2, '0')}/${String(currentDate.getMonth() + 1).padStart(2, '0')}/${currentDate.getFullYear()}`;
+                if (rules.date_rules?.special_abnormal_dates?.includes(dateFormatted)) { abnormal_dates_set.add(dateStr); }
+                if (rules.date_rules?.always_mark_first_date_abnormal && currentDate.getTime() === startDate.getTime()) { abnormal_dates_set.add(dateStr); }
             }
 
             // ================================================================
