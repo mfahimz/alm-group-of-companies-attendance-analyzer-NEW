@@ -5,7 +5,7 @@ import { ScanLine, Download, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { extractTime } from './useDetectionAnalysis';
+import { extractTime } from '@/utils/attendanceAnalysisUtils';
 
 export default function DetectionPanel({
     shiftMismatchDetections, noMatchDetections, exceptions, project, results,
