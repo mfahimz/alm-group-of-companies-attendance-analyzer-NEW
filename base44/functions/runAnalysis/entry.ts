@@ -960,9 +960,9 @@ Deno.serve(async (req: Request) => {
                     })[0]
                     : null;
 
-                const scopedReportExceptions = matchingExceptions.filter(ex =>
-                    ex.created_from_report === true && (!_scope_report_run_id || ex.report_run_id === _scope_report_run_id)
-                );
+                // ALL created_from_report exceptions for this project+employee are considered,
+                // regardless of which report_run_id generated them. The newest one wins per type.
+                const scopedReportExceptions = matchingExceptions.filter(ex => ex.created_from_report === true);
                 const STATUS_TYPES_FOR_REPORT = ['MANUAL_PRESENT', 'MANUAL_ABSENT', 'SICK_LEAVE', 'WORK_FROM_HOME', 'ANNUAL_LEAVE'];
                 const reportGeneratedException = scopedReportExceptions
                     .filter(ex => STATUS_TYPES_FOR_REPORT.includes(ex.type))
@@ -972,7 +972,9 @@ Deno.serve(async (req: Request) => {
                         if (priA !== priB) return priB - priA;
                         return new Date(b.created_date).getTime() - new Date(a.created_date).getTime();
                     })[0];
-                const reportShiftOverrideException = scopedReportExceptions.find(ex => ex.type === 'SHIFT_OVERRIDE') || null;
+                const reportShiftOverrideException = scopedReportExceptions
+                    .filter(ex => ex.type === 'SHIFT_OVERRIDE')
+                    .sort((a: any, b: any) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime())[0] || null;
 
                 // _DAY_OVERRIDES: in-memory override from Reanalyze (not saved to DB)
                 const dayOverrideEntry = (_day_overrides as any)?.[attendanceIdStr]?.[dateStr];
