@@ -260,10 +260,11 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     }, [allResults, isDepartmentHead, deptHeadVerification, employees, reportRun, project]);
 
     React.useEffect(() => {
-        if (reportRun.verified_employees) {
-            setVerifiedEmployees(reportRun.verified_employees.split(',').filter(Boolean));
-        }
-    }, [reportRun]);
+        const verified = reportRun?.verified_employees
+            ? reportRun.verified_employees.split(',').filter(Boolean)
+            : [];
+        setVerifiedEmployees(verified);
+    }, [reportRun?.verified_employees]);
 
     // Dismissed mismatch state now managed inside DetectionPanel component
 
@@ -415,12 +416,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
             verified_employees: verifiedList.join(',')
         }),
         onSuccess: () => {
-            // Don't invalidate - local state is already updated
+            // Restore cache invalidation to ensure UI and parent table stay in sync
+            queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
+            queryClient.invalidateQueries({ queryKey: ['reportRuns', project.id] });
         },
-        onError: () => {
-            // Only invalidate on error to refetch correct state
-            queryClient.invalidateQueries(['reportRun', reportRun.id]);
-            toast.error('Failed to update verification');
+        onError: (error) => {
+            // Revert local state or refetch on error to ensure consistency
+            queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
+            toast.error('Failed to update verification: ' + (error.message || 'Unknown error'));
         },
         retry: 3,
         retryDelay: (attemptIndex) => Math.min(2000 * Math.pow(2, attemptIndex), 15000)

@@ -9,6 +9,7 @@ import { base44 } from '@/api/base44Client';
 import TimePicker from '../ui/QuickTimePicker';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { parseTime, matchPunchesToShiftPoints, filterMultiplePunches, extractTime, formatTime, calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
 
 /**
@@ -127,9 +128,32 @@ export default function DailyBreakdownDialog({
                 other_minutes: totalOther,
                 deductible_minutes: deductible
             });
+            // Step 3: PERSIST AS EXCEPTIONS (The Data Loss Fix)
+            // Create Exception records for bulk status overrides so they survive report reanalysis
+            if (bulkType) {
+                const exceptionTasks = Array.from(selectedDays).map(dateStr => {
+                    return base44.entities.Exception.create({
+                        project_id: project.id,
+                        attendance_id: String(selectedEmployee.attendance_id),
+                        date_from: dateStr,
+                        date_to: dateStr,
+                        type: bulkType,
+                        details: 'Bulk apply override from report',
+                        use_in_analysis: true,
+                        approval_status: 'approved',
+                        created_from_report: true,
+                        report_run_id: reportRun.id
+                    }).catch(e => console.warn(`Failed to create exception for ${dateStr}:`, e));
+                });
+                await Promise.all(exceptionTasks);
+            }
+
             // BUG 1 FIX: Force active refetch so summary table updates without page reload
             queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' });
             queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
+            queryClient.invalidateQueries({ queryKey: ['employeeExceptions', project.id, attendanceIdStr] });
+            
+            toast.success(`Successfully applied changes to ${selectedDays.size} days`);
             setSelectedDays(new Set());
             setShowBulkPanel(false);
             setBulkType('');
@@ -139,6 +163,7 @@ export default function DailyBreakdownDialog({
             setBulkShiftOverride({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '', is_single_shift: false });
         } catch (err) {
             console.error('Bulk apply failed:', err);
+            toast.error('Failed to apply bulk changes: ' + (err.message || 'Unknown error'));
         } finally {
             setIsBulkSaving(false);
         }
