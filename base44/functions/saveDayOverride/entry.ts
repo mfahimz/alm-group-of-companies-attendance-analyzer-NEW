@@ -113,19 +113,61 @@ Deno.serve(async (req) => {
             updatePayload.day_override_updated_by = user.email;
         }
 
-        // Update snapshot with override fields
+        // ================================================================
+        // TRANSACTION SAFETY: Capture original state BEFORE mutating snapshot
+        // so we can compensate (rollback) if the recalculation step fails.
+        // The override fields below are the only fields we mutate, so this
+        // is the minimal payload required to fully revert the update.
+        // ================================================================
+        const originalSnapshotPayload = {
+            override_present_days: snapshot.override_present_days ?? null,
+            override_full_absence_count: snapshot.override_full_absence_count ?? null,
+            override_annual_leave_count: snapshot.override_annual_leave_count ?? null,
+            override_sick_leave_count: snapshot.override_sick_leave_count ?? null,
+            override_salary_leave_days: snapshot.override_salary_leave_days ?? null,
+            override_working_days: snapshot.override_working_days ?? null,
+            has_admin_day_override: snapshot.has_admin_day_override ?? false,
+            day_override_updated_at: snapshot.day_override_updated_at ?? null,
+            day_override_updated_by: snapshot.day_override_updated_by ?? null,
+        };
+
+        // Step 1: Update snapshot with override fields
         await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, updatePayload);
 
-        // Trigger recalculation via existing recalculateSalarySnapshot function
-        const recalcResponse = await base44.asServiceRole.functions.invoke('recalculateSalarySnapshot', {
-            report_run_id: report_run_id,
-            project_id: project_id,
-            attendance_id: String(attendance_id),
-            mode: 'APPLY'
-        });
+        // Step 2: Trigger recalculation. If this fails, we MUST rollback step 1.
+        let recalcResponse;
+        try {
+            recalcResponse = await base44.asServiceRole.functions.invoke('recalculateSalarySnapshot', {
+                report_run_id: report_run_id,
+                project_id: project_id,
+                attendance_id: String(attendance_id),
+                mode: 'APPLY'
+            });
 
-        if (!recalcResponse.data.success) {
-            throw new Error('Recalculation failed: ' + recalcResponse.data.error);
+            if (!recalcResponse?.data?.success) {
+                throw new Error('Recalculation failed: ' + (recalcResponse?.data?.error || 'unknown error'));
+            }
+        } catch (recalcError) {
+            // COMPENSATION: Revert the snapshot update to its pre-mutation state.
+            console.error('[saveDayOverride] Recalculation failed — initiating rollback for snapshot', snapshot.id);
+            try {
+                await base44.asServiceRole.entities.SalarySnapshot.update(snapshot.id, originalSnapshotPayload);
+                console.log('[saveDayOverride] Rollback successful for snapshot', snapshot.id);
+            } catch (rollbackError) {
+                // Critical: rollback itself failed. Log loudly so ops can intervene.
+                console.error('[saveDayOverride] CRITICAL: Rollback FAILED for snapshot', snapshot.id, rollbackError.message);
+                return Response.json({
+                    error: 'Recalculation failed AND rollback failed. Manual intervention required.',
+                    original_error: recalcError.message,
+                    rollback_error: rollbackError.message,
+                    snapshot_id: snapshot.id
+                }, { status: 500 });
+            }
+            // Propagate the original failure to the caller (frontend gets 500).
+            return Response.json({
+                error: 'Recalculation failed. Snapshot update has been rolled back.',
+                details: recalcError.message
+            }, { status: 500 });
         }
 
         // Audit log

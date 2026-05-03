@@ -7,8 +7,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
  * triggered by ReportRun (Attendance Report) finalization/un-finalization.
  */
 
-const BATCH_SIZE = 8;
-const BATCH_DELAY_MS = 1500;
+// Mandatory backend rule: batch employee records in groups of 10 with 300ms delays.
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 300;
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -312,23 +313,57 @@ Deno.serve(async (req) => {
             if (i + BATCH_SIZE < tasksToDelete.length) await sleep(BATCH_DELAY_MS);
         }
 
+        // ORPHAN PREVENTION: Track every ChecklistItem we successfully create
+        // in this execution. If a later batch fails, the catch block uses this
+        // list to delete partially-created records before propagating the error.
+        const createdTaskIds: string[] = [];
+
         let created = 0;
         const currentFingerprints = new Set(relevantExisting.map((t: any) => t.fingerprint));
         const tasksToCreate = expectedTasks.filter(task => !currentFingerprints.has(task.fingerprint));
-        for (let i = 0; i < tasksToCreate.length; i += BATCH_SIZE) {
-            const batch = tasksToCreate.slice(i, i + BATCH_SIZE);
-            await Promise.all(batch.map(task => withRetry(() => base44.asServiceRole.entities.ChecklistItem.create({
-                project_id: projectId,
-                task_type: task.type,
-                task_description: task.description,
-                status: 'pending',
-                is_predefined: false,
-                is_auto_created: true,
-                fingerprint: task.fingerprint,
-                notes: task.notes
-            }))));
-            created += batch.length;
-            if (i + BATCH_SIZE < tasksToCreate.length) await sleep(BATCH_DELAY_MS);
+
+        try {
+            for (let i = 0; i < tasksToCreate.length; i += BATCH_SIZE) {
+                const batch = tasksToCreate.slice(i, i + BATCH_SIZE);
+                const batchResults = await Promise.all(batch.map(task =>
+                    withRetry(() => base44.asServiceRole.entities.ChecklistItem.create({
+                        project_id: projectId,
+                        task_type: task.type,
+                        task_description: task.description,
+                        status: 'pending',
+                        is_predefined: false,
+                        is_auto_created: true,
+                        fingerprint: task.fingerprint,
+                        notes: task.notes
+                    }))
+                ));
+                // Capture IDs of successfully created records for potential rollback.
+                for (const result of batchResults) {
+                    if (result?.id) createdTaskIds.push(result.id);
+                }
+                created += batchResults.length;
+                if (i + BATCH_SIZE < tasksToCreate.length) await sleep(BATCH_DELAY_MS);
+            }
+        } catch (createError: any) {
+            // COMPENSATION: A batch failed mid-flight. Clean up everything we
+            // created in THIS execution to prevent orphaned ChecklistItems.
+            console.error(`[createReportChecklistTasks] Batch creation failed after ${createdTaskIds.length} successful creates. Rolling back...`, createError.message);
+            let rollbackDeleted = 0;
+            let rollbackFailed = 0;
+            for (let i = 0; i < createdTaskIds.length; i += BATCH_SIZE) {
+                const batch = createdTaskIds.slice(i, i + BATCH_SIZE);
+                const cleanupResults = await Promise.allSettled(batch.map(id =>
+                    withRetry(() => base44.asServiceRole.entities.ChecklistItem.delete(id), 1)
+                ));
+                for (const r of cleanupResults) {
+                    if (r.status === 'fulfilled') rollbackDeleted++;
+                    else rollbackFailed++;
+                }
+                if (i + BATCH_SIZE < createdTaskIds.length) await sleep(BATCH_DELAY_MS);
+            }
+            console.error(`[createReportChecklistTasks] Rollback complete: ${rollbackDeleted} deleted, ${rollbackFailed} failed.`);
+            // Propagate to the outer catch which returns 500 to the caller.
+            throw new Error(`Checklist creation failed and rollback was attempted (${rollbackDeleted}/${createdTaskIds.length} cleaned up). Original error: ${createError.message}`);
         }
 
         return Response.json({ success: true, action: 'upsert', deleted, created });
