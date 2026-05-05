@@ -368,10 +368,10 @@ export default function ProjectSchedules() {
             {/* PART A - Tabs & Filters */}
             <div className="space-y-6">
                 <Tabs value={activeCompany} onValueChange={setActiveCompany} className="w-full">
-                    <TabsList className="bg-slate-100 p-1 rounded-xl h-auto flex-wrap justify-start">
-                        <TabsTrigger value="All Companies" className="rounded-lg py-2 px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm">All Companies</TabsTrigger>
+                    <TabsList className="bg-slate-200 p-1 rounded-xl h-auto flex-wrap justify-start">
+                        <TabsTrigger value="All Companies" className="rounded-lg py-2 px-4 font-semibold text-slate-600 hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm">All Companies</TabsTrigger>
                         {COMPANIES.map(company => (
-                            <TabsTrigger key={company} value={company} className="rounded-lg py-2 px-4 data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                            <TabsTrigger key={company} value={company} className="rounded-lg py-2 px-4 font-semibold text-slate-600 hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm">
                                 {company}
                             </TabsTrigger>
                         ))}
