@@ -6,6 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { Progress } from "@/components/ui/progress";
 
+const sanitizeProgressMessage = (msg) => {
+    if (!msg) return msg;
+    const technical = ['retry', 'rate limit', '429', 'rate_limit', 'too many requests'];
+    if (technical.some(t => msg.toLowerCase().includes(t))) return 'Processing, please wait...';
+    return msg;
+};
+
 export function GraceMinutesDialog({ editingGraceMinutes, onClose, onSave, isPending }) {
     return (
         <Dialog open={!!editingGraceMinutes} onOpenChange={(open) => !open && onClose()}>
@@ -97,9 +104,9 @@ export function FinalizationProgressDialog({ progress, isAlMaraghiMotors = false
                         </div>
                     )}
                     <div className="space-y-1">
-                        <div className="text-sm font-medium text-slate-700">{progress.status}</div>
+                        <div className="text-sm font-medium text-slate-700">{sanitizeProgressMessage(progress.status)}</div>
                         {progress.currentEmployee && (
-                            <div className="text-xs text-slate-500">{progress.currentEmployee}</div>
+                            <div className="text-xs text-slate-500">{sanitizeProgressMessage(progress.currentEmployee)}</div>
                         )}
                     </div>
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">

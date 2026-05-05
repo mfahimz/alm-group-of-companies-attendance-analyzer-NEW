@@ -99,6 +99,24 @@ const calculateEmployeeSalary = (input) => {
 };
 
 
+async function withRetry(fn, maxRetries = 5, baseDelay = 2000) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            const is429 = err?.status === 429 || err?.message?.includes('429') || err?.message?.toLowerCase().includes('rate limit');
+            if (is429 && attempt < maxRetries) {
+                const delay = baseDelay * Math.pow(2, attempt);
+                await new Promise(r => setTimeout(r, delay));
+            } else {
+                throw err;
+            }
+        }
+    }
+}
+
+
+
 /**
  * DATA ACCESS LAYER - EXPLICIT LIMITS ENFORCED
  * 
@@ -1728,7 +1746,7 @@ Deno.serve(async (req) => {
 
             if (snapshots.length > 0) {
                 console.log(`[createSalarySnapshots] 💾 Calling bulkCreate for ${snapshots.length} snapshots...`);
-                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots);
+                await withRetry(() => base44.asServiceRole.entities.SalarySnapshot.bulkCreate(snapshots));
                 console.log(`[createSalarySnapshots] ✅ bulkCreate completed successfully`);
             } else {
                 console.log(`[createSalarySnapshots] ⚠️ WARNING: No snapshots to create in this batch`);
@@ -1767,11 +1785,12 @@ Deno.serve(async (req) => {
             console.log(`[createSalarySnapshots] 💾 STANDARD MODE: Creating ${snapshots.length} salary snapshots (${analyzedCount} analyzed, ${noAttendanceCount} no attendance data)`);
 
             // Chunked persistence to avoid API/body limits on large employee sets.
-            const CHUNK_SIZE = 100;
+            const CHUNK_SIZE = 10;
             for (let i = 0; i < snapshots.length; i += CHUNK_SIZE) {
                 const chunk = snapshots.slice(i, i + CHUNK_SIZE);
                 console.log(`[createSalarySnapshots] 💾 STANDARD MODE chunk ${Math.floor(i / CHUNK_SIZE) + 1}: creating ${chunk.length} snapshots`);
-                await base44.asServiceRole.entities.SalarySnapshot.bulkCreate(chunk);
+                await withRetry(() => base44.asServiceRole.entities.SalarySnapshot.bulkCreate(chunk));
+                await new Promise(r => setTimeout(r, 300));
             }
 
             console.log(`[createSalarySnapshots] ✅ Successfully created ${snapshots.length} snapshots`);

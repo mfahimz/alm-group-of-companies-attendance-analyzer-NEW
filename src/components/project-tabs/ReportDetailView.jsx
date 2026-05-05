@@ -26,6 +26,13 @@ import ExcelPreviewDialog from '@/components/ui/ExcelPreviewDialog';
 import { parseTime, formatTime, extractTime, matchPunchesToShiftPoints, filterMultiplePunches, isWithinMidnightBuffer, MIDNIGHT_BUFFER_MINUTES } from '@/utils/attendanceAnalysisUtils';
 const localIsWithinMidnightBuffer = isWithinMidnightBuffer;
 
+const sanitizeProgressMessage = (msg) => {
+    if (!msg) return msg;
+    const technical = ['retry', 'rate limit', '429', 'rate_limit', 'too many requests'];
+    if (technical.some(t => msg.toLowerCase().includes(t))) return 'Processing, please wait...';
+    return msg;
+};
+
 export default function ReportDetailView({ reportRun, project, isDepartmentHead = false, deptHeadVerification = null }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState(null);
@@ -1504,14 +1511,14 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                                 ) : (
                                     <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
                                 )}
-                                <span className="font-bold text-indigo-700">{reanalysisProgress.status}</span>
+                                <span className="font-bold text-indigo-700">{sanitizeProgressMessage(reanalysisProgress.status)}</span>
                             </div>
                             <div className="text-sm font-bold text-indigo-600">
                                 {reanalysisProgress.current} / {reanalysisProgress.total} employees
                             </div>
                         </div>
                         <Progress value={reanalysisProgress.total > 0 ? (reanalysisProgress.current / reanalysisProgress.total) * 100 : 0} className="w-full bg-indigo-200" />
-                        <p className="text-xs text-indigo-600 mt-2 font-medium">{reanalysisProgress.subStatus}</p>
+                        <p className="text-xs text-indigo-600 mt-2 font-medium">{sanitizeProgressMessage(reanalysisProgress.subStatus)}</p>
                     </CardContent>
                 </Card>
             )}
