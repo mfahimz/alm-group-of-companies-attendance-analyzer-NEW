@@ -14,7 +14,7 @@ import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 const COMPANIES = [
-    'Al Maraghi Motors',
+    'Al Maraghi Motors ',
     'Al Maraghi Automotive',
     'Naser Mohsin Auto Parts',
     'Astra Auto Parts'
