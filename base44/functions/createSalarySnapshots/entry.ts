@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
             console.warn('[createSalarySnapshots] Invalid ot_divisor from settings, using default divisor');
             otDivisor = divisor;
         }
-        const isAlMaraghi = project.company === 'Al Maraghi Motors';
+        const isAlMaraghi = project.company?.trim().toLowerCase().includes('al maraghi');
 
         // OT Rates from settings
         let otNormalRate = settings?.ot_normal_rate || 1.25;
@@ -1548,7 +1548,7 @@ Deno.serve(async (req) => {
                         }
                     }
 
-                    let openLeaveSalary = isAlMaraghi ? parseAdjustmentValue(otRecord?.open_leave_salary) : 0;
+                    let openLeaveSalary = parseAdjustmentValue(otRecord?.open_leave_salary);
 
                     // 2. DEFER LOGIC (< 2 Years Service & Spanning Leave)
                     const joiningDateStr = emp.joining_date;
@@ -1603,7 +1603,7 @@ Deno.serve(async (req) => {
                         bonus: parseAdjustmentValue(otRecord?.bonus),
                         incentive: parseAdjustmentValue(otRecord?.incentive),
                         open_leave_salary: openLeaveSalary + releasedHoldAmount,
-                        variable_salary: isAlMaraghi ? parseAdjustmentValue(otRecord?.variable_salary) : 0,
+                        variable_salary: parseAdjustmentValue(otRecord?.variable_salary),
                         otherDeduction: parseAdjustmentValue(otRecord?.otherDeduction),
                         advanceSalaryDeduction: parseAdjustmentValue(otRecord?.advanceSalaryDeduction)
                     };
