@@ -240,6 +240,14 @@ export default function OvertimeTab({ project }) {
         staleTime: 0
     });
 
+    // Fetch employee salaries for the company to calculate OT rate display
+    const { data: employeeSalaries = [], isLoading: loadingSalaries } = useQuery({
+        queryKey: ['employeeSalaries', project?.company],
+        queryFn: () => base44.entities.EmployeeSalary.filter({ company: project.company, active: true }),
+        enabled: !!project?.company,
+        staleTime: 5 * 60 * 1000
+    });
+
     // ============================================
     // DERIVED VALUES
     // ============================================
@@ -278,6 +286,16 @@ export default function OvertimeTab({ project }) {
             const otRecord = overtimeRecords.find(ot => 
                 String(ot.attendance_id) === String(emp.attendance_id)
             );
+
+            // Get salary record for OT rate display
+            const salary = employeeSalaries.find(s => 
+                String(s.attendance_id) === String(emp.attendance_id) || 
+                String(s.employee_id) === String(emp.hrms_id)
+            );
+
+            const totalSalary = salary?.total_salary || 0;
+            const workingHours = salary?.working_hours || 9;
+            const otRate = totalSalary > 0 ? (totalSalary / 30 / workingHours) : 0;
 
             // Get salary snapshot for this employee (for adjustments)
             const snapshot = salarySnapshots.find(s => 
@@ -320,10 +338,11 @@ export default function OvertimeTab({ project }) {
                 open_leave_salary: editableAdjustments[emp.attendance_id]?.open_leave_salary ?? loadAdjustment(otRecord?.open_leave_salary ?? snapshot?.open_leave_salary),
                 variable_salary: editableAdjustments[emp.attendance_id]?.variable_salary ?? loadAdjustment(otRecord?.variable_salary ?? snapshot?.variable_salary),
                 otherDeduction: editableAdjustments[emp.attendance_id]?.otherDeduction ?? loadAdjustment(otRecord?.otherDeduction ?? snapshot?.otherDeduction),
-                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? loadAdjustment(otRecord?.advanceSalaryDeduction ?? snapshot?.advanceSalaryDeduction)
+                advanceSalaryDeduction: editableAdjustments[emp.attendance_id]?.advanceSalaryDeduction ?? loadAdjustment(otRecord?.advanceSalaryDeduction ?? snapshot?.advanceSalaryDeduction),
+                otRate
             };
         });
-    }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids, isAlMaraghiMotors]);
+    }, [employees, overtimeRecords, editableData, editableAdjustments, salarySnapshots, project?.custom_employee_ids, isAlMaraghiMotors, employeeSalaries]);
 
     // Filter and sort
     const filteredData = useMemo(() => {
@@ -654,7 +673,7 @@ export default function OvertimeTab({ project }) {
     // ============================================
     // RENDER
     // ============================================
-    if (loadingCompanies || loadingEmployees || loadingOT || loadingReports || loadingSnapshots) {
+    if (loadingCompanies || loadingEmployees || loadingOT || loadingReports || loadingSnapshots || loadingSalaries) {
         return (
             <Card className="border-0 shadow-lg">
                 <CardContent className="p-12 text-center">
@@ -770,7 +789,14 @@ export default function OvertimeTab({ project }) {
                                 return (
                                     <TableRow key={row.attendance_id} className={`${hasEdits ? 'bg-amber-50/70 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-100/50'} transition-all duration-200`}>
                                         <TableCell className="font-medium">{row.attendance_id}</TableCell>
-                                        <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                        <TableCell className="font-medium">
+                                            <div>{row.name?.split(' ').slice(0, 2).join(' ')}</div>
+                                            {row.otRate > 0 && (
+                                                <div className="text-[10px] text-slate-500 font-normal mt-0.5 whitespace-nowrap">
+                                                    OT Rate: AED {row.otRate.toFixed(2)}/hr
+                                                </div>
+                                            )}
+                                        </TableCell>
                                         <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
                                         <TableCell className="bg-blue-50 p-1">
                                             <EntryCell 

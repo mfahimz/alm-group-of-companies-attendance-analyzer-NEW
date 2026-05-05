@@ -350,7 +350,7 @@ export default function SalaryReportDetail() {
 
         // DIVISOR_OT: For OT salary calculations
         // [MERGE_NOTE: If merging, use 'divisor' instead of 'otDivisor']
-        const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
+        const otDivisor = row.ot_divisor || report?.ot_divisor || 30;
 
         const totalSalary = Math.round(getValue(row, 'total_salary') ?? row.total_salary ?? 0);
         const workingHours = row.working_hours || 9;
@@ -539,7 +539,7 @@ export default function SalaryReportDetail() {
             // DIVISOR_OT: Use ot_divisor for OT calculations
             // [MERGE_NOTE: If merging, use salary_divisor for both]
             const divisor = row.salary_divisor || report?.salary_divisor || 30;
-            const otDivisor = row.ot_divisor || report?.ot_divisor || divisor;
+            const otDivisor = row.ot_divisor || report?.ot_divisor || 30;
             const otHourlyRate = totalSalary / otDivisor / workingHours;
 
             // Apply all admin edits
