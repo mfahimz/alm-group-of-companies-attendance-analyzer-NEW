@@ -1857,6 +1857,13 @@ export default function SalaryReportDetail() {
                                     canManageHolds={canManageHolds}
                                     verifiedEmployees={verifiedEmployees}
                                     toggleVerification={toggleVerification}
+                                    adminEditMode={adminEditMode}
+                                    setAdminEditMode={setAdminEditMode}
+                                    editableData={editableData}
+                                    handleChange={handleChange}
+                                    handleSave={handleSave}
+                                    getValue={getValue}
+                                    calculateTotals={calculateTotals}
                                     isAdmin={isAdmin}
                                     userRole={userRole}
                                     searchQuery={searchQuery}
