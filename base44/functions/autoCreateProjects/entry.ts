@@ -26,11 +26,9 @@ export default Deno.serve(async (req) => {
 
     // 1. Fetch pending schedules that should have triggered by today
     // We check trigger_date <= todayStr to handle any missed runs (though usually it's exactly today)
-    const schedules = await client.entities.ProjectSchedule.query({
-      where: { 
-        status: 'pending',
-        trigger_date: { $lte: todayStr }
-      }
+    const schedules = await client.entities.ProjectSchedule.filter({
+      status: 'pending',
+      trigger_date: { $lte: todayStr }
     });
 
     if (!schedules || schedules.length === 0) {
@@ -95,12 +93,10 @@ async function processScheduleRow(client, schedule, nowISO) {
   } = schedule;
 
   // 1. Duplicate prevention (Company + date_from + date_to)
-  const existingProjects = await client.entities.Project.query({
-    where: {
-      company: company,
-      date_from: date_from,
-      date_to: date_to
-    }
+  const existingProjects = await client.entities.Project.filter({
+    company: company,
+    date_from: date_from,
+    date_to: date_to
   });
 
   if (existingProjects && existingProjects.length > 0) {
