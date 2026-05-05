@@ -54,7 +54,18 @@ export default function SalaryReportDetail() {
     const [activeTab, setActiveTab] = useState('branch');
     // Tracks which employee hrms_ids currently have an active ON_HOLD PayrollHold
     // record for this report. Keyed by hrms_id, value is the PayrollHold record id.
-    const [activeHolds, setActiveHolds] = useState({});
+    // activeHolds is now derived from allCompanyHolds query below
+    const activeHolds = useMemo(() => {
+        const map = {};
+        const reportHrmsIds = new Set(salaryData?.map(r => String(r.hrms_id)) || []);
+        (allCompanyHolds || []).forEach(h => {
+            if (reportHrmsIds.has(String(h.hrms_id))) {
+                map[h.hrms_id] = h;
+            }
+        });
+        return map;
+    }, [allCompanyHolds, salaryData]);
+
     // Hold dialog state
     const [holdDialogOpen, setHoldDialogOpen] = useState(false);
     const [holdDialogRow, setHoldDialogRow] = useState(null);
@@ -207,6 +218,20 @@ export default function SalaryReportDetail() {
         refetchOnMount: false
     });
 
+    // Fetch all active PayrollHold records for this company (used by OnHoldTab and for Hold buttons)
+    const { data: allCompanyHolds = [] } = useQuery({
+        queryKey: ['payrollHolds', project?.company],
+        queryFn: async () => {
+            if (!project?.company) return [];
+            return await base44.entities.PayrollHold.filter({
+                company: project.company,
+                status: 'ON_HOLD'
+            }, null, 5000);
+        },
+        enabled: !!project?.company
+    });
+
+
     React.useEffect(() => {
         if (report?.snapshot_data) {
             try {
@@ -303,33 +328,7 @@ export default function SalaryReportDetail() {
         }
     }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
 
-    // Fetches all active PayrollHold records for this company and filters for employees in this report.
-    // Updates the local activeHolds state to ensure all tabs have consistent hold status.
-    const fetchActiveHolds = async () => {
-      if (!report?.company || salaryData.length === 0) return;
-      try {
-        const holds = await base44.entities.PayrollHold.filter({
-          company: report.company,
-          status: 'ON_HOLD'
-        });
-        const reportHrmsIds = new Set(salaryData.map(r => String(r.hrms_id)));
-        const holdMap = {};
-        (holds || []).forEach(h => {
-          if (reportHrmsIds.has(String(h.hrms_id))) {
-            holdMap[h.hrms_id] = h;
-          }
-        });
-        setActiveHolds(holdMap);
-      } catch (err) {
-        console.error('Failed to load manual holds:', err);
-      }
-    };
 
-    // Load existing manual leave salary holds for this report on mount
-    // Filters by company and status only, scopes to employees in this report client-side
-    useEffect(() => {
-      fetchActiveHolds();
-    }, [report?.company, salaryData.length]);
 
     // ============================================
     // HANDLERS (must be defined before useMemos that use them)
@@ -948,11 +947,8 @@ export default function SalaryReportDetail() {
             updated_by: currentUser?.id,
             updated_date: new Date().toISOString()
           });
-          setActiveHolds(prev => {
-            const next = { ...prev };
-            delete next[holdDialogRow.hrms_id];
-            return next;
-          });
+          // No need for manual state update, query invalidation below handles it
+
         }
 
         // If leave salary hold is checked and no existing hold — create it
@@ -975,7 +971,8 @@ export default function SalaryReportDetail() {
             created_by: currentUser?.id,
             created_date: new Date().toISOString()
           });
-          setActiveHolds(prev => ({ ...prev, [holdDialogRow.hrms_id]: newHold }));
+          // No need for manual state update, query invalidation below handles it
+
         }
 
         // If custom amount is entered — always create a separate hold record for it
@@ -1801,10 +1798,11 @@ export default function SalaryReportDetail() {
                                 <OnHoldTab 
                                     report={report} 
                                     project={project} 
+                                    allCompanyHolds={allCompanyHolds}
                                     onSync={handleSync} 
                                     syncing={syncing} 
-                                    onHoldsChanged={fetchActiveHolds} 
                                 />
+
                             </TabsContent>
 
                             {/* Summary tab — mirrors Main Sheet from Excel payroll file */}
