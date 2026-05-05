@@ -1,0 +1,70 @@
+{
+  "name": "ProjectSchedule",
+  "type": "object",
+  "properties": {
+    "company": {
+      "type": "string",
+      "description": "Company this schedule belongs to"
+    },
+    "label": {
+      "type": "string",
+      "description": "Short label for the period (e.g., Jan-2026)"
+    },
+    "trigger_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date to create the project (UAE time)"
+    },
+    "project_name": {
+      "type": "string",
+      "description": "Name for the created project"
+    },
+    "date_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date of the payroll period"
+    },
+    "date_to": {
+      "type": "string",
+      "format": "date",
+      "description": "End date of the payroll period"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed",
+        "inactive"
+      ],
+      "default": "pending",
+      "description": "Current status of this specific schedule row"
+    },
+    "is_dry_run": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, logs without creating Project"
+    },
+    "last_run_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this row was last processed"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Error details if processing failed"
+    },
+    "auto_fill_defaults": {
+      "type": "string",
+      "description": "JSON overrides for project fields (salary_calculation_days, etc.)"
+    }
+  },
+  "required": [
+    "company",
+    "trigger_date",
+    "project_name",
+    "date_from",
+    "date_to",
+    "status"
+  ]
+}

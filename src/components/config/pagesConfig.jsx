@@ -211,6 +211,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'user', 'ceo', 'hr_manager']
     },
+    ProjectSchedules: {
+        name: 'ProjectSchedules',
+        title: 'Project Automation',
+        icon: Clock,
+        category: 'Admin',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo']
+    },
     MaintenanceSettings: {
         name: 'MaintenanceSettings',
         title: 'Maintenance Mode',

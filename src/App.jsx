@@ -44,6 +44,7 @@ import AttendanceAnalytics from './pages/AttendanceAnalytics';
 import SalaryAnalytics from './pages/SalaryAnalytics';
 
 import WorkingDaysCalendar from './pages/WorkingDaysCalendar';
+import ProjectSchedules from './pages/ProjectSchedules';
 
 const W = ({ name, children }) => <Layout currentPageName={name}>{children}</Layout>;
 
@@ -86,6 +87,7 @@ function App() {
             <Route path="/salaryanalytics" element={<W name="SalaryAnalytics"><SalaryAnalytics /></W>} />
 
             <Route path="/workingdayscalendar" element={<W name="WorkingDaysCalendar"><WorkingDaysCalendar /></W>} />
+            <Route path="/projectschedules" element={<W name="ProjectSchedules"><ProjectSchedules /></W>} />
             <Route path="*" element={<PageNotFound />} />
           </Routes>
           <Toaster />

@@ -42,6 +42,7 @@ Deno.serve(async (req) => {
             { name: 'RulesSettings', description: 'Attendance rules configuration', defaultRoles: 'admin,ceo' },
             { name: 'MaintenanceSettings', description: 'System maintenance mode settings', defaultRoles: 'admin,ceo' },
             { name: 'CompanyBranding', description: 'Company branding settings', defaultRoles: 'admin,ceo' },
+            { name: 'ProjectSchedules', description: 'Automatic project generation rules', defaultRoles: 'admin,ceo' },
             { name: 'AIPayrollInsights', description: 'AI Payroll Insights', defaultRoles: 'admin,ceo,supervisor,hr_manager' },
             { name: 'AuditLogs', description: 'Audit logs', defaultRoles: 'admin' },
             { name: 'SecurityAudit', description: 'Security and audit logs', defaultRoles: 'admin' },
