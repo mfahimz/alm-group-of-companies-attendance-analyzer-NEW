@@ -198,6 +198,10 @@
       "default": true,
       "description": "Whether to use this exception in future analysis runs"
     },
+    "annual_leave_id": {
+      "type": "string",
+      "description": "ID of the source AnnualLeave record this exception was imported from. Used for bilateral sync."
+    },
     "approval_status": {
       "type": "string",
       "enum": [

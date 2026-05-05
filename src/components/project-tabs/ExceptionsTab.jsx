@@ -276,6 +276,30 @@ export default function ExceptionsTab({ project }) {
                                 salary_leave_days: updatedException.salary_leave_days
                             });
                         }
+
+                        // ChecklistItem Sync: Update related checklist items
+                        if (updatedException.annual_leave_id) {
+                            const checklistItems = await base44.entities.ChecklistItem.filter({
+                                project_id: updatedException.project_id,
+                                linked_annual_leave_id: updatedException.annual_leave_id
+                            });
+
+                            for (let i = 0; i < checklistItems.length; i += 10) {
+                                const batch = checklistItems.slice(i, i + 10);
+                                await Promise.all(batch.map(async (item) => {
+                                    const employeeName = item.task_description.split(' | ')[0];
+                                    const newDateRangeStr = `${updatedException.date_from} to ${updatedException.date_to}`;
+                                    const newDays = updatedException.salary_leave_days || '';
+                                    const newDescription = `${employeeName} | ${newDateRangeStr} | Days: ${newDays}`;
+                                    return base44.entities.ChecklistItem.update(item.id, {
+                                        task_description: newDescription
+                                    });
+                                }));
+                                if (i + 10 < checklistItems.length) {
+                                    await new Promise(resolve => setTimeout(resolve, 300));
+                                }
+                            }
+                        }
                     } catch (e) {
                         // Skip silently - no error shown to user
                     }

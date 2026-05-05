@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
                 date_to: effectiveEnd.toISOString().split('T')[0],
                 type: 'ANNUAL_LEAVE',
                 salary_leave_days: salaryLeaveDays,
+                annual_leave_id: String(leave.id),
                 details: `Imported from Annual Leave Calendar - ${leave.reason || 'Annual leave'}`,
                 approval_status: 'approved',
                 approved_by: user.email,
