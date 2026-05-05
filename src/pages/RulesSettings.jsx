@@ -14,7 +14,7 @@ import { createPageUrl } from '../utils';
 import Breadcrumb from '../components/ui/Breadcrumb';
 
 const COMPANIES = [
-    'Al Maraghi Auto Repairs',
+    'Al Maraghi Motors',
     'Al Maraghi Automotive',
     'Naser Mohsin Auto Parts',
     'Astra Auto Parts'
@@ -666,7 +666,7 @@ export default function RulesSettings() {
                                     <div>
                                         <Label className="text-slate-900">Approved Minutes Offset</Label>
                                         <p className="text-xs text-slate-500 mt-1">
-                                            Deduct approved minutes BEFORE applying grace minutes (currently only for Al Maraghi Auto Repairs)
+                                            Deduct approved minutes BEFORE applying grace minutes (currently only for Al Maraghi Motors)
                                         </p>
                                     </div>
                                     <Switch
