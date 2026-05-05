@@ -29,6 +29,7 @@ import SummaryTab from '../components/salary/SummaryTab';
 import BranchPayrollTab from '../components/salary/BranchPayrollTab';
 import BodyShopPayrollTab from '../components/salary/BodyShopPayrollTab';
 import CashSalaryTab from '../components/salary/CashSalaryTab';
+import PayrollHoldDialog from '../components/salary/PayrollHoldDialog';
 
 
 export default function SalaryReportDetail() {
@@ -52,20 +53,6 @@ export default function SalaryReportDetail() {
     const [saveErrors, setSaveErrors] = useState({});
     const [adminEditMode, setAdminEditMode] = useState(false);
     const [activeTab, setActiveTab] = useState('branch');
-    // Tracks which employee hrms_ids currently have an active ON_HOLD PayrollHold
-    // record for this report. Keyed by hrms_id, value is the PayrollHold record id.
-    // activeHolds is now derived from allCompanyHolds query below
-    const activeHolds = useMemo(() => {
-        const map = {};
-        const reportHrmsIds = new Set(salaryData?.map(r => String(r.hrms_id)) || []);
-        (allCompanyHolds || []).forEach(h => {
-            if (reportHrmsIds.has(String(h.hrms_id))) {
-                map[h.hrms_id] = h;
-            }
-        });
-        return map;
-    }, [allCompanyHolds, salaryData]);
-
     // Hold dialog state
     const [holdDialogOpen, setHoldDialogOpen] = useState(false);
     const [holdDialogRow, setHoldDialogRow] = useState(null);
@@ -328,10 +315,16 @@ export default function SalaryReportDetail() {
         }
     }, [report?.snapshot_data, editableData, liveSalarySnapshots, verifiedEmployees]);
 
-
+    // Active ON_HOLD PayrollHold records for employees in this report, keyed by hrms_id.
+    const activeHolds = useMemo(() => {
+        const map = {};
+        const ids = new Set(salaryData?.map(r => String(r.hrms_id)) || []);
+        (allCompanyHolds || []).forEach(h => { if (ids.has(String(h.hrms_id))) map[h.hrms_id] = h; });
+        return map;
+    }, [allCompanyHolds, salaryData]);
 
     // ============================================
-    // HANDLERS (must be defined before useMemos that use them)
+    // HANDLERS
     // ============================================
     const handleChange = (hrmsId, field, value) => {
         setEditableData(prev => ({
@@ -792,7 +785,6 @@ export default function SalaryReportDetail() {
 
     // Toggle verification for a single employee
     const toggleVerification = async (attendanceId) => {
-        if (!canEdit) return;
 
         const attendanceIdStr = String(attendanceId);
         const isCurrentlyVerified = verifiedEmployees.includes(attendanceIdStr);
@@ -1889,77 +1881,19 @@ export default function SalaryReportDetail() {
                 </Card>
             )}
 
-            {/* Hold Dialog */}
-            {holdDialogOpen && holdDialogRow && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-base font-bold text-slate-900">Payroll Hold — {holdDialogRow.name}</h2>
-                            <button onClick={() => setHoldDialogOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
-                        </div>
-
-                        {/* Leave Salary Hold */}
-                        {(holdDialogRow.salaryLeaveAmount || 0) > 0 && (
-                            <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                                <input
-                                    type="checkbox"
-                                    id="holdLeaveSalary"
-                                    checked={holdLeaveSalaryChecked}
-                                    onChange={e => setHoldLeaveSalaryChecked(e.target.checked)}
-                                    className="h-4 w-4 accent-amber-500"
-                                />
-                                <label htmlFor="holdLeaveSalary" className="text-sm text-amber-800 font-medium cursor-pointer">
-                                    Hold Leave Salary — AED {Number(holdDialogRow.salaryLeaveAmount).toFixed(2)}
-                                </label>
-                            </div>
-                        )}
-
-                        {/* Custom Amount Hold */}
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium text-slate-700">Custom Hold Amount (AED)</label>
-                            <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={holdCustomAmount}
-                                onChange={e => setHoldCustomAmount(e.target.value)}
-                                placeholder="Enter amount to hold"
-                                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                            />
-                            <p className="text-xs text-slate-400">Max: AED {Number(holdDialogRow.total_salary || 0).toFixed(2)}</p>
-                        </div>
-
-                        {/* Reason — mandatory */}
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium text-slate-700">Reason <span className="text-red-500">*</span></label>
-                            <textarea
-                                value={holdReason}
-                                onChange={e => setHoldReason(e.target.value)}
-                                placeholder="Enter reason for hold (required)"
-                                rows={3}
-                                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
-                            />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex justify-end gap-2 pt-1">
-                            <button
-                                onClick={() => setHoldDialogOpen(false)}
-                                className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleConfirmHold}
-                                disabled={holdSubmitting}
-                                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50"
-                            >
-                                {holdSubmitting ? 'Saving...' : 'Confirm Hold'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <PayrollHoldDialog
+                open={holdDialogOpen}
+                row={holdDialogRow}
+                leaveSalaryChecked={holdLeaveSalaryChecked}
+                setLeaveSalaryChecked={setHoldLeaveSalaryChecked}
+                customAmount={holdCustomAmount}
+                setCustomAmount={setHoldCustomAmount}
+                reason={holdReason}
+                setReason={setHoldReason}
+                submitting={holdSubmitting}
+                onClose={() => setHoldDialogOpen(false)}
+                onConfirm={handleConfirmHold}
+            />
 
             {/* Salary Snapshot Detail Dialog */}
             <SalarySnapshotDialog

@@ -284,7 +284,7 @@ export default function BranchPayrollTab({
                                                 <Checkbox 
                                                     checked={verifiedEmployees.includes(String(row.attendance_id))}
                                                     onCheckedChange={() => toggleVerification(row.attendance_id)}
-                                                    disabled={!canEdit || savingVerified.has(String(row.attendance_id))}
+                                                    disabled={savingVerified.has(String(row.attendance_id))}
                                                 />
                                                 {savingVerified.has(String(row.attendance_id)) && (
                                                     <div className="absolute inset-0 flex items-center justify-center">
