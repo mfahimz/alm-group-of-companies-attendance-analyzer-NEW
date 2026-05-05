@@ -43,7 +43,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
 
 const COMPANIES = [
-    'Al Maraghi Auto Repairs',
+    'Al Maraghi Motors',
     'Al Maraghi Automotive',
     'Naser Mohsin Auto Parts',
     'Astra Auto Parts'
