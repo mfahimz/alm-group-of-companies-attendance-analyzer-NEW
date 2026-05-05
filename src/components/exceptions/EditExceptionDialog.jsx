@@ -98,9 +98,33 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
 
     const updateMutation = useMutation({
         mutationFn: (data) => base44.entities.Exception.update(exception.id, data),
-        onSuccess: () => {
+        onSuccess: (updatedException) => {
             queryClient.invalidateQueries({ queryKey: ['exceptions', projectId] });
             toast.success('Exception updated successfully');
+
+            // Part B: Sync to AnnualLeave (Silent background sync)
+            if (updatedException && updatedException.type === 'ANNUAL_LEAVE') {
+                (async () => {
+                    try {
+                        const leaves = await base44.entities.AnnualLeave.filter({
+                            attendance_id: updatedException.attendance_id
+                        });
+                        const matchingLeave = leaves.find(l => 
+                            (updatedException.date_from <= l.date_to && updatedException.date_to >= l.date_from)
+                        );
+                        if (matchingLeave) {
+                            await base44.entities.AnnualLeave.update(matchingLeave.id, {
+                                date_from: updatedException.date_from,
+                                date_to: updatedException.date_to,
+                                salary_leave_days: updatedException.salary_leave_days
+                            });
+                        }
+                    } catch (e) {
+                        // Skip silently
+                    }
+                })();
+            }
+
             onClose();
         },
         onError: () => {
@@ -188,7 +212,7 @@ export default function EditExceptionDialog({ open, onClose, exception, projectI
     const needsEarlyCheckoutMinutes = formData.type === 'MANUAL_EARLY_CHECKOUT';
     // needsSalaryLeaveDays: salary leave days field is only relevant for Al Maraghi Motors
     // other companies do not use this field for salary calculation
-    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE' && project?.company === 'Al Maraghi Motors';
+    const needsSalaryLeaveDays = formData.type === 'ANNUAL_LEAVE';
     const needsSkipPunch = formData.type === 'SKIP_PUNCH';
     const needsHalfDayHoliday = formData.type === 'HALF_DAY_HOLIDAY';
     const needsDaySwap = formData.type === 'DAY_SWAP';

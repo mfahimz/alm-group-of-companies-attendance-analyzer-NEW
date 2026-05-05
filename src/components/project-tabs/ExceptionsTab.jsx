@@ -254,9 +254,33 @@ export default function ExceptionsTab({ project }) {
 
     const updateMutation = useMutation({
         mutationFn: ({ id, data }) => base44.entities.Exception.update(id, data),
-        onSuccess: () => {
+        onSuccess: (updatedException) => {
             queryClient.invalidateQueries({ queryKey: ['exceptions', project.id] });
             toast.success('Exception updated');
+
+            // Part B: Sync to AnnualLeave (Silent background sync)
+            if (updatedException && updatedException.type === 'ANNUAL_LEAVE') {
+                (async () => {
+                    try {
+                        // Find matching AnnualLeave record by attendance_id and overlapping date range
+                        const leaves = await base44.entities.AnnualLeave.filter({
+                            attendance_id: updatedException.attendance_id
+                        });
+                        const matchingLeave = leaves.find(l => 
+                            (updatedException.date_from <= l.date_to && updatedException.date_to >= l.date_from)
+                        );
+                        if (matchingLeave) {
+                            await base44.entities.AnnualLeave.update(matchingLeave.id, {
+                                date_from: updatedException.date_from,
+                                date_to: updatedException.date_to,
+                                salary_leave_days: updatedException.salary_leave_days
+                            });
+                        }
+                    } catch (e) {
+                        // Skip silently - no error shown to user
+                    }
+                })();
+            }
         },
         onError: (error) => {
             toast.error('Failed to update exception: ' + (error.message || 'Unknown error'));
@@ -988,6 +1012,14 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {formData.type === 'ANNUAL_LEAVE' && (
+                                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+                                            <div className="mt-0.5"><Sparkles className="w-4 h-4 text-blue-600" /></div>
+                                            <p className="text-xs text-blue-700">
+                                                Annual Leave exceptions must be imported from the Leave Management page. Please use the 'Import Annual Leaves' button above.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1190,7 +1222,7 @@ Only include relevant fields. Match employee names/IDs intelligently.`,
                             </div>
 
                             <div className="flex gap-3">
-                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createMutation.isPending}>
+                                <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={createMutation.isPending || formData.type === 'ANNUAL_LEAVE'}>
                                     {createMutation.isPending ? 'Adding...' : 'Add Exception'}
                                 </Button>
                                 <Button type="button" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
