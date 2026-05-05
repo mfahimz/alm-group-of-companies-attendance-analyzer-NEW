@@ -219,7 +219,7 @@ export const PAGES_CONFIG = {
         showInNav: true,
         requiresAuth: true,
         availableToAll: false,
-        defaultRoles: ['admin', 'ceo']
+        defaultRoles: ['admin']
     },
     MaintenanceSettings: {
         name: 'MaintenanceSettings',
