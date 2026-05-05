@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+// redeploy trigger: flexible isAlMaraghi check
 // ============================================================
 // INLINED HELPERS (no local imports allowed in Deno functions)
 // ============================================================
