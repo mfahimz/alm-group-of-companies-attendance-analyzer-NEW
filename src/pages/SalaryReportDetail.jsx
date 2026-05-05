@@ -48,6 +48,8 @@ export default function SalaryReportDetail() {
     const [confirmRecalcAll, setConfirmRecalcAll] = useState(false);
     const [selectedSnapshot, setSelectedSnapshot] = useState(null);
     const [verifiedEmployees, setVerifiedEmployees] = useState([]);
+    const [savingVerified, setSavingVerified] = useState(new Set());
+    const [saveErrors, setSaveErrors] = useState({});
     const [adminEditMode, setAdminEditMode] = useState(false);
     const [activeTab, setActiveTab] = useState('branch');
     // Tracks which employee hrms_ids currently have an active ON_HOLD PayrollHold
@@ -314,7 +316,7 @@ export default function SalaryReportDetail() {
         const holdMap = {};
         (holds || []).forEach(h => {
           if (reportHrmsIds.has(String(h.hrms_id))) {
-            holdMap[h.hrms_id] = h.id;
+            holdMap[h.hrms_id] = h;
           }
         });
         setActiveHolds(holdMap);
@@ -790,12 +792,71 @@ export default function SalaryReportDetail() {
     };
 
     // Toggle verification for a single employee
-    const toggleVerification = (attendanceId) => {
+    const toggleVerification = async (attendanceId) => {
+        if (!canEdit) return;
+
         const attendanceIdStr = String(attendanceId);
-        const newVerified = verifiedEmployees.includes(attendanceIdStr) 
-            ? verifiedEmployees.filter(id => id !== attendanceIdStr)
-            : [...verifiedEmployees, attendanceIdStr];
-        setVerifiedEmployees(newVerified);
+        const isCurrentlyVerified = verifiedEmployees.includes(attendanceIdStr);
+        const newIsVerified = !isCurrentlyVerified;
+        
+        // Optimistic UI update
+        const newVerifiedList = newIsVerified 
+            ? [...verifiedEmployees, attendanceIdStr]
+            : verifiedEmployees.filter(id => id !== attendanceIdStr);
+        
+        setVerifiedEmployees(newVerifiedList);
+        
+        // Find the live snapshot to get the ID for direct update
+        const liveSnapshot = liveSalarySnapshots.find(s => String(s.attendance_id) === attendanceIdStr);
+        
+        if (!liveSnapshot) {
+            console.error(`[SalaryReportDetail] No live snapshot found for employee ${attendanceIdStr}`);
+            // Revert state if we can't find the snapshot to update
+            setVerifiedEmployees(verifiedEmployees);
+            setSaveErrors(prev => ({ ...prev, [attendanceIdStr]: 'Update failed: Record not found' }));
+            return;
+        }
+
+        // Set loading state
+        setSavingVerified(prev => {
+            const next = new Set(prev);
+            next.add(attendanceIdStr);
+            return next;
+        });
+        
+        // Clear previous error
+        setSaveErrors(prev => {
+            const next = { ...prev };
+            delete next[attendanceIdStr];
+            return next;
+        });
+
+        try {
+            // Direct update to SalarySnapshot entity
+            await base44.entities.SalarySnapshot.update(liveSnapshot.id, {
+                salary_verified: newIsVerified
+            });
+            
+            // Note: We don't automatically update the main SalaryReport yet.
+            // The user still needs to click "Save Report" to finalize the entire report's snapshot_data JSON.
+            // However, the individual snapshot is now persistent.
+        } catch (error) {
+            console.error(`[SalaryReportDetail] Auto-save verification failed:`, error);
+            
+            // Revert state on error
+            setVerifiedEmployees(verifiedEmployees);
+            setSaveErrors(prev => ({ 
+                ...prev, 
+                [attendanceIdStr]: 'Save failed' 
+            }));
+        } finally {
+            // Clear loading state
+            setSavingVerified(prev => {
+                const next = new Set(prev);
+                next.delete(attendanceIdStr);
+                return next;
+            });
+        }
     };
 
     // Verify all employees with clean records (positive total)
@@ -856,7 +917,7 @@ export default function SalaryReportDetail() {
       if (!canManageHolds) return;
       setHoldDialogRow(row);
       // Pre-fill leave salary checkbox if employee already has an active hold
-      const existingHoldId = activeHolds[row.hrms_id];
+      const existingHoldId = activeHolds[row.hrms_id]?.id;
       setHoldLeaveSalaryChecked(!!existingHoldId && (row.salaryLeaveAmount || 0) > 0);
       setHoldCustomAmount('');
       setHoldReason('');
@@ -878,7 +939,7 @@ export default function SalaryReportDetail() {
       }
       setHoldSubmitting(true);
       try {
-        const existingHoldId = activeHolds[holdDialogRow.hrms_id];
+        const existingHoldId = activeHolds[holdDialogRow.hrms_id]?.id;
 
         // If there was an existing hold and leave salary is now unchecked — release it
         if (existingHoldId && !hasLeaveSalary) {
@@ -914,7 +975,7 @@ export default function SalaryReportDetail() {
             created_by: currentUser?.id,
             created_date: new Date().toISOString()
           });
-          setActiveHolds(prev => ({ ...prev, [holdDialogRow.hrms_id]: newHold.id }));
+          setActiveHolds(prev => ({ ...prev, [holdDialogRow.hrms_id]: newHold }));
         }
 
         // If custom amount is entered — always create a separate hold record for it
@@ -1768,6 +1829,10 @@ export default function SalaryReportDetail() {
                             <TabsContent value="branch" className="p-6 m-0">
                                 <BranchPayrollTab 
                                     salaryData={salaryData}
+                                    verifiedEmployees={verifiedEmployees}
+                                    toggleVerification={toggleVerification}
+                                    savingVerified={savingVerified}
+                                    saveErrors={saveErrors}
                                     adminEditMode={adminEditMode}
                                     setAdminEditMode={setAdminEditMode}
                                     editableData={editableData}
@@ -1778,8 +1843,6 @@ export default function SalaryReportDetail() {
                                     activeHolds={activeHolds}
                                     handleToggleHold={handleOpenHoldDialog}
                                     canManageHolds={canManageHolds}
-                                    verifiedEmployees={verifiedEmployees}
-                                    toggleVerification={toggleVerification}
                                     isAdmin={isAdmin}
                                     userRole={userRole}
                                     searchQuery={searchQuery}
@@ -1796,14 +1859,9 @@ export default function SalaryReportDetail() {
                             {/* Body Shop tab — Bodyshop department employees only */}
                             <TabsContent value="bodyshop" className="p-6 m-0">
                                 <BodyShopPayrollTab 
+                                    savingVerified={savingVerified}
+                                    saveErrors={saveErrors}
                                     salaryData={salaryData}
-                                    adminEditMode={adminEditMode}
-                                    setAdminEditMode={setAdminEditMode}
-                                    editableData={editableData}
-                                    handleChange={handleChange}
-                                    handleSave={handleSave}
-                                    getValue={getValue}
-                                    calculateTotals={calculateTotals}
                                     activeHolds={activeHolds}
                                     handleToggleHold={handleOpenHoldDialog}
                                     canManageHolds={canManageHolds}

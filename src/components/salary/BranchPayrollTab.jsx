@@ -10,6 +10,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Search, CheckCircle, Eye } from 'lucide-react';
 import { TableHead } from '@/components/ui/table';
 import SortableTableHead from '../ui/SortableTableHead';
+import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function BranchPayrollTab({
     salaryData = [],
@@ -34,7 +41,9 @@ export default function BranchPayrollTab({
     verifyAllClean,
     setSelectedSnapshot,
     isAlMaraghi = false,
-    asNumber
+    asNumber,
+    savingVerified = new Set(),
+    saveErrors = {}
 }) {
     const branchEmployees = useMemo(() => {
         return salaryData.filter(row => row.department !== 'Bodyshop');
@@ -270,11 +279,25 @@ export default function BranchPayrollTab({
                             return (
                                 <tr key={row.hrms_id} className={`border-b border-slate-100 hover:bg-blue-50/40 transition-colors ${stripe}`}>
                                     <td className={`${cellBase} px-1 sticky left-0 z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>
-                                        <Checkbox
-                                            checked={verifiedEmployees.includes(String(row.attendance_id))}
-                                            onCheckedChange={() => toggleVerification(row.attendance_id)}
-                                            className="h-3.5 w-3.5"
-                                        />
+                                        <div className="flex flex-col items-center gap-1">
+                                            <div className={`relative ${savingVerified.has(String(row.attendance_id)) ? 'opacity-50' : ''}`}>
+                                                <Checkbox 
+                                                    checked={verifiedEmployees.includes(String(row.attendance_id))}
+                                                    onCheckedChange={() => toggleVerification(row.attendance_id)}
+                                                    disabled={!canEdit || savingVerified.has(String(row.attendance_id))}
+                                                />
+                                                {savingVerified.has(String(row.attendance_id)) && (
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {saveErrors[String(row.attendance_id)] && (
+                                                <span className="text-[10px] leading-tight text-red-500 font-medium">
+                                                    {saveErrors[String(row.attendance_id)]}
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className={`${cellBase} text-center text-slate-400 sticky left-[32px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{idx + 1}</td>
                                     <td className={`${cellBase} font-medium text-slate-700 sticky left-[64px] z-10 ${stickyStripe} shadow-[2px_0_4px_-2px_rgba(0,0,0,0.05)]`}>{row.attendance_id}</td>
@@ -341,9 +364,40 @@ export default function BranchPayrollTab({
                                     <td className={`${cellBase} bg-emerald-50/50 px-1`}>
                                         <Input type="number" step="0.01" value={getValue(row, 'incentive')} onChange={(e) => handleChange(row.hrms_id, 'incentive', e.target.value)} className="h-6 text-xs w-14 px-1" />
                                     </td>
-                                    {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
-                                        <Input type="number" step="0.01" value={getValue(row, 'open_leave_salary')} onChange={(e) => handleChange(row.hrms_id, 'open_leave_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
-                                    </td>}
+                                    {isAlMaraghi && (
+                                        <td className={`${cellBase} bg-emerald-50/50 px-1`}>
+                                            <div className="flex items-center gap-1.5">
+                                                <Input 
+                                                    type="number" 
+                                                    step="0.01" 
+                                                    value={getValue(row, 'open_leave_salary')} 
+                                                    onChange={(e) => handleChange(row.hrms_id, 'open_leave_salary', e.target.value)} 
+                                                    className="h-6 text-xs w-16 px-1" 
+                                                />
+                                                {getValue(row, 'open_leave_salary') === 0 && 
+                                                 activeHolds[row.hrms_id] && 
+                                                 String(activeHolds[row.hrms_id].auto_key || '').includes('LEAVE_DEFERRAL') && (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Badge variant="warning" className="h-5 px-1 py-0 text-[9px] cursor-help whitespace-nowrap">
+                                                                    On Hold
+                                                                </Badge>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top">
+                                                                <p className="font-medium">
+                                                                    AED {Number(activeHolds[row.hrms_id].amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} deferred
+                                                                </p>
+                                                                <p className="text-[10px] opacity-80">
+                                                                    {activeHolds[row.hrms_id].notes || 'Tenure < 2 years + spanning annual leave'}
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                )}
+                                            </div>
+                                        </td>
+                                    )}
                                     {isAlMaraghi && <td className={`${cellBase} bg-emerald-50/50 px-1`}>
                                         <Input type="number" step="0.01" value={getValue(row, 'variable_salary')} onChange={(e) => handleChange(row.hrms_id, 'variable_salary', e.target.value)} className="h-6 text-xs w-16 px-1" />
                                     </td>}
