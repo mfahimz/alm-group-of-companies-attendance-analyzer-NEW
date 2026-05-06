@@ -1357,7 +1357,7 @@ export default function DailyBreakdownDialog({
                                     </TableRow>
                                 ))}
                             </TableBody>
-                            <TableFooter className="bg-slate-50/80 sticky bottom-0 z-10 border-t-2">
+                            <TableFooter className="bg-slate-50/80 sticky bottom-0 z-10 border-t-2 invisible">
                                 <TableRow>
                                     <TableCell colSpan={7} className="text-right font-bold text-slate-700">Authoritative Summary (from Report):</TableCell>
                                     <TableCell className="font-bold text-orange-700">
