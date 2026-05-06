@@ -770,46 +770,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
 
 
-    // Use a query hook to fetch results for a specific report when displaying verification count
-    // Memoize report run IDs to prevent infinite re-renders
-    const reportRunIds = React.useMemo(() => reportRuns.map(r => r.id).join(','), [reportRuns]);
-
-    const { data: reportResults = {} } = useQuery({
-        queryKey: ['reportResults', project.id, reportRunIds],
-        queryFn: async () => {
-            // Fetch results only for displayed reports with delays between each to avoid rate limiting
-            const resultsByReport = {};
-            for (let i = 0; i < reportRuns.length; i++) {
-                const run = reportRuns[i];
-                // Use single page fetch (limit 500) instead of full paginated fetch for list view
-                const results = await base44.entities.AnalysisResult.filter({ 
-                    project_id: project.id,
-                    report_run_id: run.id 
-                }, null, 500);
-                
-                // Filter for department heads
-                const filteredForDeptHead = isDepartmentHead && deptHeadVerification?.verified
-                    ? results.filter(result => {
-                        const resultAttIdStr = String(result.attendance_id);
-                        return departmentEmployees.some(emp => String(emp.attendance_id) === resultAttIdStr);
-                    })
-                    : results;
-                
-                resultsByReport[run.id] = filteredForDeptHead;
-                // Add delay between report fetches to avoid rate limiting
-                if (i < reportRuns.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-            }
-            return resultsByReport;
-        },
-        enabled: reportRuns.length > 0,
-        staleTime: 5 * 60 * 1000,
-        gcTime: 15 * 60 * 1000,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false
-    });
+    // The reportResults query has been removed to fix the initial page load bottleneck.
+    // The verified count is natively available on the reportRun entity.
 
     // Find the finalized report
     const finalizedReport = allReportRuns.find(r => r.is_final === true);
@@ -1206,10 +1168,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 </TableHeader>
                                 <TableBody>
                                     {reportRuns.map((run) => {
-                                        const runResults = reportResults[run.id] || [];
-                                        const verifiedCount = isDepartmentHead
-                                            ? runResults.length // For dept heads, show results count as verification
-                                            : (run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0);
+                                        const verifiedCount = run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0;
                                         
                                         return (
                                             <TableRow key={run.id} className={`${selectedIds.includes(run.id) ? 'bg-slate-50' : ''} group hover:bg-slate-50/80 transition-colors duration-200`}>

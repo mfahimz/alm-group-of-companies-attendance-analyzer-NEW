@@ -40,6 +40,12 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const [editingDay, setEditingDay] = useState(null);
     const [editingGraceMinutes, setEditingGraceMinutes] = useState(null);
     const [sort, setSort] = useState({ key: 'deductible_minutes', direction: 'desc' });
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+    React.useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
     
     // Preview state for Excel export
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -289,9 +295,17 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     // ALWAYS use stored AnalysisResult values for the summary table.
     // No client-side recalculation from raw punch data.
     // When user edits a day, the backend recalcEmployeeTotals function recalculates and updates the stored values.
+    const employeeMap = React.useMemo(() => {
+        const map = new Map();
+        for (const e of employees) {
+            map.set(String(e.attendance_id), e);
+        }
+        return map;
+    }, [employees]);
+
     const baseEnrichedResults = React.useMemo(() => {
         return results.map(result => {
-            const employee = employees.find(e => String(e.attendance_id) === String(result.attendance_id));
+            const employee = employeeMap.get(String(result.attendance_id));
 
             // Use stored values for ALL reports (both finalized and non-finalized)
             const lateMin = result.late_minutes || 0;
@@ -345,8 +359,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     const filteredResults = React.useMemo(() => {
         return enrichedResults
             .filter(result => {
-                const matchesSearch = String(result.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    result.name.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesSearch = String(result.attendance_id).toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                    result.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
 
                 if (!matchesSearch) return false;
 
@@ -391,7 +405,7 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
                 return 0;
             });
-    }, [enrichedResults, searchTerm, riskFilter, sort]);
+    }, [enrichedResults, debouncedSearchTerm, riskFilter, sort]);
 
     const toggleSelectAll = () => {
         if (selectedRowIds.length === filteredResults.length) {
@@ -1025,7 +1039,6 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
     };
 
     const showDailyBreakdown = (result) => {
-        loadRawData(); // Trigger lazy load of punches/shifts/exceptions
         setSelectedEmployee(result);
         setShowBreakdown(true);
     };
@@ -1641,22 +1654,24 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 employeesLoading={employeesLoading}
             />
 
-            <DailyBreakdownDialog
-                open={showBreakdown}
-                onOpenChange={setShowBreakdown}
-                selectedEmployee={selectedEmployee}
-                enrichedResults={enrichedResults}
-                punches={punches}
-                shifts={shifts}
-                exceptions={exceptions}
-                employees={employees}
-                reportRun={reportRun}
-                project={project}
-                parseTime={parseTime}
-                formatTime={formatTime}
-                matchPunchesToShiftPoints={matchPunchesToShiftPoints}
-                filterMultiplePunches={filterMultiplePunches}
-            />
+            {showBreakdown && (
+                <DailyBreakdownDialog
+                    open={showBreakdown}
+                    onOpenChange={setShowBreakdown}
+                    selectedEmployee={selectedEmployee}
+                    enrichedResults={enrichedResults}
+                    punches={punches}
+                    shifts={shifts}
+                    exceptions={exceptions}
+                    employees={employees}
+                    reportRun={reportRun}
+                    project={project}
+                    parseTime={parseTime}
+                    formatTime={formatTime}
+                    matchPunchesToShiftPoints={matchPunchesToShiftPoints}
+                    filterMultiplePunches={filterMultiplePunches}
+                />
+            )}
 
             <GraceMinutesDialog
                 editingGraceMinutes={editingGraceMinutes}
@@ -1707,16 +1722,18 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 onConfirm={executeExcelDownload}
             />
             
-            <EditDayRecordDialog
-                open={!!editingDay}
-                onClose={() => setEditingDay(null)}
-                onSave={() => queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' })}
-                dayRecord={editingDay}
-                project={project}
-                attendanceId={selectedEmployee?.attendance_id}
-                analysisResult={selectedEmployee}
-                dailyBreakdownData={auditDailyBreakdownData}
-            />
+            {!!editingDay && (
+                <EditDayRecordDialog
+                    open={!!editingDay}
+                    onClose={() => setEditingDay(null)}
+                    onSave={() => queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' })}
+                    dayRecord={editingDay}
+                    project={project}
+                    attendanceId={selectedEmployee?.attendance_id}
+                    analysisResult={selectedEmployee}
+                    dailyBreakdownData={auditDailyBreakdownData}
+                />
+            )}
         </div>
     );
 }
