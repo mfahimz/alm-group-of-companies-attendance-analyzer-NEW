@@ -16,8 +16,9 @@ import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
 import WorkflowStepper from '../components/project-detail/WorkflowStepper';
+import EditProjectDialog from '../components/project-detail/EditProjectDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Settings, Settings2, Trash2, Copy, Lock, RefreshCw } from 'lucide-react';
+import { MoreVertical, Settings, Settings2, Trash2, Copy, Lock, RefreshCw, Pencil } from 'lucide-react';
 
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Label } from '@/components/ui/label';
@@ -137,6 +138,8 @@ export default function ProjectDetail() {
 
 
 
+  const [showEditDialog, setShowEditDialog] = useState(false);
+
   const reopenProjectMutation = useMutation({
     mutationFn: async () => {
       await base44.entities.Project.update(project.id, { status: 'analyzed' });
@@ -147,6 +150,90 @@ export default function ProjectDetail() {
     },
     onError: () => {
       toast.error('Failed to reopen project');
+    }
+  });
+
+  const lockProjectMutation = useMutation({
+    mutationFn: () => base44.entities.Project.update(project.id, { status: 'locked' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['project', projectId]);
+      queryClient.invalidateQueries(['projects']);
+      toast.success('Project locked successfully');
+    },
+    onError: () => {
+      toast.error('Failed to lock project');
+    }
+  });
+
+  const duplicateProjectMutation = useMutation({
+    mutationFn: async () => {
+      return await base44.entities.Project.create({
+        name: `${project.name} (Copy)`,
+        company: project.company,
+        date_from: project.date_from,
+        date_to: project.date_to,
+        department: project.department,
+        status: 'draft',
+        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+        use_gift_minutes: project.use_gift_minutes || false,
+        shift_blocks_count: project.shift_blocks_count || 2,
+        custom_employee_ids: project.custom_employee_ids || ''
+      });
+    },
+    onSuccess: (newProject) => {
+      queryClient.invalidateQueries(['projects']);
+      toast.success('Project duplicated successfully');
+      navigate(createPageUrl(`ProjectDetail?id=${newProject.id}`));
+    },
+    onError: (error) => {
+      toast.error('Failed to duplicate project: ' + error.message);
+    }
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async () => {
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const batchSize = 20;
+
+      const deleteBatch = async (items, entityType) => {
+        for (let i = 0; i < items.length; i += batchSize) {
+          const batch = items.slice(i, i + batchSize);
+          await Promise.all(batch.map(item => entityType.delete(item.id)));
+          if (i + batchSize < items.length) {
+            await delay(500);
+          }
+        }
+      };
+
+      const reportRunsToDelete = await base44.entities.ReportRun.filter({ project_id: project.id });
+      await deleteBatch(reportRunsToDelete, base44.entities.ReportRun);
+      await delay(500);
+
+      const punchItems = await base44.entities.Punch.filter({ project_id: project.id });
+      await deleteBatch(punchItems, base44.entities.Punch);
+      await delay(500);
+
+      const exceptionItems = await base44.entities.Exception.filter({ project_id: project.id });
+      await deleteBatch(exceptionItems, base44.entities.Exception);
+      await delay(500);
+
+      const resultItems = await base44.entities.AnalysisResult.filter({ project_id: project.id });
+      await deleteBatch(resultItems, base44.entities.AnalysisResult);
+      await delay(500);
+
+      const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: project.id });
+      await deleteBatch(shiftItems, base44.entities.ShiftTiming);
+      await delay(500);
+
+      await base44.entities.Project.delete(project.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['projects']);
+      toast.success('Project deleted successfully');
+      navigate(createPageUrl('Projects'));
+    },
+    onError: (error) => {
+      toast.error('Failed to delete project: ' + error.message);
     }
   });
 
@@ -289,8 +376,21 @@ export default function ProjectDetail() {
                                         Project Controls
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
+
+                                    {/* Edit Project — admin only, not on closed projects */}
+                                    {isAdmin && project.status !== 'closed' && (
+                                        <DropdownMenuItem
+                                            onClick={() => setShowEditDialog(true)}
+                                            className="text-slate-700 focus:text-slate-900 focus:bg-slate-50"
+                                        >
+                                            <Pencil className="w-4 h-4 mr-2" />
+                                            Edit Project
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    {/* Reopen — admin only, only on closed projects */}
                                     {project.status === 'closed' && isAdmin && (
-                                        <DropdownMenuItem 
+                                        <DropdownMenuItem
                                             onClick={() => {
                                                 if (window.confirm('Reopen this project?')) {
                                                     reopenProjectMutation.mutate();
@@ -302,19 +402,57 @@ export default function ProjectDetail() {
                                             Reopen Project
                                         </DropdownMenuItem>
                                     )}
-                                    <DropdownMenuItem className="text-slate-600">
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        Duplicate Project
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-slate-600">
-                                        <Lock className="w-4 h-4 mr-2" />
-                                        Lock Project
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50">
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete Project
-                                    </DropdownMenuItem>
+
+                                    {/* Duplicate — admin only */}
+                                    {isAdmin && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (window.confirm(`Duplicate "${project.name}"? A new draft project will be created with the same configuration.`)) {
+                                                    duplicateProjectMutation.mutate();
+                                                }
+                                            }}
+                                            disabled={duplicateProjectMutation.isPending}
+                                            className="text-slate-600 focus:text-slate-700 focus:bg-slate-50"
+                                        >
+                                            <Copy className="w-4 h-4 mr-2" />
+                                            {duplicateProjectMutation.isPending ? 'Duplicating...' : 'Duplicate Project'}
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    {/* Lock — admin only, only when not already locked/closed */}
+                                    {isAdmin && project.status !== 'locked' && project.status !== 'closed' && (
+                                        <DropdownMenuItem
+                                            onClick={() => {
+                                                if (window.confirm('Lock this project? Once locked, no further edits can be made until reopened.')) {
+                                                    lockProjectMutation.mutate();
+                                                }
+                                            }}
+                                            disabled={lockProjectMutation.isPending}
+                                            className="text-slate-600 focus:text-slate-700 focus:bg-slate-50"
+                                        >
+                                            <Lock className="w-4 h-4 mr-2" />
+                                            {lockProjectMutation.isPending ? 'Locking...' : 'Lock Project'}
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    {/* Delete — admin only, destructive */}
+                                    {isAdmin && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    if (window.confirm(`PERMANENTLY DELETE "${project.name}"?\n\nThis will delete the project AND all related punches, exceptions, shifts, analysis results, and reports. This action CANNOT be undone.`)) {
+                                                        deleteProjectMutation.mutate();
+                                                    }
+                                                }}
+                                                disabled={deleteProjectMutation.isPending}
+                                                className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                {deleteProjectMutation.isPending ? 'Deleting...' : 'Delete Project'}
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -418,6 +556,15 @@ export default function ProjectDetail() {
 
                 </div>
             </Tabs>
+            )}
+
+            {/* Edit Project Dialog — controlled from header dropdown */}
+            {showEditDialog && (
+                <EditProjectDialog
+                    open={showEditDialog}
+                    onOpenChange={setShowEditDialog}
+                    project={project}
+                />
             )}
         </div>);
 

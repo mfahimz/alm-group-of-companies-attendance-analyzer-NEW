@@ -1,70 +1,28 @@
 import React, { useState } from 'react';
-import { formatInUAE } from '@/components/ui/timezone';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Lock, Copy, Trash2, Calendar, Users, AlertCircle, FileText, Pencil, CheckCircle, UserPlus } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from '../../utils';
 
-import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 import CloseProjectDialog from './CloseProjectDialog';
 import ProjectEmployeeOverrideDialog from '../projects/ProjectEmployeeOverrideDialog';
-import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
 import CommandCenter from '../project-detail/CommandCenter';
 
+/**
+ * OverviewTab
+ * Project lifecycle/management actions (Edit, Duplicate, Lock, Delete, Reopen)
+ * are owned by ProjectDetail header dropdown — not duplicated here.
+ * This tab focuses on dashboard stats + secondary dialogs (Close, Employee Overrides).
+ */
 export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
     const [showCloseDialog, setShowCloseDialog] = useState(false);
     const [showEmployeeOverrideDialog, setShowEmployeeOverrideDialog] = useState(false);
 
     const { data: lastSavedReport } = useQuery({
         queryKey: ['lastSavedReport', project.last_saved_report_id],
-        queryFn: () => project.last_saved_report_id 
+        queryFn: () => project.last_saved_report_id
             ? base44.entities.ReportRun.filter({ id: project.last_saved_report_id }).then(r => r[0])
             : null,
         enabled: !!project.last_saved_report_id
     });
-    const queryClient = useQueryClient();
-    const navigate = useNavigate();
-    const [showEditDialog, setShowEditDialog] = useState(false);
-    const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
-    // Added: State to handle dismissible warning for first-time gift minutes date setting
-    const [showGiftDateWarning, setShowGiftDateWarning] = useState(true);
-    const [editData, setEditData] = useState({
-        name: project.name,
-        company: project.company,
-        date_from: project.date_from,
-        date_to: project.date_to,
-        custom_employee_ids: project.custom_employee_ids || '',
-        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
-        use_gift_minutes: project.use_gift_minutes || false,
-        // Added: Gift minutes date range fields tracking
-        gift_minutes_date_from: project.gift_minutes_date_from || '',
-        gift_minutes_date_to: project.gift_minutes_date_to || '',
-        skip_double_deduction: project.skip_double_deduction || false,
-        skip_double_deduction_date_from: project.skip_double_deduction_date_from || '',
-        skip_double_deduction_date_to: project.skip_double_deduction_date_to || '',
-        shift_blocks_count: project.shift_blocks_count || 2,
-        sync_recurring_adjustments: false
-    });
-
-    const { data: currentUser } = useQuery({
-        queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
-    });
-
-    const userRole = currentUser?.extended_role || currentUser?.role || 'user';
-    const isAdmin = userRole === 'admin';
-    const isSupervisor = userRole === 'supervisor';
-    const isAdminOrSupervisor = isAdmin || isSupervisor;
-    const isUser = userRole === 'user';
 
     const { data: punches = [] } = useQuery({
         queryKey: ['punches', project.id],
@@ -86,18 +44,10 @@ export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
-    // Fetch project-specific employee overrides
     const { data: projectEmployees = [] } = useQuery({
         queryKey: ['projectEmployees', project.id],
         queryFn: () => base44.entities.ProjectEmployee.filter({ project_id: project.id })
     });
-
-    const { data: companyRecord } = useQuery({
-        queryKey: ['companyByName', project.company],
-        queryFn: () => base44.entities.Company.filter({ name: project.company }).then(r => r[0] || null),
-        enabled: !!project.company
-    });
-    const isAlMaraghiMotors = companyRecord?.company_id === AL_MARAGHI_MOTORS_COMPANY_ID;
 
     const uniqueEmployees = new Set(punches.map(p => String(p.attendance_id))).size;
 
@@ -109,7 +59,7 @@ export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
         return Array.from(punchIds).filter(id => !masterIds.has(id) && !projectIds.has(id)).length;
     }, [punches, employees, projectEmployees]);
 
-    const calculateWorkingDays = () => {
+    const workingDays = React.useMemo(() => {
         const startDate = new Date(project.date_from);
         const endDate = new Date(project.date_to);
         let days = 0;
@@ -117,223 +67,7 @@ export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
             if (d.getDay() !== 0) days++;
         }
         return days;
-    };
-    const workingDays = calculateWorkingDays();
-
-    const lockMutation = useMutation({
-        mutationFn: () => base44.entities.Project.update(project.id, { status: 'locked' }),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['project', project.id]);
-            queryClient.invalidateQueries(['projects']);
-            toast.success('Project locked successfully');
-        },
-        onError: () => {
-            toast.error('Failed to lock project');
-        }
-    });
-
-    const closeMutation = useMutation({
-        mutationFn: async () => {
-            // 1. Update employees with unused grace minutes
-            const updates = results.map(result => {
-                const employee = employees.find(e => e.attendance_id === result.attendance_id);
-                if (!employee) return null;
-
-                const effectiveGrace = result.grace_minutes || 15;
-                const totalLateMinutes = result.late_minutes || 0;
-                const totalEarlyCheckoutMinutes = result.early_checkout_minutes || 0;
-                const unused = Math.max(0, effectiveGrace - (totalLateMinutes + totalEarlyCheckoutMinutes));
-
-                // If project used carried grace, it means current allowance included previous balance.
-                // The new balance is simply what's left.
-                // If project didn't use carried grace, the new balance is just this month's unused.
-                // Wait, user said "add... total available".
-                // If I didn't use carried grace, does it mean I still have it?
-                // Assume yes: New Balance = (UseCarried ? 0 : OldBalance) + Unused
-                // BUT User said: "ask if this project can use... total available".
-                // Simplest logic: Whatever is calculated as "unused" from the report becomes the new "total available".
-                // Because report calculation already factored in (Base + Carried) if flag was checked.
-                // So Unused = (Base + Carried) - Used. This is the new Carried.
-                // If flag was NOT checked: Unused = Base - Used.
-                // What happens to old Carried? It should probably persist if not used?
-                // "carry forward the 10 minutes... total 25".
-                // If I assume "Bank" model:
-                // New Balance = (project.use_carried_grace_minutes ? 0 : employee.carried_grace_minutes) + Math.max(0, (result.grace_minutes - result.late_minutes));
-                // Note: result.grace_minutes already includes Carried if flag is true.
-                // So: Unused = result.grace_minutes - result.late_minutes.
-                // If flag True: result.grace = Base + Carried. Unused = Base + Carried - Used. -> New Balance.
-                // If flag False: result.grace = Base. Unused = Base - Used.
-                // Should we add Old Carried? "carry forward... total available".
-                // If I didn't use it, I keep it.
-                // So: New Balance = Unused + (project.use_carried_grace_minutes ? 0 : employee.carried_grace_minutes).
-                
-                const newBalance = Math.max(0, unused + (project.use_carried_grace_minutes ? 0 : (employee.carried_grace_minutes || 0)));
-
-                return base44.entities.Employee.update(employee.id, {
-                    carried_grace_minutes: newBalance
-                });
-            }).filter(Boolean);
-
-            await Promise.all(updates);
-
-            // 2. Close project
-            return base44.entities.Project.update(project.id, { status: 'closed' });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['project', project.id]);
-            queryClient.invalidateQueries(['employees']);
-            toast.success('Project closed and grace minutes updated');
-        }
-    });
-
-    const duplicateMutation = useMutation({
-        mutationFn: async () => {
-            const newProject = await base44.entities.Project.create({
-                name: `${project.name} (Copy)`,
-                company: project.company, // Explicitly copy company // Fix: Ensure company is copied during duplication
-                date_from: project.date_from,
-                date_to: project.date_to,
-                department: project.department,
-                status: 'draft',
-                use_carried_grace_minutes: project.use_carried_grace_minutes || false, // Explicitly copy grace settings // Fix: Copy grace settings
-                use_gift_minutes: project.use_gift_minutes || false, // Explicitly copy gift settings // Fix: Copy gift settings matching grace
-                shift_blocks_count: project.shift_blocks_count || 2, // Explicitly copy shift blocks // Fix: Copy shift configuration
-                custom_employee_ids: project.custom_employee_ids || '' // Explicitly copy employee scope // Fix: Copy employee scope
-            });
-            return newProject;
-        },
-        onSuccess: (newProject) => {
-            queryClient.invalidateQueries(['projects']);
-            toast.success('Project duplicated successfully');
-            navigate(createPageUrl(`ProjectDetail?id=${newProject.id}`));
-        }
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: async () => {
-            const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-            const batchSize = 20;
-            
-            // Helper to delete in batches with delay
-            const deleteBatch = async (items, entityType) => {
-                for (let i = 0; i < items.length; i += batchSize) {
-                    const batch = items.slice(i, i + batchSize);
-                    await Promise.all(batch.map(item => entityType.delete(item.id)));
-                    if (i + batchSize < items.length) {
-                        await delay(500); // Wait between batches
-                    }
-                }
-            };
-            
-            // Delete all ReportRuns first
-            const reportRuns = await base44.entities.ReportRun.filter({ project_id: project.id });
-            await deleteBatch(reportRuns, base44.entities.ReportRun);
-            await delay(500);
-            
-            // Delete all related data
-            const punchItems = await base44.entities.Punch.filter({ project_id: project.id });
-            await deleteBatch(punchItems, base44.entities.Punch);
-            await delay(500);
-            
-            const exceptionItems = await base44.entities.Exception.filter({ project_id: project.id });
-            await deleteBatch(exceptionItems, base44.entities.Exception);
-            await delay(500);
-            
-            const resultItems = await base44.entities.AnalysisResult.filter({ project_id: project.id });
-            await deleteBatch(resultItems, base44.entities.AnalysisResult);
-            await delay(500);
-            
-            const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: project.id });
-            await deleteBatch(shiftItems, base44.entities.ShiftTiming);
-            await delay(500);
-            
-            await base44.entities.Project.delete(project.id);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries(['projects']);
-            toast.success('Project deleted successfully');
-            navigate(createPageUrl('Projects'));
-        },
-        onError: (error) => {
-            toast.error('Failed to delete project: ' + error.message);
-        }
-    });
-
-    const syncRecurringMutation = useMutation({
-        mutationFn: async () => {
-            // Trigger the seeding function
-            await base44.functions.invoke('seedRecurringAdjustments', {
-                projectId: project.id
-            });
-        },
-        onSuccess: () => {
-            toast.success('Recurring adjustments synchronized successfully');
-            // We might need to invalidate OvertimeData queries if they are visible
-            queryClient.invalidateQueries(['overtimeData', project.id]);
-        },
-        onError: (error) => {
-            toast.error('Failed to sync recurring adjustments: ' + error.message);
-        }
-    });
-
-    const handleDelete = () => {
-        if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-            deleteMutation.mutate();
-        }
-    };
-
-    const updateProjectMutation = useMutation({
-        mutationFn: (data) => base44.entities.Project.update(project.id, {
-            ...data,
-            use_gift_minutes: !!data.use_gift_minutes,
-            use_carried_grace_minutes: !!data.use_carried_grace_minutes,
-            skip_double_deduction: !!data.skip_double_deduction
-        }),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['project', project.id]);
-            queryClient.invalidateQueries(['projects']);
-            toast.success('Project updated successfully');
-            setShowEditDialog(false);
-        },
-        onError: () => {
-            toast.error('Failed to update project');
-        }
-    });
-
-    const handleEditSubmit = async (e) => {
-        e.preventDefault();
-        if (!editData.name.trim()) {
-            toast.error('Project name is required');
-            return;
-        }
-        if (!editData.date_from || !editData.date_to) {
-            toast.error('Date range is required');
-            return;
-        }
-        // Added: Validation for Gift Minutes date range
-        if (editData.use_gift_minutes && (!editData.gift_minutes_date_from || !editData.gift_minutes_date_to)) {
-            toast.error('Gift minutes date range is required when gift minutes is enabled');
-            return;
-        }
-        if (new Date(editData.date_from) > new Date(editData.date_to)) {
-            toast.error('Start date must be before end date');
-            return;
-        }
-
-        // Trigger sync if requested
-        if (editData.sync_recurring_adjustments) {
-            try {
-                await syncRecurringMutation.mutateAsync();
-            } catch (err) {
-                // Error handled by mutation already
-            }
-        }
-
-        updateProjectMutation.mutate({
-            ...editData,
-            sync_recurring_adjustments: undefined // Don't persist this flag
-        });
-    };
+    }, [project.date_from, project.date_to]);
 
     const dashboardStats = {
         punchCount: punches.length,
@@ -347,11 +81,9 @@ export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
         workingDays: workingDays
     };
 
-    const canCloseProject = project.status === 'analyzed' && project.status !== 'closed';
-
     return (
         <div className="space-y-6">
-            <CommandCenter 
+            <CommandCenter
                 project={project}
                 stats={dashboardStats}
                 salaryDivisor={salaryDivisor}
@@ -359,292 +91,9 @@ export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
                 onNavigate={(tab) => {
                     window.dispatchEvent(new CustomEvent('changeTab', { detail: tab }));
                 }}
-                onShowSettings={() => setShowEditDialog(true)}
                 onShowOverrides={() => setShowEmployeeOverrideDialog(true)}
             />
 
-            {/* Legacy functionality triggers - kept for business logic support */}
-            <div className="hidden">
-                {canCloseProject && isAdmin && (
-                    <Button onClick={() => setShowCloseDialog(true)}>Close</Button>
-                )}
-            </div>
-
-            {/* Existing Dialogs remain intact */}
-            <CloseProjectDialog 
-                open={showCloseDialog}
-                onClose={() => setShowCloseDialog(false)}
-                project={project}
-            />
-
-            {/* Edit Project Dialog */}
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Edit Project Settings</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
-                        <div>
-                            <Label>Project Name *</Label>
-                            <Input
-                                value={editData.name}
-                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                                placeholder="Enter project name"
-                            />
-                        </div>
-                        <div>
-                            <Label>Company *</Label>
-                            <Select 
-                                value={editData.company} 
-                                onValueChange={(value) => setEditData({ ...editData, company: value })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
-                                    <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
-                                    <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
-                                    <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label>Start Date *</Label>
-                                <Input
-                                    type="date"
-                                    value={editData.date_from}
-                                    onChange={(e) => setEditData({ ...editData, date_from: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <Label>End Date *</Label>
-                                <Input
-                                    type="date"
-                                    value={editData.date_to}
-                                    onChange={(e) => setEditData({ ...editData, date_to: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        {editData.company && (
-                            <div>
-                                <Label>Custom Employee Selection</Label>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full justify-start"
-                                    onClick={() => setShowEmployeeDialog(true)}
-                                >
-                                    <Users className="w-4 h-4 mr-2" />
-                                    {editData.custom_employee_ids 
-                                        ? `${editData.custom_employee_ids.split(',').length} employees selected`
-                                        : 'Select employees for this project'
-                                    }
-                                </Button>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Leave empty to include all employees
-                                </p>
-                            </div>
-                        )}
-                        <div className="flex items-center space-x-2">
-                            <Checkbox 
-                                id="use_grace" 
-                                checked={editData.use_carried_grace_minutes}
-                                onCheckedChange={(checked) => setEditData({ ...editData, use_carried_grace_minutes: checked })}
-                            />
-                            <Label htmlFor="use_grace" className="font-normal">
-                                Use carried forward grace minutes
-                            </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Checkbox 
-                                id="use_gift" 
-                                checked={editData.use_gift_minutes}
-                                onCheckedChange={(checked) => setEditData({ ...editData, use_gift_minutes: checked })}
-                                disabled={project.gift_minutes_date_from && project.gift_minutes_date_to}
-                            />
-                            <Label htmlFor="use_gift" className="font-normal">
-                                Enable Gift Minutes
-                            </Label>
-                        </div>
-
-                        {/* Added: Gift Minutes Date Range configuration with locking logic */}
-                        {editData.use_gift_minutes && (
-                            <div className="space-y-3 pl-6 border-l-2 border-indigo-100">
-                                {!(project.gift_minutes_date_from && project.gift_minutes_date_to) ? (
-                                    <>
-                                        {showGiftDateWarning && (
-                                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 relative">
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => setShowGiftDateWarning(false)}
-                                                    className="absolute top-2 right-2 text-amber-500 hover:text-amber-700"
-                                                >
-                                                    ×
-                                                </button>
-                                                <p className="text-xs text-amber-800 pr-4">
-                                                    Please confirm the gift minutes date range as it cannot be changed after saving.
-                                                </p>
-                                            </div>
-                                        )}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <Label className="text-xs">Gift Minutes From *</Label>
-                                                <Input
-                                                    type="date"
-                                                    value={editData.gift_minutes_date_from}
-                                                    onChange={(e) => setEditData({ ...editData, gift_minutes_date_from: e.target.value })}
-                                                    className="h-8 text-xs"
-                                                    min={editData.date_from}
-                                                    max={editData.date_to}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">Gift Minutes To *</Label>
-                                                <Input
-                                                    type="date"
-                                                    value={editData.gift_minutes_date_to}
-                                                    onChange={(e) => setEditData({ ...editData, gift_minutes_date_to: e.target.value })}
-                                                    className="h-8 text-xs"
-                                                    min={editData.gift_minutes_date_from || editData.date_from}
-                                                    max={editData.date_to}
-                                                />
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-[10px] text-slate-500 font-medium">GIFT MINUTES FROM</p>
-                                                <p className="text-sm font-medium text-slate-900">{new Date(project.gift_minutes_date_from).toLocaleDateString('en-GB')}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-slate-500 font-medium">GIFT MINUTES TO</p>
-                                                <p className="text-sm font-medium text-slate-900">{new Date(project.gift_minutes_date_to).toLocaleDateString('en-GB')}</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 mt-2 italic flex items-center gap-1">
-                                            <Lock className="w-3 h-3" />
-                                            Gift minutes date range is locked and cannot be changed.
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        <div>
-                            <Label>Number of Shift Blocks *</Label>
-                            <Select
-                                value={String(editData.shift_blocks_count || 2)}
-                                onValueChange={(value) => setEditData({ ...editData, shift_blocks_count: parseInt(value) })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="1">1 Block</SelectItem>
-                                    <SelectItem value="2">2 Blocks</SelectItem>
-                                    <SelectItem value="3">3 Blocks</SelectItem>
-                                    <SelectItem value="4">4 Blocks</SelectItem>
-                                    <SelectItem value="5">5 Blocks</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-slate-500 mt-1">
-                                How many shift timing blocks this project needs
-                            </p>
-                        </div>
-
-                        {isAlMaraghiMotors && (
-                            <div className="space-y-3 pt-1">
-                                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
-                                    <div className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id="skip_double_deduction" 
-                                            checked={editData.skip_double_deduction}
-                                            onCheckedChange={(checked) => setEditData({ ...editData, skip_double_deduction: !!checked })}
-                                        />
-                                        <Label htmlFor="skip_double_deduction" className="font-semibold text-slate-900 cursor-pointer">
-                                            Skip Double Deduction
-                                        </Label>
-                                    </div>
-                                    <p className="text-[10px] text-slate-500 leading-tight">
-                                        When enabled, double deduction will be skipped for all employees in this project for the selected date range. Leave dates empty to skip for the entire project period.
-                                    </p>
-                                    {editData.skip_double_deduction && (
-                                        <div className="grid grid-cols-2 gap-3 pl-6 pt-1">
-                                            <div className="space-y-1">
-                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Skip From</Label>
-                                                <Input
-                                                    type="date"
-                                                    value={editData.skip_double_deduction_date_from}
-                                                    onChange={(e) => setEditData({ ...editData, skip_double_deduction_date_from: e.target.value })}
-                                                    className="h-8 text-xs bg-white"
-                                                    min={project.date_from}
-                                                    max={project.date_to}
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Skip To</Label>
-                                                <Input
-                                                    type="date"
-                                                    value={editData.skip_double_deduction_date_to}
-                                                    onChange={(e) => setEditData({ ...editData, skip_double_deduction_date_to: e.target.value })}
-                                                    className="h-8 text-xs bg-white"
-                                                    min={editData.skip_double_deduction_date_from || project.date_from}
-                                                    max={project.date_to}
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {project.status !== 'closed' && (
-                                    <div className="flex items-center space-x-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100/50">
-                                        <Checkbox 
-                                            id="sync_recurring_edit" 
-                                            checked={editData.sync_recurring_adjustments}
-                                            onCheckedChange={(checked) => setEditData({ ...editData, sync_recurring_adjustments: !!checked })}
-                                        />
-                                        <div className="flex-1">
-                                            <Label htmlFor="sync_recurring_edit" className="font-semibold text-indigo-900 cursor-pointer">
-                                                Sync Recurring Adjustments
-                                            </Label>
-                                            <p className="text-[10px] text-indigo-600 mt-0.5">
-                                                Fetch latest recurring variables (Housing, etc.) from employee master.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                        <div className="flex gap-3 pt-2">
-                            <Button
-                                type="submit"
-                                className="bg-indigo-600 hover:bg-indigo-700"
-                                disabled={updateProjectMutation.isPending}
-                            >
-                                {updateProjectMutation.isPending ? 'Saving...' : 'Save Changes'}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setShowEditDialog(false)}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            <EmployeeSelectionDialog
-                open={showEmployeeDialog}
-                onOpenChange={setShowEmployeeDialog}
-                company={editData.company}
-                initialIds={editData.custom_employee_ids}
-                onConfirm={(ids) => setEditData({ ...editData, custom_employee_ids: ids })}
-            />
             <CloseProjectDialog
                 open={showCloseDialog}
                 onClose={() => setShowCloseDialog(false)}

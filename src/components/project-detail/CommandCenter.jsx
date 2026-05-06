@@ -17,7 +17,6 @@ export default function CommandCenter({
     salaryDivisor,
     prevMonthDays,
     onNavigate,
-    onShowSettings,
     onShowOverrides
 }) {
     const {
