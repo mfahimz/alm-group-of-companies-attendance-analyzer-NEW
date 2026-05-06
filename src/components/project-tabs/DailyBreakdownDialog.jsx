@@ -11,6 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { parseTime, matchPunchesToShiftPoints, filterMultiplePunches, extractTime, formatTime, calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
+import { usePermissions } from '@/components/hooks/usePermissions';
+import { formatInUAE } from '@/components/ui/timezone';
+import { Clock } from 'lucide-react';
 
 /**
  * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
@@ -61,6 +64,8 @@ export default function DailyBreakdownDialog({
 
 
     const queryClient = useQueryClient();
+    const { userRole } = usePermissions();
+    const isAdmin = userRole === 'admin';
     const includeSeconds = true; // Unified
     const isFinalized = reportRun.is_final || project.status === 'closed';
 
@@ -148,6 +153,28 @@ export default function DailyBreakdownDialog({
                 await Promise.all(exceptionTasks);
             }
 
+            // Audit Log for bulk apply
+            let changesCtx = [];
+            if (bulkType) changesCtx.push(`Status: ${bulkType}`);
+            if (bulkAbnormal) changesCtx.push(`Marked Abnormal`);
+            if (bulkZeroEarly) changesCtx.push(`Zeroed Early Checkout`);
+            if (bulkZeroLate) changesCtx.push(`Zeroed Late`);
+            if (bulkShiftOverride.enabled) changesCtx.push(`Shift Override Applied`);
+
+            if (changesCtx.length > 0) {
+                base44.functions.invoke('logAudit', {
+                    action_type: 'UPDATE',
+                    entity_name: `Daily Breakdown (Bulk Apply - ${attendanceIdStr})`,
+                    entity_id: currentResult.id,
+                    project_id: project.id,
+                    company: project.company,
+                    changes: JSON.stringify({
+                        new_data: { bulkType, bulkAbnormal, bulkZeroEarly, bulkZeroLate, bulkShiftOverride }
+                    }),
+                    context: `Bulk apply to ${selectedDays.size} days. ${changesCtx.join(', ')}`
+                }).catch(e => console.error('Failed to log audit:', e));
+            }
+
             // BUG 1 FIX: Force active refetch so summary table updates without page reload
             queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' });
             queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
@@ -183,6 +210,13 @@ export default function DailyBreakdownDialog({
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnMount: false
+    });
+
+    const { data: auditLogs = [], isLoading: isLoadingLogs } = useQuery({
+        queryKey: ['auditLogs', selectedEmployee?.id],
+        queryFn: () => base44.entities.AuditLog.filter({ entity_id: selectedEmployee?.id }, '-created_date', 30),
+        enabled: open && !!selectedEmployee?.id,
+        staleTime: 60 * 1000
     });
 
     const { data: selfShifts = [], isFetched: selfShiftsFetched } = useQuery({
@@ -1355,6 +1389,43 @@ export default function DailyBreakdownDialog({
                                 </TableRow>
                             </TableFooter>
                         </Table>
+                        )}
+                        {auditLogs.length > 0 && (
+                            <div className="mt-6 border-t pt-4">
+                                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-700">
+                                    <Clock className="w-4 h-4" />
+                                    Change History
+                                </h4>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                    {auditLogs.map(log => {
+                                        const safeDate = log.created_date?.endsWith('Z') ? log.created_date : log.created_date + 'Z';
+                                        return (
+                                            <div key={log.id} className="text-xs bg-slate-50 p-2 rounded border">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="font-medium text-slate-700">{log.context || 'Record updated'}</span>
+                                                    <span className="text-slate-500 text-[10px] whitespace-nowrap ml-2">
+                                                        {formatInUAE(safeDate, 'dd/MM/yyyy hh:mm a')}
+                                                    </span>
+                                                </div>
+                                                {isAdmin && (
+                                                    <div className="text-[10px] text-slate-400">
+                                                        By: {log.user_name || log.user_email}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        {auditLogs.length === 0 && open && (
+                            <div className="mt-6 border-t pt-4">
+                                <h4 className="text-sm font-semibold flex items-center gap-2 mb-2 text-slate-700">
+                                    <Clock className="w-4 h-4" />
+                                    Change History
+                                </h4>
+                                <div className="text-xs text-slate-400 italic">No history available for this record.</div>
+                            </div>
                         )}
                         </div>
 

@@ -655,24 +655,26 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             // Fire-and-forget audit log - don't block or fail the save
             retryWithBackoff(() =>
                 base44.functions.invoke('logAudit', {
-                    action: 'UPDATE',
-                    entity_type: 'DailyBreakdown',
+                    action_type: 'UPDATE',
+                    entity_name: `Daily Breakdown (${attendanceId} - ${dayRecord.date})`,
                     entity_id: analysisResult.id,
-                    entity_name: `${attendanceId} - ${dayRecord.date}`,
-                    old_data: {
-                        lateMinutes: data.originalLateMinutes || 0,
-                        earlyCheckoutMinutes: data.originalEarlyCheckout || 0,
-                        otherMinutes: data.originalOtherMinutes || 0
-                    },
-                    new_data: {
-                        type: data.type,
-                        lateMinutes: data.lateMinutes,
-                        earlyCheckoutMinutes: data.earlyCheckoutMinutes,
-                        otherMinutes: data.otherMinutes,
-                        shiftOverride: data.shiftOverride?.enabled ? data.shiftOverride : null
-                    },
-                    details: `Daily breakdown edited: ${changes.join(', ')}`,
-                    company: project.company
+                    project_id: project.id,
+                    company: project.company,
+                    changes: JSON.stringify({
+                        old_data: {
+                            lateMinutes: data.originalLateMinutes || 0,
+                            earlyCheckoutMinutes: data.originalEarlyCheckout || 0,
+                            otherMinutes: data.originalOtherMinutes || 0
+                        },
+                        new_data: {
+                            type: data.type,
+                            lateMinutes: data.lateMinutes,
+                            earlyCheckoutMinutes: data.earlyCheckoutMinutes,
+                            otherMinutes: data.otherMinutes,
+                            shiftOverride: data.shiftOverride?.enabled ? data.shiftOverride : null
+                        }
+                    }),
+                    context: `Daily breakdown edited: ${changes.join(', ')}`
                 })
             ).catch(e => console.error('Failed to log audit:', e));
         },
