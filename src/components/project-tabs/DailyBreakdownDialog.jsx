@@ -2,19 +2,15 @@ import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Edit, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
+import { Edit, Loader2 } from 'lucide-react';
 import EditDayRecordDialog from './EditDayRecordDialog';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import TimePicker from '../ui/QuickTimePicker';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { parseTime, matchPunchesToShiftPoints, filterMultiplePunches, extractTime, formatTime, calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
 import { usePermissions } from '@/components/hooks/usePermissions';
-import { formatInUAE } from '@/components/ui/timezone';
-import { Clock } from 'lucide-react';
-
 /**
  * Midnight buffer: punches between 12:00 AM and 03:00 AM (180 min after midnight).
  * Now UNIVERSAL: moved into the previous day unless the current day has an early shift start.
@@ -210,13 +206,6 @@ export default function DailyBreakdownDialog({
         gcTime: 10 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnMount: false
-    });
-
-    const { data: auditLogs = [], isLoading: isLoadingLogs } = useQuery({
-        queryKey: ['auditLogs', selectedEmployee?.id],
-        queryFn: () => base44.entities.AuditLog.filter({ entity_id: selectedEmployee?.id }, '-created_date', 30),
-        enabled: open && !!selectedEmployee?.id,
-        staleTime: 60 * 1000
     });
 
     const { data: selfShifts = [], isFetched: selfShiftsFetched } = useQuery({
@@ -1389,43 +1378,6 @@ export default function DailyBreakdownDialog({
                                 </TableRow>
                             </TableFooter>
                         </Table>
-                        )}
-                        {auditLogs.length > 0 && (
-                            <div className="mt-6 border-t pt-4">
-                                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-700">
-                                    <Clock className="w-4 h-4" />
-                                    Change History
-                                </h4>
-                                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                                    {auditLogs.map(log => {
-                                        const safeDate = log.created_date?.endsWith('Z') ? log.created_date : log.created_date + 'Z';
-                                        return (
-                                            <div key={log.id} className="text-xs bg-slate-50 p-2 rounded border">
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className="font-medium text-slate-700">{log.context || 'Record updated'}</span>
-                                                    <span className="text-slate-500 text-[10px] whitespace-nowrap ml-2">
-                                                        {formatInUAE(safeDate, 'dd/MM/yyyy hh:mm a')}
-                                                    </span>
-                                                </div>
-                                                {isAdmin && (
-                                                    <div className="text-[10px] text-slate-400">
-                                                        By: {log.user_name || log.user_email}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                        {auditLogs.length === 0 && open && (
-                            <div className="mt-6 border-t pt-4">
-                                <h4 className="text-sm font-semibold flex items-center gap-2 mb-2 text-slate-700">
-                                    <Clock className="w-4 h-4" />
-                                    Change History
-                                </h4>
-                                <div className="text-xs text-slate-400 italic">No history available for this record.</div>
-                            </div>
                         )}
                         </div>
 

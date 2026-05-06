@@ -11,6 +11,8 @@ import { toast } from 'sonner';
 import TimePicker from '../ui/QuickTimePicker';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
 import { calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
+import { Clock } from 'lucide-react';
+import { formatInUAE } from '@/components/ui/timezone';
 
 export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData }) {
     const [formData, setFormData] = useState({
@@ -40,6 +42,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const isUser = userRole === 'user';
     const isAdmin = userRole === 'admin';
     const isSupervisor = userRole === 'supervisor';
+
+    const { data: auditLogs = [] } = useQuery({
+        queryKey: ['auditLogs', analysisResult?.id],
+        queryFn: () => base44.entities.AuditLog.filter({ entity_id: analysisResult?.id }, '-created_date', 30),
+        enabled: open && !!analysisResult?.id,
+        staleTime: 60 * 1000
+    });
 
     // Reuse cached employee-level data from DailyBreakdownDialog when available.
     // Only fetch if no cached data exists. Uses employee-scoped queries (not project-wide)
@@ -1211,6 +1220,44 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                         </Button>
                     </div>
                 </form>
+
+                {auditLogs.length > 0 && (
+                    <div className="mt-6 border-t pt-4">
+                        <h4 className="text-sm font-semibold flex items-center gap-2 mb-3 text-slate-700">
+                            <Clock className="w-4 h-4" />
+                            Change History
+                        </h4>
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                            {auditLogs.map(log => {
+                                const safeDate = log.created_date?.endsWith('Z') ? log.created_date : log.created_date + 'Z';
+                                return (
+                                    <div key={log.id} className="text-xs bg-slate-50 p-2 rounded border">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className="font-medium text-slate-700">{log.context || 'Record updated'}</span>
+                                            <span className="text-slate-500 text-[10px] whitespace-nowrap ml-2">
+                                                {formatInUAE(safeDate, 'dd/MM/yyyy hh:mm a')}
+                                            </span>
+                                        </div>
+                                        {isAdmin && (
+                                            <div className="text-[10px] text-slate-400">
+                                                By: {log.user_name || log.user_email}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+                {auditLogs.length === 0 && open && (
+                    <div className="mt-6 border-t pt-4">
+                        <h4 className="text-sm font-semibold flex items-center gap-2 mb-2 text-slate-700">
+                            <Clock className="w-4 h-4" />
+                            Change History
+                        </h4>
+                        <div className="text-xs text-slate-400 italic">No history available for this record.</div>
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     );
