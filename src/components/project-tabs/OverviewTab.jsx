@@ -18,8 +18,9 @@ import EmployeeSelectionDialog from '../projects/EmployeeSelectionDialog';
 import CloseProjectDialog from './CloseProjectDialog';
 import ProjectEmployeeOverrideDialog from '../projects/ProjectEmployeeOverrideDialog';
 import { AL_MARAGHI_MOTORS_COMPANY_ID } from '@/constants/companyIds';
+import CommandCenter from '../project-detail/CommandCenter';
 
-export default function OverviewTab({ project }) {
+export default function OverviewTab({ project, salaryDivisor, prevMonthDays }) {
     const [showCloseDialog, setShowCloseDialog] = useState(false);
     const [showEmployeeOverrideDialog, setShowEmployeeOverrideDialog] = useState(false);
 
@@ -334,253 +335,47 @@ export default function OverviewTab({ project }) {
         });
     };
 
-    const stats = [
-        { label: 'Working Days', value: workingDays, icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: 'Employees', value: uniqueEmployees, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Punches', value: punches.length, icon: FileText, color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Exceptions', value: exceptions.length, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' }
-    ];
+    const dashboardStats = {
+        punchCount: punches.length,
+        shiftCount: project.shift_blocks_count || 0,
+        exceptionCount: exceptions.length,
+        unmatchedCount: unmatchedCount,
+        employeeCount: uniqueEmployees,
+        hasReport: !!project.last_saved_report_id || results.length > 0,
+        isFinalized: project.status === 'closed',
+        lastAnalysisDate: project.updated_date,
+        workingDays: workingDays
+    };
 
     const canCloseProject = project.status === 'analyzed' && project.status !== 'closed';
 
     return (
         <div className="space-y-6">
-            {/* Close & Finalize Button - Admin Only */}
-            {canCloseProject && isAdmin && (
-                <Card className="border-red-200/40 bg-red-50/80 shadow-sm rounded-xl ring-1 ring-red-200/50">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="font-semibold text-red-900">Ready to close this project?</p>
-                                <p className="text-sm text-red-700 mt-1">
-                                    Once closed, all punch data will be deleted and the project becomes read-only
-                                </p>
-                            </div>
-                            <Button 
-                                onClick={() => setShowCloseDialog(true)}
-                                className="bg-red-600 hover:bg-red-700 transition-all duration-200 shadow-sm"
-                            >
-                                <Lock className="w-4 h-4 mr-2" />
-                                Close & Finalize
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {stats.map((stat) => {
-                    const Icon = stat.icon;
-                    return (
-                        <Card key={stat.label} className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200/80 border-0">
-                            <CardContent className="p-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                                        <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
-                                    </div>
-                                    <div className={`${stat.bg} p-3 rounded-xl ring-1 ring-black/5`}>
-                                        <Icon className={`w-5 h-5 ${stat.color}`} />
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
+            <CommandCenter 
+                project={project}
+                stats={dashboardStats}
+                salaryDivisor={salaryDivisor}
+                prevMonthDays={prevMonthDays}
+                onNavigate={(tab) => {
+                    window.dispatchEvent(new CustomEvent('changeTab', { detail: tab }));
+                }}
+                onShowSettings={() => setShowEditDialog(true)}
+                onShowOverrides={() => setShowEmployeeOverrideDialog(true)}
+            />
+
+            {/* Legacy functionality triggers - kept for business logic support */}
+            <div className="hidden">
+                {canCloseProject && isAdmin && (
+                    <Button onClick={() => setShowCloseDialog(true)}>Close</Button>
+                )}
             </div>
 
-            {/* Details */}
-            <Card className="border-0 bg-white shadow-sm">
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle className="text-slate-900">Project Details</CardTitle>
-                        {(isAdmin || isSupervisor || isUser) && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setEditData({
-                                       name: project.name,
-                                       company: project.company,
-                                       date_from: project.date_from,
-                                       date_to: project.date_to,
-                                       custom_employee_ids: project.custom_employee_ids || '',
-                                       use_carried_grace_minutes: project.use_carried_grace_minutes || false,
-                                       use_gift_minutes: project.use_gift_minutes || false,
-                                       // Added: Include gift minutes dates when opening edit dialog
-                                       gift_minutes_date_from: project.gift_minutes_date_from || '',
-                                       gift_minutes_date_to: project.gift_minutes_date_to || '',
-                                       skip_double_deduction: project.skip_double_deduction || false,
-                                       skip_double_deduction_date_from: project.skip_double_deduction_date_from || '',
-                                       skip_double_deduction_date_to: project.skip_double_deduction_date_to || '',
-                                       shift_blocks_count: project.shift_blocks_count || 2
-                                    });
-                                    setShowGiftDateWarning(true); // Reset warning dismissal state
-                                    setShowEditDialog(true);
-                                }}
-                                disabled={project.status === 'locked' || project.status === 'closed'}
-                            >
-                                <Pencil className="w-4 h-4 mr-2" />
-                                Edit
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-sm text-slate-600">Project Name</p>
-                            <p className="font-medium text-slate-900 mt-1">{project.name}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-600">Company</p>
-                            <p className="font-medium text-slate-900 mt-1">{project.company || '-'}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-600">Date Range</p>
-                            <p className="font-medium text-slate-900 mt-1">
-                                {new Date(project.date_from).toLocaleDateString('en-GB')} - {new Date(project.date_to).toLocaleDateString('en-GB')}
-                            </p>
-                        </div>
-
-                        <div>
-                            <p className="text-sm text-slate-600">Created By</p>
-                            <p className="font-medium text-slate-900 mt-1">{project.created_by || '-'}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-slate-600">Created Date</p>
-                            <p className="font-medium text-slate-900 mt-1">
-                                {formatInUAE(project.created_date, 'dd/MM/yyyy hh:mm a')}
-                            </p>
-                        </div>
-                        {project.updated_date && (
-                            <div>
-                                <p className="text-sm text-slate-600">Last Analysis</p>
-                                <p className="font-medium text-slate-900 mt-1">
-                                    {formatInUAE(project.updated_date, 'dd/MM/yyyy hh:mm a')}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-
-
-            {/* Unmatched Employees Warning */}
-            {unmatchedCount > 0 && isAdmin && (
-                <Card className="bg-amber-50/50 border-amber-200/50 shadow-sm ring-1 ring-amber-200/40 rounded-xl">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-start gap-3">
-                                <div className="p-2 bg-amber-100 rounded-lg">
-                                    <AlertCircle className="w-5 h-5 text-amber-600" />
-                                </div>
-                                <div>
-                                    <p className="font-semibold text-amber-900">
-                                        {unmatchedCount} Unmatched Attendance ID{unmatchedCount > 1 ? 's' : ''} Found
-                                    </p>
-                                    <p className="text-sm text-amber-700 mt-1">
-                                        Some punch records have attendance IDs that don't exist in the employee master list.
-                                    </p>
-                                </div>
-                            </div>
-                            <Button 
-                                onClick={() => setShowEmployeeOverrideDialog(true)}
-                                variant="outline"
-                                className="border-amber-200 hover:bg-amber-100 text-amber-700 transition-all duration-200"
-                            >
-                                <UserPlus className="w-4 h-4 mr-2" />
-                                Manage Overrides
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Actions */}
-            <Card className="border-0 bg-white shadow-sm">
-                <CardHeader>
-                    <CardTitle className="text-slate-900">Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-3">
-                    {(isAdmin || isSupervisor || isUser) && (
-                    <>
-                        {isAdmin && (
-                            <Button
-                                onClick={() => setShowEmployeeOverrideDialog(true)}
-                                variant="outline"
-                                disabled={project.status === 'closed'}
-                            >
-                                <UserPlus className="w-4 h-4 mr-2" />
-                                Employee Overrides
-                                {projectEmployees.length > 0 && (
-                                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded">
-                                        {projectEmployees.length}
-                                    </span>
-                                )}
-                            </Button>
-                        )}
-                        <Button
-                            onClick={() => lockMutation.mutate()}
-                            disabled={project.status === 'locked' || project.status === 'closed' || lockMutation.isPending}
-                            variant="outline"
-                        >
-                            <Lock className="w-4 h-4 mr-2" />
-                            {project.status === 'locked' ? 'Locked' : 'Lock Project'}
-                        </Button>
-
-                        {(isAdmin || isSupervisor) && project.status !== 'closed' && (
-                            <Button
-                                onClick={() => syncRecurringMutation.mutate()}
-                                disabled={syncRecurringMutation.isPending}
-                                variant="outline"
-                                className="border-indigo-200 hover:bg-indigo-50 text-indigo-700"
-                            >
-                                <Calendar className="w-4 h-4 mr-2" />
-                                {syncRecurringMutation.isPending ? 'Syncing...' : 'Sync Recurring Adjustments'}
-                            </Button>
-                        )}
-
-                        {isAdmin && project.status === 'analyzed' && (
-                            <Button
-                                onClick={() => {
-                                    if (window.confirm('This will finalize the project and update employee grace minutes. Continue?')) {
-                                        closeMutation.mutate();
-                                    }
-                                }}
-                                disabled={closeMutation.isPending}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                            >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Close & Finalize
-                            </Button>
-                        )}
-
-                        <Button
-                            onClick={() => duplicateMutation.mutate()}
-                            disabled={duplicateMutation.isPending}
-                            variant="outline"
-                        >
-                            <Copy className="w-4 h-4 mr-2" />
-                            Duplicate Project
-                        </Button>
-
-                        {isAdmin && (
-                            <Button
-                                onClick={handleDelete}
-                                disabled={deleteMutation.isPending}
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete Project
-                            </Button>
-                        )}
-                    </>
-                    )}
-                </CardContent>
-            </Card>
+            {/* Existing Dialogs remain intact */}
+            <CloseProjectDialog 
+                open={showCloseDialog}
+                onClose={() => setShowCloseDialog(false)}
+                project={project}
+            />
 
             {/* Edit Project Dialog */}
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

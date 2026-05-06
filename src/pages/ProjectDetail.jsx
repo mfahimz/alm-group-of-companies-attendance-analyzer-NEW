@@ -7,6 +7,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { createPageUrl } from '../utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import OverviewTab from '../components/project-tabs/OverviewTab';
 import PunchUploadTab from '../components/project-tabs/PunchUploadTab';
 import ShiftTimingsTab from '../components/project-tabs/ShiftTimingsTab';
@@ -14,9 +15,13 @@ import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
+import WorkflowStepper from '../components/project-detail/WorkflowStepper';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { MoreVertical, Settings, Settings2, Trash2, Copy, Lock, RefreshCw } from 'lucide-react';
 
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Label } from '@/components/ui/label';
+import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
 
 export default function ProjectDetail() {
   const location = useLocation();
@@ -42,6 +47,17 @@ export default function ProjectDetail() {
     newUrl.searchParams.set('tab', newTab);
     window.history.replaceState({}, '', newUrl.toString());
   };
+
+  // Listen for navigation requests from CommandCenter
+  useEffect(() => {
+    const handleNavigation = (e) => {
+        if (e.detail) {
+            handleTabChange(e.detail);
+        }
+    };
+    window.addEventListener('changeTab', handleNavigation);
+    return () => window.removeEventListener('changeTab', handleNavigation);
+  }, []);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', projectId],
@@ -227,104 +243,87 @@ export default function ProjectDetail() {
       { label: 'Projects', href: 'Projects' },
       { label: project.name }]
       } />
-            {/* Header */}
-            <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/40 rounded-[2rem] shadow-sm p-6 sm:p-10 border border-slate-200/60 animate-in slide-in-from-top-4 duration-700">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-2 h-12 rounded-full bg-gradient-to-b ${
-              project.status === 'draft' ? 'from-amber-400 to-amber-600' :
-              project.status === 'analyzed' ? 'from-green-400 to-green-600' :
-              project.status === 'locked' ? 'from-slate-400 to-slate-600' :
-              'from-red-400 to-red-600'}`
-              } />
+            {/* Header - Compact Context Bar */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={cn(
+                                "w-1 h-8 rounded-full",
+                                project.status === 'draft' ? "bg-amber-500" :
+                                project.status === 'analyzed' ? "bg-green-500" :
+                                project.status === 'locked' ? "bg-slate-500" :
+                                "bg-red-500"
+                            )} />
                             <div>
-                                <h1 className="bg-clip-text text-transparent bg-gradient-to-r from-slate-950 via-slate-800 to-slate-600 text-2xl font-extrabold sm:text-5xl tracking-tight">
+                                <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                                     {project.name}
+                                    <span className={cn(
+                                        "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-inset",
+                                        project.status === 'draft' ? "bg-amber-50 text-amber-700 ring-amber-200" :
+                                        project.status === 'analyzed' ? "bg-green-50 text-green-700 ring-green-200" :
+                                        project.status === 'locked' ? "bg-blue-50 text-blue-700 ring-blue-200" :
+                                        "bg-red-50 text-red-700 ring-red-200"
+                                    )}>
+                                        {project.status}
+                                    </span>
                                 </h1>
-                                <p className="text-slate-500 mt-2 text-sm font-medium tracking-wide uppercase">{project.company}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    {project.company}
+                                    <span>•</span>
+                                    {formatInUAE(parseDateInUAE(project.date_from), 'dd/MM/yyyy')} → {formatInUAE(parseDateInUAE(project.date_to), 'dd/MM/yyyy')}
+                                </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2 text-slate-600">
-                            <Calendar className="w-4 h-4" />
-                            <p className="text-sm font-semibold sm:text-base">
-                                {new Date(project.date_from).toLocaleDateString('en-GB')} → {new Date(project.date_to).toLocaleDateString('en-GB')}
-                            </p>
+
+                        <div className="flex items-center gap-2">
+                            {/* Project Settings Dropdown */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 transition-colors">
+                                        <Settings2 className="w-5 h-5 text-slate-500" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem className="font-bold text-xs uppercase text-slate-400 disabled:opacity-50" disabled>
+                                        Project Controls
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    {project.status === 'closed' && isAdmin && (
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                if (window.confirm('Reopen this project?')) {
+                                                    reopenProjectMutation.mutate();
+                                                }
+                                            }}
+                                            className="text-green-600 focus:text-green-700 focus:bg-green-50"
+                                        >
+                                            <RefreshCw className="w-4 h-4 mr-2" />
+                                            Reopen Project
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem className="text-slate-600">
+                                        <Copy className="w-4 h-4 mr-2" />
+                                        Duplicate Project
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-slate-600">
+                                        <Lock className="w-4 h-4 mr-2" />
+                                        Lock Project
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50">
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete Project
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                         <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ring-1 ring-inset transition-all duration-200 ${
-                            project.status === 'draft' ? 'bg-amber-50 text-amber-700 ring-amber-200' :
-                            project.status === 'analyzed' ? 'bg-green-50 text-green-700 ring-green-200' :
-                            project.status === 'locked' ? 'bg-blue-50 text-blue-700 ring-blue-200' :
-                            'bg-red-50 text-red-700 ring-red-200'
-                            }`}>
-                            {project.status}
-                            </span>
-                            {project.status === 'closed' && isAdmin &&
-                            <Button
-                            size="sm"
-                            onClick={() => {
-                            if (window.confirm('Reopen this project? This will allow editing again.')) {
-                            reopenProjectMutation.mutate();
-                            }
-                            }}
-                            disabled={reopenProjectMutation.isPending}
-                            className="bg-green-600 hover:bg-green-700">
+                </div>
 
-                                 <LockOpen className="w-4 h-4 mr-2" />
-                                 Reopen Project
-                             </Button>
-                            }
-                            </div>
-
-                            {/* DIVISOR SETTINGS - Al Maraghi Motors only */}
-                            {/* [MERGE_NOTE: If merging divisors in future, remove the OT divisor section and update label] */}
-                            {isAlMaraghiMotors && isAdmin && (
-                            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Salary / Deduction Divisor — auto-calculated read-only */}
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                                        Salary / Deduction Divisor
-                                    </Label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-2xl font-bold text-slate-800">
-                                            {salaryDivisorAuto}
-                                        </span>
-                                        <span className="text-xs text-slate-400">days</span>
-                                        <span className="text-xs text-emerald-600 font-medium">
-                                            (auto-calculated)
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Used for: Leave Pay, Salary Leave Amount, Deductible Hours Pay
-                                    </p>
-                                </div>
-
-                                {/* Prev Month Days — auto-calculated read-only */}
-                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                                        Prev Month Days
-                                    </Label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-2xl font-bold text-slate-800">
-                                            {prevMonthDaysAuto !== null ? prevMonthDaysAuto : '—'}
-                                        </span>
-                                        <span className="text-xs text-slate-400">days</span>
-                                        {prevMonthDaysAuto !== null && (
-                                            <span className="text-xs text-emerald-600 font-medium">
-                                                (auto-calculated)
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {prevMonthDaysAuto !== null
-                                            ? `Days in previous month — used for prev month LOP pay calculation`
-                                            : `No previous month overflow for this project period`}
-                                    </p>
-                                </div>
-                            </div>
-                            )}
+                {/* Workflow Stepper integration */}
+                <div className="px-6 py-2 bg-white">
+                    <WorkflowStepper currentStatus={project.status} currentTab={activeTab} />
                 </div>
             </div>
 
@@ -383,7 +382,13 @@ export default function ProjectDetail() {
 
                 <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 ring-1 ring-slate-200 p-2 sm:p-6 min-h-[400px]">
                     <TabsContent value="overview">
-                        {activeTab === 'overview' && <OverviewTab project={project} />}
+                        {activeTab === 'overview' && (
+                            <OverviewTab 
+                                project={project} 
+                                salaryDivisor={salaryDivisorAuto}
+                                prevMonthDays={prevMonthDaysAuto}
+                            />
+                        )}
                     </TabsContent>
 
                     <TabsContent value="shifts">
