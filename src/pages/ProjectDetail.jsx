@@ -17,11 +17,18 @@ import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
 import WorkflowStepper from '../components/project-detail/WorkflowStepper';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Settings, Settings2, Trash2, Copy, Lock, RefreshCw } from 'lucide-react';
+import { MoreVertical, Settings, Settings2, Trash2, Copy, Lock, RefreshCw, Pencil, Users, AlertCircle } from 'lucide-react';
 
 import Breadcrumb from '../components/ui/Breadcrumb';
 import { Label } from '@/components/ui/label';
 import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import CloseProjectDialog from '../components/project-tabs/CloseProjectDialog';
+import EmployeeSelectionDialog from '../components/projects/EmployeeSelectionDialog';
+import ProjectEmployeeOverrideDialog from '../components/projects/ProjectEmployeeOverrideDialog';
 
 export default function ProjectDetail() {
   const location = useLocation();
@@ -39,6 +46,58 @@ export default function ProjectDetail() {
     }
   }, [location.search]);
   const navigate = useNavigate();
+
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+  const [showEmployeeOverrideDialog, setShowEmployeeOverrideDialog] = useState(false);
+  const [showGiftDateWarning, setShowGiftDateWarning] = useState(true);
+
+  const [editData, setEditData] = useState({
+    name: '',
+    company: '',
+    date_from: '',
+    date_to: '',
+    custom_employee_ids: '',
+    use_carried_grace_minutes: false,
+    use_gift_minutes: false,
+    gift_minutes_date_from: '',
+    gift_minutes_date_to: '',
+    skip_double_deduction: false,
+    skip_double_deduction_date_from: '',
+    skip_double_deduction_date_to: '',
+    shift_blocks_count: 2,
+    sync_recurring_adjustments: false
+  });
+
+  // Sync editData when project loads
+  useEffect(() => {
+    if (project) {
+      setEditData({
+        name: project.name || '',
+        company: project.company || '',
+        date_from: project.date_from || '',
+        date_to: project.date_to || '',
+        custom_employee_ids: project.custom_employee_ids || '',
+        use_carried_grace_minutes: !!project.use_carried_grace_minutes,
+        use_gift_minutes: !!project.use_gift_minutes,
+        gift_minutes_date_from: project.gift_minutes_date_from || '',
+        gift_minutes_date_to: project.gift_minutes_date_to || '',
+        skip_double_deduction: !!project.skip_double_deduction,
+        skip_double_deduction_date_from: project.skip_double_deduction_date_from || '',
+        skip_double_deduction_date_to: project.skip_double_deduction_date_to || '',
+        shift_blocks_count: project.shift_blocks_count || 2,
+        sync_recurring_adjustments: false
+      });
+    }
+  }, [project]);
+
+  // Handle global events from children
+  useEffect(() => {
+    const handleShowOverrides = () => setShowEmployeeOverrideDialog(true);
+    window.addEventListener('showOverrides', handleShowOverrides);
+    return () => window.removeEventListener('showOverrides', handleShowOverrides);
+  }, []);
 
   // Update URL when tab changes (without full page reload)
   const handleTabChange = (newTab) => {
@@ -150,6 +209,128 @@ export default function ProjectDetail() {
     }
   });
 
+  const updateProjectMutation = useMutation({
+    mutationFn: (data) => base44.entities.Project.update(project.id, {
+      ...data,
+      use_gift_minutes: !!data.use_gift_minutes,
+      use_carried_grace_minutes: !!data.use_carried_grace_minutes,
+      skip_double_deduction: !!data.skip_double_deduction
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['project', projectId]);
+      toast.success('Project updated successfully');
+      setShowEditDialog(false);
+    },
+    onError: () => {
+      toast.error('Failed to update project');
+    }
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      const newProject = await base44.entities.Project.create({
+        name: `${project.name} (Copy)`,
+        company: project.company,
+        date_from: project.date_from,
+        date_to: project.date_to,
+        department: project.department,
+        status: 'draft',
+        use_carried_grace_minutes: project.use_carried_grace_minutes || false,
+        use_gift_minutes: project.use_gift_minutes || false,
+        shift_blocks_count: project.shift_blocks_count || 2,
+        custom_employee_ids: project.custom_employee_ids || ''
+      });
+      return newProject;
+    },
+    onSuccess: (newProject) => {
+      queryClient.invalidateQueries(['projects']);
+      toast.success('Project duplicated successfully');
+      navigate(createPageUrl(`ProjectDetail?id=${newProject.id}`));
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      // Logic from OverviewTab
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const batchSize = 20;
+      
+      const deleteBatch = async (items, entityType) => {
+        for (let i = 0; i < items.length; i += batchSize) {
+          const batch = items.slice(i, i + batchSize);
+          await Promise.all(batch.map(item => entityType.delete(item.id)));
+          if (i + batchSize < items.length) await delay(500);
+        }
+      };
+      
+      const reportRuns = await base44.entities.ReportRun.filter({ project_id: project.id });
+      await deleteBatch(reportRuns, base44.entities.ReportRun);
+      
+      const punchItems = await base44.entities.Punch.filter({ project_id: project.id });
+      await deleteBatch(punchItems, base44.entities.Punch);
+      
+      const exceptionItems = await base44.entities.Exception.filter({ project_id: project.id });
+      await deleteBatch(exceptionItems, base44.entities.Exception);
+      
+      const resultItems = await base44.entities.AnalysisResult.filter({ project_id: project.id });
+      await deleteBatch(resultItems, base44.entities.AnalysisResult);
+      
+      const shiftItems = await base44.entities.ShiftTiming.filter({ project_id: project.id });
+      await deleteBatch(shiftItems, base44.entities.ShiftTiming);
+      
+      await base44.entities.Project.delete(project.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['projects']);
+      toast.success('Project deleted successfully');
+      navigate(createPageUrl('Projects'));
+    },
+    onError: (error) => {
+      toast.error('Failed to delete project: ' + error.message);
+    }
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: () => base44.entities.Project.update(project.id, { status: 'locked' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['project', projectId]);
+      toast.success('Project locked successfully');
+    },
+    onError: () => {
+      toast.error('Failed to lock project');
+    }
+  });
+
+  const syncRecurringMutation = useMutation({
+    mutationFn: async () => {
+      await base44.functions.invoke('seedRecurringAdjustments', { projectId: project.id });
+    },
+    onSuccess: () => {
+      toast.success('Recurring adjustments synchronized successfully');
+      queryClient.invalidateQueries(['overtimeData', projectId]);
+    },
+    onError: (error) => {
+      toast.error('Failed to sync recurring adjustments: ' + error.message);
+    }
+  });
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editData.name.trim()) return toast.error('Project name is required');
+    if (editData.use_gift_minutes && (!editData.gift_minutes_date_from || !editData.gift_minutes_date_to)) {
+      return toast.error('Gift minutes date range is required');
+    }
+
+    if (editData.sync_recurring_adjustments) {
+      await syncRecurringMutation.mutateAsync();
+    }
+
+    updateProjectMutation.mutate({
+      ...editData,
+      sync_recurring_adjustments: undefined
+    });
+  };
+
 
 
   if (isLoading) {
@@ -238,7 +419,7 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 px-4 md:px-0 bg-gradient-to-br from-slate-50 to-white min-h-screen">
+    <div className="space-y-6 animate-in fade-in duration-500 bg-gradient-to-br from-slate-50 to-white min-h-screen">
             <Breadcrumb items={[
       { label: 'Projects', href: 'Projects' },
       { label: project.name }]
@@ -289,6 +470,30 @@ export default function ProjectDetail() {
                                         Project Controls
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
+                                    {isAdmin && (
+                                        <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                                            <Pencil className="w-4 h-4 mr-2" />
+                                            Edit Settings
+                                        </DropdownMenuItem>
+                                    )}
+                                    {isAdmin && (
+                                        <DropdownMenuItem onClick={() => setShowEmployeeOverrideDialog(true)}>
+                                            <Users className="w-4 h-4 mr-2" />
+                                            Manage Overrides
+                                        </DropdownMenuItem>
+                                    )}
+                                    {project.status !== 'closed' && project.status !== 'locked' && isAdmin && (
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                if (window.confirm('Lock this project? It will become read-only.')) {
+                                                    lockMutation.mutate();
+                                                }
+                                            }}
+                                        >
+                                            <Lock className="w-4 h-4 mr-2" />
+                                            Lock Project
+                                        </DropdownMenuItem>
+                                    )}
                                     {project.status === 'closed' && isAdmin && (
                                         <DropdownMenuItem 
                                             onClick={() => {
@@ -302,19 +507,30 @@ export default function ProjectDetail() {
                                             Reopen Project
                                         </DropdownMenuItem>
                                     )}
-                                    <DropdownMenuItem className="text-slate-600">
-                                        <Copy className="w-4 h-4 mr-2" />
-                                        Duplicate Project
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-slate-600">
-                                        <Lock className="w-4 h-4 mr-2" />
-                                        Lock Project
-                                    </DropdownMenuItem>
+                                    {isAdmin && (
+                                        <DropdownMenuItem onClick={() => {
+                                            if (window.confirm('Duplicate this project?')) {
+                                                duplicateMutation.mutate();
+                                            }
+                                        }}>
+                                            <Copy className="w-4 h-4 mr-2" />
+                                            Duplicate Project
+                                        </DropdownMenuItem>
+                                    )}
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-red-600 focus:text-red-700 focus:bg-red-50">
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Delete Project
-                                    </DropdownMenuItem>
+                                    {isAdmin && (
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                if (window.confirm('Delete this project? This cannot be undone.')) {
+                                                    deleteMutation.mutate();
+                                                }
+                                            }}
+                                            className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                                        >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete Project
+                                        </DropdownMenuItem>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -414,11 +630,99 @@ export default function ProjectDetail() {
                     <TabsContent value="salary">
                         {activeTab === 'salary' && <SalaryTab project={project} />}
                     </TabsContent>
-
-
                 </div>
             </Tabs>
             )}
+
+            {/* lifted Management Dialogs */}
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Project Settings</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
+                        <div>
+                            <Label>Project Name *</Label>
+                            <Input
+                                value={editData.name}
+                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <Label>Company *</Label>
+                            <Select 
+                                value={editData.company} 
+                                onValueChange={(value) => setEditData({ ...editData, company: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Al Maraghi Motors">Al Maraghi Motors</SelectItem>
+                                    <SelectItem value="Al Maraghi Automotive">Al Maraghi Automotive</SelectItem>
+                                    <SelectItem value="Naser Mohsin Auto Parts">Naser Mohsin Auto Parts</SelectItem>
+                                    <SelectItem value="Astra Auto Parts">Astra Auto Parts</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label>Start Date *</Label>
+                                <Input type="date" value={editData.date_from} onChange={(e) => setEditData({ ...editData, date_from: e.target.value })} />
+                            </div>
+                            <div>
+                                <Label>End Date *</Label>
+                                <Input type="date" value={editData.date_to} onChange={(e) => setEditData({ ...editData, date_to: e.target.value })} />
+                            </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="use_grace" checked={editData.use_carried_grace_minutes} onCheckedChange={(checked) => setEditData({ ...editData, use_carried_grace_minutes: !!checked })} />
+                            <Label htmlFor="use_grace" className="font-normal text-xs">Use carried forward grace</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="use_gift" checked={editData.use_gift_minutes} onCheckedChange={(checked) => setEditData({ ...editData, use_gift_minutes: !!checked })} />
+                            <Label htmlFor="use_gift" className="font-normal text-xs">Enable Gift Minutes</Label>
+                        </div>
+                        
+                        {editData.company?.includes('Al Maraghi') && (
+                            <div className="space-y-3 pt-2 border-t border-slate-100">
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox id="skip_double" checked={editData.skip_double_deduction} onCheckedChange={(checked) => setEditData({ ...editData, skip_double_deduction: !!checked })} />
+                                    <Label htmlFor="skip_double" className="font-normal text-xs">Skip Double Deduction</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox id="sync_rec" checked={editData.sync_recurring_adjustments} onCheckedChange={(checked) => setEditData({ ...editData, sync_recurring_adjustments: !!checked })} />
+                                    <Label htmlFor="sync_rec" className="font-normal text-xs">Sync Recurring Adjustments</Label>
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex gap-3 pt-2">
+                            <Button type="submit" disabled={updateProjectMutation.isPending}>{updateProjectMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+                            <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <EmployeeSelectionDialog
+                open={showEmployeeDialog}
+                onOpenChange={setShowEmployeeDialog}
+                company={editData.company}
+                initialIds={editData.custom_employee_ids}
+                onConfirm={(ids) => setEditData({ ...editData, custom_employee_ids: ids })}
+            />
+
+            <CloseProjectDialog
+                open={showCloseDialog}
+                onClose={() => setShowCloseDialog(false)}
+                project={project}
+            />
+
+            <ProjectEmployeeOverrideDialog
+                open={showEmployeeOverrideDialog}
+                onOpenChange={setShowEmployeeOverrideDialog}
+                project={project}
+            />
         </div>);
 
 }

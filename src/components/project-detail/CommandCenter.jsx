@@ -22,9 +22,7 @@ export default function CommandCenter({
     stats, 
     salaryDivisor,
     prevMonthDays,
-    onNavigate,
-    onShowSettings,
-    onShowOverrides
+    onNavigate
 }) {
     const {
         punchCount = 0,
@@ -40,44 +38,9 @@ export default function CommandCenter({
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Top Row: Core Status */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Project Snapshot */}
-                <Card className="lg:col-span-1 border-0 shadow-sm bg-gradient-to-br from-slate-900 to-slate-800 text-white overflow-hidden relative">
-                    <div className="absolute top-0 right-0 p-6 opacity-10">
-                        <Briefcase className="w-24 h-24 rotate-12" />
-                    </div>
-                    <CardContent className="p-8 space-y-6">
-                        <div>
-                            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Project Identifier</p>
-                            <h2 className="text-2xl font-black">{project.name}</h2>
-                            <p className="text-slate-300 text-sm mt-1 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                                {project.company}
-                            </p>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/50">
-                            <div>
-                                <p className="text-slate-500 text-[10px] font-bold uppercase">Period</p>
-                                <p className="text-sm font-medium">{formatInUAE(parseDateInUAE(project.date_from), 'dd/MM/yyyy')}</p>
-                            </div>
-                            <div>
-                                <p className="text-slate-500 text-[10px] font-bold uppercase">End Date</p>
-                                <p className="text-sm font-medium">{formatInUAE(parseDateInUAE(project.date_to), 'dd/MM/yyyy')}</p>
-                            </div>
-                        </div>
-
-                        <div className="pt-4">
-                            <span className="inline-flex items-center px-3 py-1 rounded-full bg-slate-700/50 text-[10px] font-bold uppercase tracking-wider text-slate-300 ring-1 ring-slate-600">
-                                Status: {project.status}
-                            </span>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Health Overview */}
-                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Top Row: Readiness & Quick Stats */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <DashboardHealthCard 
                         title="Punches"
                         value={punchCount}
@@ -108,20 +71,10 @@ export default function CommandCenter({
                         subtitle="Unmatched IDs"
                         icon={Users}
                         status={unmatchedCount > 0 ? 'error' : 'success'}
-                        onClick={unmatchedCount > 0 ? onShowOverrides : null}
+                        onClick={unmatchedCount > 0 ? () => window.dispatchEvent(new CustomEvent('showOverrides')) : null}
                     />
                 </div>
-            </div>
 
-            {/* Middle Row: Next Action */}
-            <NextActionPanel 
-                project={project} 
-                stats={stats} 
-                onNavigate={onNavigate} 
-            />
-
-            {/* Bottom Row: Readiness & Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Readiness Checklist */}
                 <Card className="border-0 shadow-md bg-white">
                     <CardHeader className="border-b border-slate-50 px-6 py-4">
@@ -156,6 +109,17 @@ export default function CommandCenter({
                         </ul>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Middle Row: Next Action */}
+            <NextActionPanel 
+                project={project} 
+                stats={stats} 
+                onNavigate={onNavigate} 
+            />
+
+            {/* Bottom Row: Lifecycle & Financials */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
                 {/* Project Metadata & Activity */}
                 <Card className="border-0 shadow-md bg-white">
@@ -191,14 +155,7 @@ export default function CommandCenter({
                             </div>
                             
                             <div className="pt-4 border-t border-slate-50">
-                                <Button 
-                                    variant="ghost" 
-                                    className="w-full justify-between text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 font-bold text-xs"
-                                    onClick={onShowSettings}
-                                >
-                                    Open Project Settings
-                                    <Settings2 className="w-4 h-4" />
-                                </Button>
+                                <p className="text-[10px] text-slate-400 italic">Project settings managed via main context menu above.</p>
                             </div>
                         </div>
                     </CardContent>
