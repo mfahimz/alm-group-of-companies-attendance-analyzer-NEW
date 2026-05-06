@@ -14,7 +14,7 @@ import { calculateDailyPenalties } from '@/utils/attendanceAnalysisUtils';
 import { Clock } from 'lucide-react';
 import { formatInUAE } from '@/components/ui/timezone';
 
-export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData }) {
+export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, project, attendanceId, analysisResult, dailyBreakdownData, acquireSaveLock, releaseSaveLock, isSaveLocked }) {
     const [formData, setFormData] = useState({
         type: 'MANUAL_PRESENT',
         details: '',
@@ -32,6 +32,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
         }
     });
     const queryClient = useQueryClient();
+
+    // Ref to track save-in-flight for form re-init guard (PART D).
+    // Declared early so useEffect can reference it before useMutation is declared.
+    const isSavePendingRef = React.useRef(false);
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -334,6 +338,9 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     };
 
     useEffect(() => {
+        // PART D: Guard form re-initialization while save is in-flight.
+        // Prevents parent query invalidation/refetch from wiping form state mid-save.
+        if (isSavePendingRef.current) return;
         if (dayRecord && open && analysisResult) {
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${month}-${day}`;
@@ -528,6 +535,13 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const updateDayMutation = useMutation({
         mutationFn: async (data) => {
+            // Track pending state for the form re-init guard (PART D)
+            isSavePendingRef.current = true;
+            // PART B: Acquire shared per-AnalysisResult save lock.
+            // Prevents overlapping saves (single-edit or bulk-edit) on the same record.
+            if (acquireSaveLock && !acquireSaveLock(analysisResult.id)) {
+                throw new Error('Another save is already in progress for this employee. Please wait.');
+            }
             const [day, month, year] = dayRecord.date.split('/');
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
@@ -688,6 +702,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             ).catch(e => console.error('Failed to log audit:', e));
         },
         onSuccess: () => {
+            // Clear pending ref for form re-init guard (PART D)
+            isSavePendingRef.current = false;
+            // Release shared save lock on success
+            if (releaseSaveLock && analysisResult?.id) releaseSaveLock(analysisResult.id);
             // BUG 1 FIX: Force active refetch on the results query so the summary table
             // in ReportDetailView updates immediately after a day edit save.
             // The broad ['results'] prefix match invalidates all variants.
@@ -699,6 +717,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
             onClose();
         },
         onError: (error) => {
+            // Clear pending ref for form re-init guard (PART D)
+            isSavePendingRef.current = false;
+            // Release shared save lock on error
+            if (releaseSaveLock && analysisResult?.id) releaseSaveLock(analysisResult.id);
             console.error('Update day record error:', error);
             toast.error('Failed to save changes. Please try again.');
         }
@@ -781,6 +803,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!dayRecord || !analysisResult) return;
+        // PART C: Block submit if save already in-flight (double-click guard)
+        if (updateDayMutation.isPending) return;
+        // PART B: Block submit if another save (e.g. bulk apply) holds the lock
+        if (isSaveLocked && analysisResult?.id && isSaveLocked(analysisResult.id)) return;
         
         const [day, month, year] = dayRecord.date.split('/');
         const dateStr = `${year}-${month}-${day}`;
@@ -880,9 +906,16 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
 
     const dayPunches = getDayPunches();
 
+    // PART C: Block dialog close while save is pending
+    const safeOnClose = (openState) => {
+        // Only allow close if NOT currently saving
+        if (updateDayMutation.isPending) return;
+        if (!openState) onClose();
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <Dialog open={open} onOpenChange={safeOnClose}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onPointerDownOutside={(e) => { if (updateDayMutation.isPending) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (updateDayMutation.isPending) e.preventDefault(); }}>
                 <DialogHeader>
                     <DialogTitle>Edit Day Record: {(() => {
                         if (typeof dayRecord?.date === 'string' && dayRecord.date.includes('/')) {
@@ -1212,10 +1245,10 @@ export default function EditDayRecordDialog({ open, onClose, onSave, dayRecord, 
                     </div>
 
                     <div className="flex gap-3 pt-4 border-t">
-                        <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateDayMutation.isPending}>
+                        <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700" disabled={updateDayMutation.isPending || (isSaveLocked && analysisResult?.id && isSaveLocked(analysisResult.id))}>
                             {updateDayMutation.isPending ? 'Saving...' : 'Save Changes'}
                         </Button>
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button type="button" variant="outline" onClick={onClose} disabled={updateDayMutation.isPending}>
                             Cancel
                         </Button>
                     </div>

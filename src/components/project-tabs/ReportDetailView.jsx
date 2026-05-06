@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { fetchAllRecords } from '../utils/paginatedFetch';
@@ -67,7 +67,30 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         status: 'Processing...'
     });
     const [giftMinutesOverrides, setGiftMinutesOverrides] = useState({});
-    
+
+    // ── Per-AnalysisResult in-flight save lock ──────────────────────────
+    // Prevents overlapping single-edit and bulk-edit saves that target the
+    // same AnalysisResult.id.  Different employees remain independent.
+    const saveLockSetRef = useRef(new Set());
+    const [, forceRenderLock] = useState(0);          // trigger re-render on lock change
+
+    const acquireSaveLock = useCallback((analysisResultId) => {
+        if (saveLockSetRef.current.has(analysisResultId)) return false;   // already locked
+        saveLockSetRef.current.add(analysisResultId);
+        forceRenderLock(n => n + 1);
+        return true;
+    }, []);
+
+    const releaseSaveLock = useCallback((analysisResultId) => {
+        saveLockSetRef.current.delete(analysisResultId);
+        forceRenderLock(n => n + 1);
+    }, []);
+
+    const isSaveLocked = useCallback((analysisResultId) => {
+        return saveLockSetRef.current.has(analysisResultId);
+    }, []);
+    // ────────────────────────────────────────────────────────────────────
+
     const [selectedRowIds, setSelectedRowIds] = useState([]);
     const [isZeroingEarlyMin, setIsZeroingEarlyMin] = useState(false);
 
@@ -1670,6 +1693,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     formatTime={formatTime}
                     matchPunchesToShiftPoints={matchPunchesToShiftPoints}
                     filterMultiplePunches={filterMultiplePunches}
+                    acquireSaveLock={acquireSaveLock}
+                    releaseSaveLock={releaseSaveLock}
+                    isSaveLocked={isSaveLocked}
                 />
             )}
 
@@ -1732,6 +1758,9 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                     attendanceId={selectedEmployee?.attendance_id}
                     analysisResult={selectedEmployee}
                     dailyBreakdownData={auditDailyBreakdownData}
+                    acquireSaveLock={acquireSaveLock}
+                    releaseSaveLock={releaseSaveLock}
+                    isSaveLocked={isSaveLocked}
                 />
             )}
         </div>

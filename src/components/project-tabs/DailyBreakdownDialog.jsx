@@ -46,7 +46,10 @@ export default function DailyBreakdownDialog({
     exceptions: parentExceptions,
     employees,
     reportRun,
-    project
+    project,
+    acquireSaveLock,
+    releaseSaveLock,
+    isSaveLocked
 }) {
     const [editingDay, setEditingDay] = useState(null);
     const [selectedDays, setSelectedDays] = useState(new Set());
@@ -75,9 +78,26 @@ export default function DailyBreakdownDialog({
     const handleBulkApply = async () => {
         if (!selectedEmployee || selectedDays.size === 0) return;
         if (!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled && !bulkZeroEarly && !bulkZeroLate) return;
+
+        // PART B: Acquire shared save lock to prevent overlapping saves
+        if (acquireSaveLock && !acquireSaveLock(selectedEmployee.id)) {
+            toast.error('Another save is already in progress for this employee. Please wait.');
+            return;
+        }
+
         setIsBulkSaving(true);
         try {
-            const currentResult = enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+            // PART A: Fetch the LATEST AnalysisResult from the backend before merging.
+            // Prevents stale prop/state from overwriting a recent single-day edit.
+            let freshResult;
+            try {
+                const latestResults = await base44.entities.AnalysisResult.filter({ id: selectedEmployee.id });
+                freshResult = latestResults[0];
+            } catch (fetchErr) {
+                console.warn('Failed to fetch latest AnalysisResult, falling back to props:', fetchErr);
+            }
+            const currentResult = freshResult || enrichedResults.find(r => r.id === selectedEmployee.id) || selectedEmployee;
+
             let overrides = {};
             if (currentResult.day_overrides) {
                 try { overrides = JSON.parse(currentResult.day_overrides); } catch { overrides = {}; }
@@ -186,8 +206,10 @@ export default function DailyBreakdownDialog({
             setBulkShiftOverride({ enabled: false, am_start: '', am_end: '', pm_start: '', pm_end: '', is_single_shift: false });
         } catch (err) {
             console.error('Bulk apply failed:', err);
-            toast.error('Failed to apply bulk changes: ' + (err.message || 'Unknown error'));
+            toast.error('Failed to apply bulk changes. Please try again.');
         } finally {
+            // PART B: Always release save lock
+            if (releaseSaveLock && selectedEmployee?.id) releaseSaveLock(selectedEmployee.id);
             setIsBulkSaving(false);
         }
     };
@@ -1005,10 +1027,19 @@ export default function DailyBreakdownDialog({
         return matches;
     }
 
+    // PART C: Block dialog close while bulk save is in-flight
+    const safeOnOpenChange = (newOpen) => {
+        if (isBulkSaving) return;
+        onOpenChange(newOpen);
+    };
+
+    // PART C: Determine if row-level edit buttons should be disabled (lock held by bulk or single save)
+    const isEditLocked = isBulkSaving || (isSaveLocked && selectedEmployee?.id && isSaveLocked(selectedEmployee.id));
+
     return (
         <>
-            <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
+            <Dialog open={open} onOpenChange={safeOnOpenChange}>
+                <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto" onPointerDownOutside={(e) => { if (isBulkSaving) e.preventDefault(); }} onEscapeKeyDown={(e) => { if (isBulkSaving) e.preventDefault(); }}>
                     <DialogHeader>
                         <DialogTitle>
                             Daily Breakdown: {selectedEmployee?.attendance_id} - {selectedEmployee?.name}
@@ -1159,7 +1190,7 @@ export default function DailyBreakdownDialog({
                                     <Button
                                         size="sm"
                                         onClick={handleBulkApply}
-                                        disabled={(!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled && !bulkZeroEarly && !bulkZeroLate) || isBulkSaving}
+                                        disabled={(!bulkType && !bulkAbnormal && !bulkShiftOverride.enabled && !bulkZeroEarly && !bulkZeroLate) || isBulkSaving || (isSaveLocked && selectedEmployee?.id && isSaveLocked(selectedEmployee.id))}
                                         className="text-xs h-7 bg-indigo-600 hover:bg-indigo-700 text-white">
                                         {isBulkSaving
                                             ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Saving...</>
@@ -1348,7 +1379,7 @@ export default function DailyBreakdownDialog({
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {!isFinalized && (
-                                                <Button size="sm" variant="ghost" onClick={() => setEditingDay(day)}>
+                                                <Button size="sm" variant="ghost" onClick={() => setEditingDay(day)} disabled={isEditLocked}>
                                                     <Edit className="w-4 h-4 text-indigo-600" />
                                                 </Button>
                                             )}
@@ -1385,7 +1416,7 @@ export default function DailyBreakdownDialog({
 
                         </DialogContent>
                         <DialogFooter className="bg-slate-50/50 p-4 border-t">
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>Close Breakdown</Button>
+                            <Button variant="outline" onClick={() => safeOnOpenChange(false)} disabled={isBulkSaving}>Close Breakdown</Button>
                         </DialogFooter>
             </Dialog>
 
@@ -1413,6 +1444,9 @@ export default function DailyBreakdownDialog({
                         }), {})
                     }
                 }}
+                acquireSaveLock={acquireSaveLock}
+                releaseSaveLock={releaseSaveLock}
+                isSaveLocked={isSaveLocked}
             />
         </>
     );
