@@ -279,8 +279,8 @@ export default function Layout({ children, currentPageName }) {
                 </div>
             </header>
 
-            {/* Main Content */}
-            <main className="container mx-auto p-6">
+            {/* Main Content - full-width fluid shell with responsive padding */}
+            <main className="w-full px-4 sm:px-6 lg:px-8 py-6">
                 {children}
             </main>
 
