@@ -14,8 +14,31 @@ import {
 import DashboardHealthCard from './DashboardHealthCard';
 import NextActionPanel from './NextActionPanel';
 import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+function ChecklistItem({ label, completed, subtext, isWarning }) {
+    return (
+        <li className="flex items-start gap-3 group">
+            <div className={cn(
+                "mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300",
+                completed ? "bg-green-100 border-green-200 text-green-600" : 
+                isWarning ? "bg-amber-100 border-amber-200 text-amber-600" :
+                "bg-slate-50 border-slate-200 text-slate-300"
+            )}>
+                <CheckCircle2 className={cn("w-3.5 h-3.5", !completed && "opacity-20")} />
+            </div>
+            <div>
+                <p className={cn(
+                    "text-sm font-bold transition-colors duration-300",
+                    completed ? "text-slate-900" : "text-slate-500"
+                )}>
+                    {label}
+                </p>
+                <p className="text-[11px] text-slate-400 font-medium">{subtext}</p>
+            </div>
+        </li>
+    );
+}
 
 export default function CommandCenter({ 
     project, 
@@ -200,29 +223,5 @@ export default function CommandCenter({
                 )}
             </div>
         </div>
-    );
-}
-
-function ChecklistItem({ label, completed, subtext, isWarning }) {
-    return (
-        <li className="flex items-start gap-3 group">
-            <div className={cn(
-                "mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300",
-                completed ? "bg-green-100 border-green-200 text-green-600" : 
-                isWarning ? "bg-amber-100 border-amber-200 text-amber-600" :
-                "bg-slate-50 border-slate-200 text-slate-300"
-            )}>
-                <CheckCircle2 className={cn("w-3.5 h-3.5", !completed && "opacity-20")} />
-            </div>
-            <div>
-                <p className={cn(
-                    "text-sm font-bold transition-colors duration-300",
-                    completed ? "text-slate-900" : "text-slate-500"
-                )}>
-                    {label}
-                </p>
-                <p className="text-[11px] text-slate-400 font-medium">{subtext}</p>
-            </div>
-        </li>
     );
 }
