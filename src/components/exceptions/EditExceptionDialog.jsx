@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import TimePicker from '../ui/QuickTimePicker';
 import { useQuery } from '@tanstack/react-query';
 import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
+import ExceptionForm from './ExceptionForm';
 
 export default function EditExceptionDialog({ open, onClose, exception, projectId, canEditAllowedMinutes }) {
     const { data: project } = useQuery({

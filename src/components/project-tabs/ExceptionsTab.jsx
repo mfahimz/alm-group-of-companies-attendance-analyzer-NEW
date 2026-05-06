@@ -667,25 +667,7 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
 
     return (
         <div className="space-y-6">
-            {/* Group Export Button */}
-            <Card className="border-0 shadow-sm bg-gradient-to-r from-indigo-50 to-green-50">
-                <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <p className="font-medium text-slate-900">Export All Data</p>
-                            <p className="text-sm text-slate-600 mt-1">Export exceptions and checklist together in a single consolidated sheet</p>
-                        </div>
-                        <Button
-                            onClick={handleGroupExport}
-                            disabled={sortedExceptions.length === 0 && checklistItems.length === 0}
-                            className="bg-gradient-to-r from-indigo-600 to-green-600 hover:from-indigo-700 hover:to-green-700"
-                        >
-                            <Download className="w-4 h-4 mr-2" />
-                            Export Unified
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Group Export Button - hidden */}
 
             {/* Upload Progress */}
             {uploadProgress && (
