@@ -15,13 +15,15 @@ export const EXCEPTION_TYPES = [
         value: 'PUBLIC_HOLIDAY', 
         label: 'Public Holiday', 
         categories: ['general', 'filter'],
-        group: 'LEAVES'
+        group: 'LEAVES',
+        adminOnly: true
     },
     { 
         value: 'SHIFT_OVERRIDE', 
         label: 'Shift Override', 
         categories: ['general', 'filter', 'report_filter', 'day_override'],
-        group: 'CORRECTIONS'
+        group: 'CORRECTIONS',
+        adminOnly: true
     },
     { 
         value: 'MANUAL_PRESENT', 
@@ -57,25 +59,29 @@ export const EXCEPTION_TYPES = [
         value: 'ALLOWED_MINUTES', 
         label: 'Allowed Minutes (Grace)', 
         categories: ['general', 'filter', 'day_override'],
-        group: 'OVERRIDES'
+        group: 'OVERRIDES',
+        adminOnly: true
     },
     { 
         value: 'SKIP_PUNCH', 
         label: 'Skip Specific Punch', 
         categories: ['general', 'filter', 'day_override'],
-        group: 'OVERRIDES'
+        group: 'OVERRIDES',
+        adminOnly: true
     },
     { 
         value: 'HALF_DAY_HOLIDAY', 
         label: 'Half-Day Holiday (Natural Calamity)', 
         categories: ['general', 'filter', 'day_override'],
-        group: 'OVERRIDES'
+        group: 'OVERRIDES',
+        adminOnly: true
     },
     { 
         value: 'DAY_SWAP', 
         label: 'Day Swap (Weekly Off Override)', 
         categories: ['general', 'filter', 'day_override'],
-        group: 'OVERRIDES'
+        group: 'OVERRIDES',
+        adminOnly: true
     },
     { 
         value: 'MANUAL_LATE', 
@@ -108,14 +114,15 @@ export const EXCEPTION_TYPES = [
     { 
         value: 'OFF', 
         label: 'Off Day', 
-        categories: ['day_override'],
+        categories: ['general', 'filter', 'day_override'],
         group: 'LEAVES'
     },
     { 
         value: 'SKIP_DOUBLE_DEDUCTION', 
         label: 'Skip Double Deduction', 
         categories: ['general', 'filter'],
-        group: 'OVERRIDES'
+        group: 'OVERRIDES',
+        adminOnly: true
     },
     { 
         value: 'CUSTOM', 

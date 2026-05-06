@@ -23,6 +23,7 @@ const getTypeColor = (type) => {
         'ALLOWED_MINUTES': 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200',
         'SKIP_PUNCH': 'bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200',
         'DAY_SWAP': 'bg-pink-50 text-pink-700 ring-1 ring-pink-200',
+        'OFF': 'bg-slate-50 text-slate-700 ring-1 ring-slate-200',
     };
     return colors[type] || 'bg-slate-50 text-slate-700 ring-1 ring-slate-200';
 };
