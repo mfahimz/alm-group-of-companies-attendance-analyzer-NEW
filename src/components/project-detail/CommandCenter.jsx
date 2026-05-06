@@ -25,9 +25,7 @@ export default function CommandCenter({
         shiftCount = 0,
         exceptionCount = 0,
         unmatchedCount = 0,
-        employeeCount = 0,
         hasReport = false,
-        isFinalized = false,
         lastAnalysisDate = null,
         workingDays = 0
     } = stats;
