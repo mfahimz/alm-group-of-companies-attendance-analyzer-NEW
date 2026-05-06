@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { LucideIcon, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function DashboardHealthCard({ 
