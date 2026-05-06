@@ -3,100 +3,125 @@
  * Used across ExceptionsTab, BulkEditExceptionDialog, EditExceptionDialog, and EditDayRecordDialog.
  */
 
+export const EXCEPTION_GROUPS = {
+    CORRECTIONS: 'Attendance Corrections',
+    LEAVES: 'Leaves & Time Off',
+    OVERRIDES: 'Advanced Overrides',
+    OTHER: 'Other'
+};
+
 export const EXCEPTION_TYPES = [
     { 
         value: 'PUBLIC_HOLIDAY', 
         label: 'Public Holiday', 
-        categories: ['general', 'filter'] 
+        categories: ['general', 'filter'],
+        group: 'LEAVES'
     },
     { 
         value: 'SHIFT_OVERRIDE', 
         label: 'Shift Override', 
-        categories: ['general', 'filter', 'report_filter', 'day_override'] 
+        categories: ['general', 'filter', 'report_filter', 'day_override'],
+        group: 'CORRECTIONS'
     },
     { 
         value: 'MANUAL_PRESENT', 
         label: 'Manual Present', 
-        categories: ['general', 'filter', 'report_filter', 'day_override'] 
+        categories: ['general', 'filter', 'report_filter', 'day_override'],
+        group: 'CORRECTIONS'
     },
     { 
         value: 'WORK_FROM_HOME', 
         label: 'Work From Home', 
-        categories: ['general', 'filter', 'report_filter', 'day_override'] 
+        categories: ['general', 'filter', 'report_filter', 'day_override'],
+        group: 'CORRECTIONS'
     },
     { 
         value: 'MANUAL_ABSENT', 
         label: 'Manual Absent', 
-        categories: ['general', 'filter', 'report_filter', 'day_override'] 
+        categories: ['general', 'filter', 'report_filter', 'day_override'],
+        group: 'CORRECTIONS'
     },
     { 
         value: 'SICK_LEAVE', 
         label: 'Sick Leave', 
-        categories: ['general', 'filter', 'day_override'] 
+        categories: ['general', 'filter', 'day_override'],
+        group: 'LEAVES'
     },
     { 
         value: 'ANNUAL_LEAVE', 
         label: 'Annual Leave / Vacation', 
-        categories: ['general', 'filter', 'day_override'] 
+        categories: ['general', 'filter', 'day_override'],
+        group: 'LEAVES'
     },
     { 
         value: 'ALLOWED_MINUTES', 
         label: 'Allowed Minutes (Grace)', 
-        categories: ['general', 'filter', 'day_override'] 
+        categories: ['general', 'filter', 'day_override'],
+        group: 'OVERRIDES'
     },
     { 
         value: 'SKIP_PUNCH', 
         label: 'Skip Specific Punch', 
-        categories: ['general', 'filter', 'day_override'] 
+        categories: ['general', 'filter', 'day_override'],
+        group: 'OVERRIDES'
     },
     { 
         value: 'HALF_DAY_HOLIDAY', 
         label: 'Half-Day Holiday (Natural Calamity)', 
-        categories: ['general', 'filter', 'day_override'] 
+        categories: ['general', 'filter', 'day_override'],
+        group: 'OVERRIDES'
     },
     { 
         value: 'DAY_SWAP', 
         label: 'Day Swap (Weekly Off Override)', 
-        categories: ['general', 'filter', 'day_override'] 
+        categories: ['general', 'filter', 'day_override'],
+        group: 'OVERRIDES'
     },
     { 
         value: 'MANUAL_LATE', 
         label: 'Manual Late', 
         categories: ['report_filter'], 
-        reportOnly: true 
+        reportOnly: true,
+        group: 'CORRECTIONS'
     },
     { 
         value: 'MANUAL_EARLY_CHECKOUT', 
         label: 'Manual Early Checkout', 
         categories: ['report_filter'], 
-        reportOnly: true 
+        reportOnly: true,
+        group: 'CORRECTIONS'
     },
     { 
         value: 'MANUAL_OTHER_MINUTES', 
         label: 'Manual Other Minutes', 
         categories: ['report_filter'], 
-        reportOnly: true 
+        reportOnly: true,
+        group: 'CORRECTIONS'
     },
     { 
         value: 'GIFT_MINUTES', 
         label: 'Gift Minutes', 
         categories: [], 
-        reportOnly: true 
+        reportOnly: true,
+        group: 'CORRECTIONS'
     },
     { 
         value: 'OFF', 
         label: 'Off Day', 
-        categories: ['day_override'] 
+        categories: ['day_override'],
+        group: 'LEAVES'
     },
     { 
         value: 'SKIP_DOUBLE_DEDUCTION', 
         label: 'Skip Double Deduction', 
-        categories: ['general', 'filter'] 
+        categories: ['general', 'filter'],
+        group: 'OVERRIDES'
     },
     { 
         value: 'CUSTOM', 
         label: 'Custom Type', 
-        categories: ['general'] 
+        categories: ['general'],
+        group: 'OTHER'
     }
 ];
 

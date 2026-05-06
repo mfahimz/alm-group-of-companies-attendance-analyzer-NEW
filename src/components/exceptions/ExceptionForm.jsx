@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectLabel, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Sparkles } from 'lucide-react';
 import TimePicker from '../ui/QuickTimePicker';
-import { getFilteredExceptionTypes, formatExceptionTypeLabel } from '@/lib/exception-types';
+import { getFilteredExceptionTypes, formatExceptionTypeLabel, EXCEPTION_GROUPS } from '@/lib/exception-types';
 
 export default function ExceptionForm({
     formData,
@@ -113,9 +113,25 @@ export default function ExceptionForm({
                     <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                         <SelectTrigger className="border-slate-200"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                            {getFilteredExceptionTypes('general', isAdmin || isSupervisor).map(type => (
-                                <SelectItem key={type.value} value={type.value}>{type.label || formatExceptionTypeLabel(type.value)}</SelectItem>
-                            ))}
+                            {Object.entries(EXCEPTION_GROUPS).map(([groupId, groupLabel]) => {
+                                const typesInGroup = getFilteredExceptionTypes('general', isAdmin || isSupervisor)
+                                    .filter(t => t.group === groupId);
+                                
+                                if (typesInGroup.length === 0) return null;
+
+                                return (
+                                    <SelectGroup key={groupId}>
+                                        <SelectLabel className="text-[10px] uppercase tracking-wider text-slate-400 font-bold px-2 py-1.5 bg-slate-50/50">
+                                            {groupLabel}
+                                        </SelectLabel>
+                                        {typesInGroup.map(type => (
+                                            <SelectItem key={type.value} value={type.value}>
+                                                {type.label || formatExceptionTypeLabel(type.value)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectGroup>
+                                );
+                            })}
                         </SelectContent>
                     </Select>
                     {formData.type === 'ANNUAL_LEAVE' && (
