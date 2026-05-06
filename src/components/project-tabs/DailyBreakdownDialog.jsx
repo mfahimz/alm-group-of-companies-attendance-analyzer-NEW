@@ -1370,7 +1370,7 @@ export default function DailyBreakdownDialog({
                                         {selectedEmployee?.other_minutes || 0} min
                                     </TableCell>
                                     {project?.company === 'Al Maraghi Motors' && (
-                                    <TableCell className="font-bold text-teal-600">
+                                    <TableCell className="font-bold text-teal-600 invisible">
                                         {selectedEmployee?.approved_minutes || 0} min
                                     </TableCell>
                                     )}
