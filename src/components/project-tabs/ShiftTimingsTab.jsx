@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, Plus, Download, Copy, Sparkles } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import EditShiftDialog from './EditShiftDialog';
@@ -371,7 +372,6 @@ export default function ShiftTimingsTab({ project }) {
     const handleFileChange = async (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
-            setFile(selectedFile);
             const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
             if (fileExtension === 'xlsx' || fileExtension === 'xls') {
                 const reader = new FileReader();

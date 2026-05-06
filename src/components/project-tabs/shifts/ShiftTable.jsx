@@ -2,9 +2,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Edit, Trash2, Clock } from 'lucide-react';
-import SortableTableHead from '../ui/SortableTableHead';
-import TablePagination from '../ui/TablePagination';
+import SortableTableHead from '@/components/ui/SortableTableHead';
+import TablePagination from '@/components/ui/TablePagination';
 import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
+import { ShiftBadge, DayBadge } from './ShiftBadge';
 
 export default function ShiftTable({ 
     shifts, 
