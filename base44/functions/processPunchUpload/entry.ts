@@ -55,10 +55,23 @@ Deno.serve(async (req) => {
                 throw new Error('Could not retrieve file content from storage');
             }
 
+            // 3. Guard against extremely large files that might crash the runtime during parsing
+            const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024; // 15MB limit for safety in Deno
+            if (fileContent.byteLength > MAX_FILE_SIZE_BYTES) {
+                throw new Error('This file is too large to process. Please try uploading a smaller file or splitting your data into multiple files.');
+            }
+
             await updateJob({ progress: 10 });
 
-            // 3. Parse and Validate
-            const workbook = XLSX.read(new Uint8Array(fileContent), { type: 'array', cellDates: true });
+            // 4. Parse and Validate
+            let workbook;
+            try {
+                workbook = XLSX.read(new Uint8Array(fileContent), { type: 'array', cellDates: true });
+            } catch (parseError) {
+                console.error('XLSX parse error:', parseError);
+                throw new Error('We could not read the format of this file. Please ensure it is a valid Excel or CSV file.');
+            }
+            
             const project = await base44.asServiceRole.entities.Project.get(project_id);
             
             if (!project) {

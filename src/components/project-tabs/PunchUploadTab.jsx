@@ -25,6 +25,13 @@ export default function PunchUploadTab({ project }) {
     const [previewPunches, setPreviewPunches] = useState([]);
     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
     const [isPreviewing, setIsPreviewing] = useState(false);
+    const [previewIssues, setPreviewIssues] = useState({
+        missingId: 0,
+        unmatchedId: 0,
+        invalidTime: 0,
+        duplicates: 0,
+        layoutError: false
+    });
     const [editingPunch, setEditingPunch] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [punchToDelete, setPunchToDelete] = useState(null);
@@ -113,6 +120,13 @@ export default function PunchUploadTab({ project }) {
             const upload_type = project.company === 'Astra Auto Parts' ? 'astra' : 'universal';
             
             let parsedRecords = [];
+            let issues = {
+                missingId: 0,
+                unmatchedId: 0,
+                invalidTime: 0,
+                duplicates: 0,
+                layoutError: false
+            };
             
             if (upload_type === 'astra') {
                 if (!project.date_from) throw new Error("Astra Excel: Project dates are missing");
@@ -164,8 +178,12 @@ export default function PunchUploadTab({ project }) {
 
                             const convertToAmPm = (time24, dateStr) => {
                                 const cleaned = time24.replace(/\s*\(SE\)\s*$/i, '').trim();
+                                if (!cleaned || cleaned === '00:00') return null;
+                                
                                 const [hhRaw, mm] = cleaned.split(':');
                                 let hh = parseInt(hhRaw || '0', 10);
+                                if (isNaN(hh)) return null;
+                                
                                 const period = hh >= 12 ? 'PM' : 'AM';
                                 if (hh > 12) hh -= 12;
                                 if (hh === 0) hh = 12;
@@ -179,24 +197,40 @@ export default function PunchUploadTab({ project }) {
                                 const outStr = String(outTimeRow?.[colIndex] || '').trim();
 
                                 if (inStr && inStr !== '00:00') {
-                                    parsedRecords.push({ attendance_id: empCode, punch_date, timestamp_raw: convertToAmPm(inStr, punch_date) });
+                                    const ts = convertToAmPm(inStr, punch_date);
+                                    if (ts) {
+                                        parsedRecords.push({ attendance_id: empCode, punch_date, timestamp_raw: ts });
+                                    } else {
+                                        issues.invalidTime++;
+                                    }
                                 }
                                 if (outStr && outStr !== '00:00' && !/\(SE\)\s*$/.test(outStr)) {
-                                    parsedRecords.push({ attendance_id: empCode, punch_date, timestamp_raw: convertToAmPm(outStr, punch_date) });
+                                    const ts = convertToAmPm(outStr, punch_date);
+                                    if (ts) {
+                                        parsedRecords.push({ attendance_id: empCode, punch_date, timestamp_raw: ts });
+                                    } else {
+                                        issues.invalidTime++;
+                                    }
                                 }
                             }
                         }
                     }
+                } else {
+                    issues.layoutError = true;
                 }
             } else {
                 const sheet = workbook.Sheets[workbook.SheetNames[0]];
                 const csvData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                 
+                if (csvData.length <= 1) {
+                    issues.layoutError = true;
+                }
+
                 for (let i = 1; i < csvData.length; i++) {
                     const values = csvData[i];
                     if (values.length < 2) continue;
                     
-                    const attendance_id = String(values[0]).trim();
+                    const attendance_id = values[0] != null ? String(values[0]).trim() : '';
                     let timestamp_raw = '';
                     if (values.length >= 4 && (String(values[2]).includes('/') || String(values[2]).includes('-'))) {
                         timestamp_raw = `${values[2]} ${values[3]}`;
@@ -206,17 +240,53 @@ export default function PunchUploadTab({ project }) {
                         timestamp_raw = values[1] || '';
                     }
 
-                    if (attendance_id && timestamp_raw) {
+                    if (attendance_id || timestamp_raw) {
                         parsedRecords.push({ attendance_id, timestamp_raw });
                     }
                 }
             }
 
+            // In-app inconsistency checks
+            const seen = new Set();
+            parsedRecords = parsedRecords.map(rec => {
+                const hasId = !!rec.attendance_id;
+                const empExists = hasId && employees.some(e => String(e.attendance_id) === String(rec.attendance_id));
+                
+                const key = `${rec.attendance_id}_${rec.timestamp_raw}`;
+                const isDuplicate = seen.has(key);
+                seen.add(key);
+
+                // Simple time check for universal format
+                let timeInvalid = false;
+                if (upload_type !== 'astra' && rec.timestamp_raw) {
+                    // Expecting something with / or - and :
+                    if (!rec.timestamp_raw.match(/[\/\-].*[:]/)) {
+                        timeInvalid = true;
+                    }
+                }
+
+                if (!hasId) issues.missingId++;
+                else if (!empExists) issues.unmatchedId++;
+                if (isDuplicate) issues.duplicates++;
+                if (timeInvalid) issues.invalidTime++;
+
+                return {
+                    ...rec,
+                    _issues: {
+                        missingId: !hasId,
+                        unmatchedId: hasId && !empExists,
+                        duplicate: isDuplicate,
+                        invalidTime: timeInvalid
+                    }
+                };
+            });
+
+            setPreviewIssues(issues);
             setPreviewPunches(parsedRecords);
             setShowPreviewDialog(true);
             setFile(selectedFile);
         } catch (err) {
-            toast.error('Failed to read file: ' + err.message);
+            toast.error('Could not read the file correctly. Please check the file format and try again.');
         } finally {
             setIsPreviewing(false);
         }
@@ -639,35 +709,84 @@ export default function PunchUploadTab({ project }) {
                         <DialogTitle>Preview Punch Records</DialogTitle>
                     </DialogHeader>
                     <div className="flex-1 overflow-auto py-4">
+                        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {previewIssues.layoutError ? (
+                                <div className="col-span-full bg-red-50 border border-red-100 p-4 rounded-lg flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="font-semibold text-red-900">Unsupported File Layout</p>
+                                        <p className="text-sm text-red-700">The file structure doesn't match what we expect. Please check the sample format above.</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className={`p-3 rounded-lg border ${previewIssues.missingId > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Missing IDs</p>
+                                        <p className={`text-2xl font-bold ${previewIssues.missingId > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{previewIssues.missingId}</p>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${previewIssues.unmatchedId > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Unknown Employees</p>
+                                        <p className={`text-2xl font-bold ${previewIssues.unmatchedId > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{previewIssues.unmatchedId}</p>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${previewIssues.invalidTime > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Invalid Times</p>
+                                        <p className={`text-2xl font-bold ${previewIssues.invalidTime > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{previewIssues.invalidTime}</p>
+                                    </div>
+                                    <div className={`p-3 rounded-lg border ${previewIssues.duplicates > 0 ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-100'}`}>
+                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Duplicate Rows</p>
+                                        <p className={`text-2xl font-bold ${previewIssues.duplicates > 0 ? 'text-blue-600' : 'text-slate-600'}`}>{previewIssues.duplicates}</p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
                         <p className="text-sm text-slate-500 mb-4">
-                            Found {previewPunches.length} potential records in <strong>{file?.name}</strong>. 
-                            Please review the first few records below.
+                            Showing first 50 records from <strong>{file?.name}</strong>. 
+                            {previewIssues.unmatchedId > 0 && " Records with unknown IDs will be skipped during upload."}
                         </p>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Employee ID</TableHead>
-                                    <TableHead>Employee Name</TableHead>
-                                    <TableHead>Timestamp (Raw)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {previewPunches.slice(0, 10).map((p, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell>{p.attendance_id}</TableCell>
-                                        <TableCell>{employees.find(e => String(e.attendance_id) === String(p.attendance_id))?.name || 'Unknown'}</TableCell>
-                                        <TableCell>{p.timestamp_raw}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {previewPunches.length > 10 && (
+                        
+                        <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader className="bg-slate-50">
                                     <TableRow>
-                                        <TableCell colSpan={3} className="text-center text-slate-400 italic">
-                                            ... and {previewPunches.length - 10} more records
-                                        </TableCell>
+                                        <TableHead>Employee ID</TableHead>
+                                        <TableHead>Employee Name</TableHead>
+                                        <TableHead>Timestamp (Raw)</TableHead>
+                                        <TableHead className="w-24 text-center">Status</TableHead>
                                     </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {previewPunches.slice(0, 50).map((p, i) => {
+                                        const hasError = p._issues.missingId || p._issues.unmatchedId || p._issues.invalidTime;
+                                        const isWarning = p._issues.duplicate;
+                                        
+                                        return (
+                                            <TableRow key={i} className={hasError ? 'bg-red-50/50' : isWarning ? 'bg-amber-50/50' : ''}>
+                                                <TableCell className="font-mono text-xs">{p.attendance_id || <span className="text-red-500 font-sans italic">Missing</span>}</TableCell>
+                                                <TableCell>{employees.find(e => String(e.attendance_id) === String(p.attendance_id))?.name || <span className="text-slate-400 italic">Unknown</span>}</TableCell>
+                                                <TableCell className={p._issues.invalidTime ? 'text-red-600' : ''}>{p.timestamp_raw}</TableCell>
+                                                <TableCell className="text-center">
+                                                    {hasError ? (
+                                                        <AlertTriangle className="w-4 h-4 text-red-500 mx-auto" />
+                                                    ) : isWarning ? (
+                                                        <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" title="Duplicate record" />
+                                                    ) : (
+                                                        <span className="text-green-600 text-xs font-medium">Ready</span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                    {previewPunches.length > 50 && (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="text-center text-slate-400 italic py-4">
+                                                ... and {previewPunches.length - 50} more records
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t">
                         <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
@@ -675,9 +794,10 @@ export default function PunchUploadTab({ project }) {
                         </Button>
                         <Button 
                             onClick={() => uploadMutation.mutate(file)}
-                            disabled={uploadMutation.isPending}
+                            disabled={uploadMutation.isPending || previewIssues.layoutError || previewPunches.length === 0}
+                            className="bg-indigo-600 hover:bg-indigo-700"
                         >
-                            {uploadMutation.isPending ? 'Starting Upload...' : `Confirm Upload (${previewPunches.length} records)`}
+                            {uploadMutation.isPending ? 'Starting Upload...' : `Confirm & Save ${previewPunches.length} Records`}
                         </Button>
                     </div>
                 </DialogContent>
