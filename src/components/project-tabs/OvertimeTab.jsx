@@ -791,11 +791,7 @@ export default function OvertimeTab({ project }) {
                                         <TableCell className="font-medium">{row.attendance_id}</TableCell>
                                         <TableCell className="font-medium">
                                             <div>{row.name?.split(' ').slice(0, 2).join(' ')}</div>
-                                            {row.otRate > 0 && (
-                                                <div className="text-[10px] text-slate-500 font-normal mt-0.5 whitespace-nowrap">
-                                                    OT Rate: AED {row.otRate.toFixed(2)}/hr
-                                                </div>
-                                            )}
+
                                         </TableCell>
                                         <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
                                         <TableCell className="bg-blue-50 p-1">
