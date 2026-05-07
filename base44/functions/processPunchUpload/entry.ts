@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
         try {
             // 2. Download file content
-            const { url: signedUrl } = await base44.integrations.Core.CreateFileSignedUrl({ 
+            const { signed_url: signedUrl } = await base44.integrations.Core.CreateFileSignedUrl({ 
                 file_uri,
                 expires_in: 300 // 5 minutes
             });
