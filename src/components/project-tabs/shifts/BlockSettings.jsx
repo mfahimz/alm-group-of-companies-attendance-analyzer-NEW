@@ -70,7 +70,7 @@ export default function BlockSettings({
                                 <div className="flex items-center gap-2 px-1 py-0.5">
                                     <Loader2 className="w-3 h-3 text-indigo-600 animate-spin" />
                                     <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">
-                                        {updateProgress.status || `Updating ${updateProgress.current} of ${updateProgress.total} shifts...`}
+                                        {updateProgress.status || "Saving block range..."}
                                     </span>
                                 </div>
                             )}

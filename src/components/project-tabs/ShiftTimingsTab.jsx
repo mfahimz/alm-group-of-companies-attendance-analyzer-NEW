@@ -580,18 +580,22 @@ export default function ShiftTimingsTab({ project }) {
         mutationFn: async ({ block, newRange }) => {
             const blockShifts = shiftsByBlock[block] || [];
             const total = blockShifts.length;
+            const batchSize = 10;
             
-            for (let i = 0; i < total; i++) {
-                setRangeUpdateProgress({ current: i + 1, total });
-                const s = blockShifts[i];
-                await base44.entities.ShiftTiming.update(s.id, {
-                    effective_from: newRange.from,
-                    effective_to: newRange.to,
-                    shift_block: block
-                });
+            setRangeUpdateProgress({ status: 'Updating shift block...' });
+            
+            for (let i = 0; i < total; i += batchSize) {
+                const batch = blockShifts.slice(i, i + batchSize);
+                await Promise.all(batch.map(s => 
+                    base44.entities.ShiftTiming.update(s.id, {
+                        effective_from: newRange.from,
+                        effective_to: newRange.to,
+                        shift_block: block
+                    })
+                ));
             }
             
-            setRangeUpdateProgress({ current: total, total, status: 'Finalizing settings...' });
+            setRangeUpdateProgress({ status: 'Finalizing settings...' });
             const currentRanges = project.shift_block_ranges ? JSON.parse(project.shift_block_ranges) : {};
             await base44.entities.Project.update(project.id, {
                 shift_block_ranges: JSON.stringify({ ...currentRanges, [block]: newRange })
