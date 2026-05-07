@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.27';
 
 /**
  * Backend function to run attendance analysis for a project.
@@ -288,8 +288,8 @@ Deno.serve(async (req: Request) => {
                 employee_count: uniqueEmployeeIds.length
             });
             console.log('[runAnalysis] Created new report run with', uniqueEmployeeIds.length, 'employees');
-        }
-        console.log('[runAnalysis] Updating existing report run with', uniqueEmployeeIds.length, 'employees');
+        } else {
+            console.log('[runAnalysis] Updating existing report run with', uniqueEmployeeIds.length, 'employees');
         }
 
         /**
