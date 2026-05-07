@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Calendar, Edit, Trash2, Copy, Save, X } from 'lucide-react';
+import { Calendar, Edit, Trash2, Copy, Save, X, Loader2 } from 'lucide-react';
 import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
 
 export default function BlockSettings({ 
@@ -14,6 +14,7 @@ export default function BlockSettings({
     onCopy, 
     onDeleteAll,
     isSaving,
+    updateProgress,
     minDate,
     maxDate
 }) {
@@ -26,30 +27,53 @@ export default function BlockSettings({
                 <div>
                     <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">{blockId.replace('block', 'Block ')} Schedule</h3>
                     {isEditing ? (
-                        <div className="flex items-center gap-2 mt-2">
-                            <Input
-                                type="date"
-                                value={blockRange.from || ''}
-                                onChange={(e) => onRangeChange('from', e.target.value)}
-                                min={minDate}
-                                max={maxDate}
-                                className="h-9 w-36 rounded-lg text-sm"
-                            />
-                            <span className="text-slate-400 text-xs font-bold">TO</span>
-                            <Input
-                                type="date"
-                                value={blockRange.to || ''}
-                                onChange={(e) => onRangeChange('to', e.target.value)}
-                                min={blockRange.from || minDate}
-                                max={maxDate}
-                                className="h-9 w-36 rounded-lg text-sm"
-                            />
-                            <Button size="sm" onClick={onSave} disabled={isSaving} className="h-9 bg-indigo-600">
-                                {isSaving ? "Saving..." : <Save className="w-4 h-4 mr-1" />} Save
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={onCancel} className="h-9">
-                                <X className="w-4 h-4" />
-                            </Button>
+                        <div className="flex flex-col gap-1.5 mt-2">
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    type="date"
+                                    value={blockRange.from || ''}
+                                    onChange={(e) => onRangeChange('from', e.target.value)}
+                                    min={minDate}
+                                    max={maxDate}
+                                    disabled={isSaving}
+                                    className="h-9 w-36 rounded-lg text-sm"
+                                />
+                                <span className="text-slate-400 text-xs font-bold">TO</span>
+                                <Input
+                                    type="date"
+                                    value={blockRange.to || ''}
+                                    onChange={(e) => onRangeChange('to', e.target.value)}
+                                    min={blockRange.from || minDate}
+                                    max={maxDate}
+                                    disabled={isSaving}
+                                    className="h-9 w-36 rounded-lg text-sm"
+                                />
+                                <Button 
+                                    size="sm" 
+                                    onClick={onSave} 
+                                    disabled={isSaving} 
+                                    className="h-9 bg-indigo-600 min-w-[80px]"
+                                >
+                                    {isSaving ? (
+                                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                                    ) : (
+                                        <Save className="w-4 h-4 mr-1" />
+                                    )}
+                                    {isSaving ? "Saving..." : "Save"}
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={onCancel} disabled={isSaving} className="h-9">
+                                    <X className="w-4 h-4" />
+                                </Button>
+                            </div>
+                            
+                            {isSaving && updateProgress && (
+                                <div className="flex items-center gap-2 px-1 py-0.5">
+                                    <Loader2 className="w-3 h-3 text-indigo-600 animate-spin" />
+                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">
+                                        {updateProgress.status || `Updating ${updateProgress.current} of ${updateProgress.total} shifts...`}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <p className="text-xs text-slate-500 font-medium mt-0.5">

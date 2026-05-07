@@ -44,6 +44,7 @@ export default function ShiftTimingsTab({ project }) {
     const [uploadProgress, setUploadProgress] = useState(null);
     const [showCopyDialog, setShowCopyDialog] = useState(false);
     const [copySource, setCopySource] = useState({ type: 'block', blockId: 'block1', projectId: '', sourceProjectBlockId: 'block1' });
+    const [rangeUpdateProgress, setRangeUpdateProgress] = useState(null);
     const [astraFile, setAstraFile] = useState(null);
     const [blockDateRanges, setBlockDateRanges] = useState(() => {
         if (!project?.date_from || !project?.date_to) {
@@ -578,13 +579,19 @@ export default function ShiftTimingsTab({ project }) {
     const updateBlockRangeMutation = useMutation({
         mutationFn: async ({ block, newRange }) => {
             const blockShifts = shiftsByBlock[block] || [];
-            for (const s of blockShifts) {
+            const total = blockShifts.length;
+            
+            for (let i = 0; i < total; i++) {
+                setRangeUpdateProgress({ current: i + 1, total });
+                const s = blockShifts[i];
                 await base44.entities.ShiftTiming.update(s.id, {
                     effective_from: newRange.from,
                     effective_to: newRange.to,
                     shift_block: block
                 });
             }
+            
+            setRangeUpdateProgress({ current: total, total, status: 'Finalizing settings...' });
             const currentRanges = project.shift_block_ranges ? JSON.parse(project.shift_block_ranges) : {};
             await base44.entities.Project.update(project.id, {
                 shift_block_ranges: JSON.stringify({ ...currentRanges, [block]: newRange })
@@ -595,6 +602,11 @@ export default function ShiftTimingsTab({ project }) {
             queryClient.invalidateQueries(['project', project.id]);
             toast.success('Range updated');
             setEditingBlockRange(null);
+            setRangeUpdateProgress(null);
+        },
+        onError: () => {
+            setRangeUpdateProgress(null);
+            toast.error('Failed to update range');
         }
     });
 
@@ -766,6 +778,7 @@ export default function ShiftTimingsTab({ project }) {
                         if (window.confirm('Delete all shifts in this block?')) deleteBlockShiftsMutation.mutate(selectedBlock);
                     }}
                     isSaving={updateBlockRangeMutation.isPending}
+                    updateProgress={rangeUpdateProgress}
                     minDate={project.date_from}
                     maxDate={project.date_to}
                 />
