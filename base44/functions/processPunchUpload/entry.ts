@@ -82,16 +82,22 @@ Deno.serve(async (req) => {
             const fetchAllEmployees = async () => {
                 const all = [];
                 let skip = 0;
-                const limit = 1000;
+                const limit = 500;
                 while (true) {
-                    const batch = await base44.asServiceRole.entities.Employee.filter({ company: project.company }, { skip, limit });
+                    const batch = await base44.asServiceRole.entities.Employee.filter({ company: project.company }, null, limit, skip);
                     all.push(...batch);
-                    if (batch.length < limit) break;
+                    if (!Array.isArray(batch) || batch.length < limit) break;
                     skip += limit;
                 }
                 return all;
             };
             const employees = await fetchAllEmployees();
+            const normalizeId = (value) => String(value ?? '').trim();
+            const employeeAttendanceIds = new Set(
+                employees
+                    .map(e => normalizeId(e.attendance_id ?? e.data?.attendance_id))
+                    .filter(Boolean)
+            );
             
             const records = [];
             const warnings = [];
@@ -235,27 +241,28 @@ Deno.serve(async (req) => {
             const fetchExistingPunches = async () => {
                 const all = [];
                 let skip = 0;
-                const limit = 1000;
+                const limit = 500;
                 while (true) {
-                    const batch = await base44.asServiceRole.entities.Punch.filter({ project_id }, { skip, limit });
+                    const batch = await base44.asServiceRole.entities.Punch.filter({ project_id }, null, limit, skip);
                     all.push(...batch);
-                    if (batch.length < limit) break;
+                    if (!Array.isArray(batch) || batch.length < limit) break;
                     skip += limit;
                 }
                 return all;
             };
             const existingPunches = await fetchExistingPunches();
-            const punchKeys = new Set(existingPunches.map(p => `${p.attendance_id}_${p.timestamp_raw}`));
+            const punchKeys = new Set(existingPunches.map(p => `${normalizeId(p.attendance_id ?? p.data?.attendance_id)}_${p.timestamp_raw ?? p.data?.timestamp_raw}`));
 
             for (const rec of records) {
-                const empExists = employees.some(e => String(e.attendance_id) === String(rec.attendance_id));
+                const attendanceId = normalizeId(rec.attendance_id);
+                const empExists = employeeAttendanceIds.has(attendanceId);
                 if (!empExists) {
                     records_invalid_data++;
-                    warnings.push(`Unknown employee ${rec.attendance_id}`);
+                    warnings.push(`Unknown employee ${attendanceId}`);
                     continue;
                 }
 
-                const key = `${rec.attendance_id}_${rec.timestamp_raw}`;
+                const key = `${attendanceId}_${rec.timestamp_raw}`;
                 if (punchKeys.has(key)) {
                     records_duplicate++;
                     continue;
@@ -263,6 +270,7 @@ Deno.serve(async (req) => {
 
                 validRecords.push({
                     ...rec,
+                    attendance_id: attendanceId,
                     project_id,
                     import_batch_id: uploadJob.import_batch_id
                 });
