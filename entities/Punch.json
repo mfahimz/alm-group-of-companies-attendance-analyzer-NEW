@@ -1,0 +1,45 @@
+{
+    "name": "Punch",
+    "type": "object",
+    "description": "Represents a single biometric attendance punch record.",
+    "properties": {
+        "project_id": {
+            "type": "string",
+            "required": true,
+            "description": "ID of the project this punch belongs to."
+        },
+        "attendance_id": {
+            "type": "string",
+            "required": true,
+            "description": "The HRMS/Attendance ID of the employee."
+        },
+        "punch_date": {
+            "type": "string",
+            "format": "date",
+            "required": true,
+            "description": "The date of the punch (YYYY-MM-DD)."
+        },
+        "timestamp_raw": {
+            "type": "string",
+            "required": true,
+            "description": "The raw timestamp string from the source file (e.g., '01/10/2025 08:30 AM')."
+        },
+        "import_batch_id": {
+            "type": "string",
+            "description": "The ID of the UploadJob that created this record, used for rollback."
+        },
+        "calendar_period_id": {
+            "type": "string",
+            "description": "Legacy batch tag field, preserved for compatibility."
+        },
+        "created_date": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updated_date": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": ["project_id", "attendance_id", "punch_date", "timestamp_raw"]
+}

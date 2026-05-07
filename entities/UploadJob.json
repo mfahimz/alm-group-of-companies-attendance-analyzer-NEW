@@ -1,0 +1,108 @@
+{
+    "name": "UploadJob",
+    "type": "object",
+    "description": "Tracks the lifecycle and progress of a punch data upload operation, including parsing, validation, and batch saving results.",
+    "properties": {
+        "project_id": {
+            "type": "string",
+            "required": true,
+            "description": "ID of the project this upload belongs to."
+        },
+        "user_email": {
+            "type": "string",
+            "description": "Email of the user who initiated the upload."
+        },
+        "file_name": {
+            "type": "string",
+            "description": "Original name of the uploaded file."
+        },
+        "file_mime_type": {
+            "type": "string",
+            "description": "MIME type of the file (csv, xlsx, etc)."
+        },
+        "file_size_bytes": {
+            "type": "number",
+            "description": "Size of the file in bytes."
+        },
+        "file_uri": {
+            "type": "string",
+            "description": "Internal storage URI of the uploaded raw file."
+        },
+        "upload_type": {
+            "type": "string",
+            "description": "Category of upload (e.g., 'astra', 'naser_mohsin', 'universal')."
+        },
+        "status": {
+            "type": "string",
+            "default": "pending",
+            "enum": ["pending", "processing", "completed", "failed", "rolling_back", "rolled_back"],
+            "description": "Current lifecycle state of the upload job."
+        },
+        "progress": {
+            "type": "number",
+            "default": 0,
+            "description": "Percentage completion (0-100)."
+        },
+        "records_total": {
+            "type": "number",
+            "default": 0,
+            "description": "Total records found in the file."
+        },
+        "records_parsed": {
+            "type": "number",
+            "default": 0,
+            "description": "Records successfully parsed."
+        },
+        "records_invalid_format": {
+            "type": "number",
+            "default": 0,
+            "description": "Records with structural format errors."
+        },
+        "records_invalid_data": {
+            "type": "number",
+            "default": 0,
+            "description": "Records with valid structure but invalid data (e.g., unknown employee)."
+        },
+        "records_duplicate": {
+            "type": "number",
+            "default": 0,
+            "description": "Records that already exist and were skipped."
+        },
+        "records_to_save": {
+            "type": "number",
+            "default": 0,
+            "description": "Count of unique valid records intended for saving."
+        },
+        "records_saved": {
+            "type": "number",
+            "default": 0,
+            "description": "Count of records successfully persisted."
+        },
+        "records_rolled_back": {
+            "type": "number",
+            "default": 0,
+            "description": "Count of records deleted during failure recovery."
+        },
+        "error_message": {
+            "type": "string",
+            "description": "Plain language error message for the user if job failed."
+        },
+        "warnings_json": {
+            "type": "string",
+            "description": "JSON array of non-blocking warning messages."
+        },
+        "import_batch_id": {
+            "type": "string",
+            "description": "Unique tag applied to punches created by this job, used for recovery/rollback."
+        },
+        "created_date": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "updated_date": {
+            "type": "string",
+            "format": "date-time"
+        }
+    },
+    "required": ["project_id", "status"]
+}
