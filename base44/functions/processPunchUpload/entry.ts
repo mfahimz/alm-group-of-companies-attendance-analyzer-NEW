@@ -277,6 +277,14 @@ Deno.serve(async (req) => {
                 warnings_json: JSON.stringify([...new Set(warnings)].slice(0, 50))
             });
 
+            if (records.length === 0) {
+                throw new Error('No punch records were found in this file. Please check the file format and try again.');
+            }
+
+            if (validRecords.length === 0) {
+                throw new Error('No punch records could be imported. Please verify that the attendance IDs in the file match the employee master list.');
+            }
+
             // 5. Save in batches of 10 with 300ms delay and retry
             const batchSize = 10;
             let records_saved = 0;
@@ -308,7 +316,13 @@ Deno.serve(async (req) => {
 
             await updateJob({ status: 'completed', progress: 100 });
 
-            return Response.json({ success: true, upload_job_id: uploadJob.id });
+            return Response.json({
+                success: true,
+                upload_job_id: uploadJob.id,
+                records_total: records.length,
+                records_saved,
+                records_skipped: records_invalid_format + records_invalid_data + records_duplicate
+            });
 
         } catch (jobError) {
             console.error('Job execution error:', jobError);

@@ -76,14 +76,13 @@ export default function PunchUploadTab({ project }) {
     // or removed if strictly following "small and safe" Phase 1.
     // I will remove it to avoid confusion.
 
-    // Polling for active UploadJob
+    // Poll latest UploadJob so the UI can always resolve processing, success, or failure states
     const { data: activeJob, refetch: refetchJob } = useQuery({
         queryKey: ['activeUploadJob', project.id, currentUser?.email],
         queryFn: async () => {
             const jobs = await base44.entities.UploadJob.filter({ 
                 project_id: project.id, 
-                user_email: currentUser?.email,
-                status: ['pending', 'processing', 'rolling_back']
+                user_email: currentUser?.email
             }, { sort: { created_date: 'desc' }, limit: 1 });
             return jobs[0] || null;
         },
@@ -97,20 +96,24 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
-    // Handle job completion/failure
+    // Handle job completion/failure and always clear local progress so the page never gets stuck
     React.useEffect(() => {
-        if (activeJob?.status === 'completed') {
+        if (!activeJob?.id) return;
+
+        if (activeJob.status === 'completed') {
             queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
-            toast.success(`Upload completed successfully! ${activeJob.records_saved} records processed.`);
-            // Clean up the job status so it doesn't keep showing as completed in a way that blocks UI
+            const saved = activeJob.records_saved || 0;
+            const skipped = (activeJob.records_invalid_data || 0) + (activeJob.records_invalid_format || 0) + (activeJob.records_duplicate || 0);
+            toast.success(`Upload finished. ${saved} punch records saved${skipped ? `, ${skipped} skipped` : ''}.`);
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived' });
             setUploadProgress(null);
-        } else if (activeJob?.status === 'failed') {
-            toast.error(activeJob.error_message || 'The upload failed. Please try again.', { duration: 8000 });
+            setFile(null);
+        } else if (activeJob.status === 'failed') {
+            toast.error(activeJob.error_message || 'Upload failed. No punch records were saved.', { duration: 10000 });
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived_failed' });
             setUploadProgress(null);
         }
-    }, [activeJob?.status, project.id, queryClient]);
+    }, [activeJob?.id, activeJob?.status, project.id, queryClient]);
 
     const parseFileForPreview = async (selectedFile) => {
         try {
@@ -301,14 +304,18 @@ export default function PunchUploadTab({ project }) {
             });
 
             // 2. Start processPunchUpload
-            setUploadProgress({ phase: 'Starting processing...', current: 0, total: 100 });
+            setUploadProgress({
+                phase: 'Checking and saving punch records...',
+                current: 0,
+                total: previewPunches.length || 1
+            });
             
             // Determine upload type based on company
             let upload_type = 'universal';
             if (project.company === 'Astra Auto Parts') upload_type = 'astra';
             // Naser Mohsin uses universal parser logic in the backend too
 
-            await base44.functions.invoke('processPunchUpload', {
+            const response = await base44.functions.invoke('processPunchUpload', {
                 project_id: project.id,
                 file_uri,
                 file_metadata: {
@@ -318,16 +325,26 @@ export default function PunchUploadTab({ project }) {
                 },
                 upload_type
             });
+
+            return response.data;
         },
-        onSuccess: () => {
-            setFile(null);
+        onSuccess: (result) => {
             setShowPreviewDialog(false);
             setPreviewPunches([]);
             refetchJob();
+
+            if (result?.success) {
+                queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
+                setUploadProgress(null);
+                setFile(null);
+                toast.success(`Upload finished. ${result.records_saved || 0} punch records saved${result.records_skipped ? `, ${result.records_skipped} skipped` : ''}.`);
+            }
         },
         onError: (error) => {
             setUploadProgress(null);
-            toast.error('Failed to start upload: ' + (error.message || 'Unknown error'));
+            refetchJob();
+            const message = error?.response?.data?.error || error?.message || 'Upload failed. No punch records were saved.';
+            toast.error(message, { duration: 10000 });
         }
     });
 
@@ -479,12 +496,12 @@ export default function PunchUploadTab({ project }) {
                                             {activeJob.records_invalid_data > 0 && ` (${activeJob.records_invalid_data} invalid)`}
                                         </>
                                     ) : (
-                                        `${uploadProgress?.current || 0} / ${uploadProgress?.total || 100} records completed`
+                                        `${uploadProgress?.total || 0} records selected for import`
                                     )}
                                 </p>
                             </div>
                         </div>
-                        <Progress value={activeJob ? activeJob.progress : (uploadProgress?.current / uploadProgress?.total) * 100} className="bg-indigo-100" />
+                        <Progress value={activeJob ? (activeJob.progress || 0) : (uploadProgress?.current / uploadProgress?.total) * 100} className="bg-indigo-100" />
                     </CardContent>
                 </Card>
             )}
