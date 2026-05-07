@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Plus, Download, Copy, Sparkles } from 'lucide-react';
+
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -667,7 +667,6 @@ export default function ShiftTimingsTab({ project }) {
             <RamadanShiftSection project={project} shifts={shifts} employees={employees} />
 
             <ShiftCommandCenter 
-                totalShifts={shifts.length}
                 onAddShift={() => setShowAddForm(true)}
                 onExportAll={exportShiftsToCSV}
                 isAstra={isAstra}
@@ -712,10 +711,9 @@ export default function ShiftTimingsTab({ project }) {
 
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-8 bg-indigo-600 rounded-full" />
-                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                            {selectedBlock.replace('block', 'Block ')} Workspace
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold text-slate-900">
+                            {selectedBlock.replace('block', 'Block ')} Active Shifts
                         </h3>
                     </div>
                     {selectedShifts.length > 0 && (
@@ -780,13 +778,30 @@ export default function ShiftTimingsTab({ project }) {
 
             <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
                 <DialogContent className="max-w-3xl">
-                    <DialogHeader><DialogTitle>Add Shift Timing</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <div className="flex items-center gap-3">
+                            <DialogTitle>Add New Shift Timing</DialogTitle>
+                            <span className="px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase tracking-wider border border-indigo-100">
+                                Target: {selectedBlock.toUpperCase().replace('BLOCK', 'Block ')}
+                            </span>
+                        </div>
+                    </DialogHeader>
                     <div className="space-y-6 p-4">
-                        <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-                            <Label className="font-bold">AI Quick Entry</Label>
-                            <div className="flex gap-2 mt-2">
-                                <Input value={nlpText} onChange={e => setNlpText(e.target.value)} placeholder="Ali 8am-5pm single shift..." onKeyDown={(e) => { if (e.key === 'Enter') handleNlpParse(); }} />
-                                <Button onClick={handleNlpParse} disabled={nlpParsing}>{nlpParsing ? 'Parsing...' : 'Parse'}</Button>
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/60">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Label className="font-bold text-slate-700">AI Quick Entry</Label>
+                            </div>
+                            <div className="flex gap-2">
+                                <Input 
+                                    value={nlpText} 
+                                    onChange={e => setNlpText(e.target.value)} 
+                                    placeholder="e.g. Ali 8am-5pm single shift..." 
+                                    onKeyDown={(e) => { if (e.key === 'Enter') handleNlpParse(); }}
+                                    className="bg-white"
+                                />
+                                <Button onClick={handleNlpParse} disabled={nlpParsing} className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50">
+                                    {nlpParsing ? 'Parsing...' : 'Parse'}
+                                </Button>
                             </div>
                         </div>
                         <form onSubmit={(e) => { e.preventDefault(); createShiftMutation.mutate(formData); }} className="space-y-4">

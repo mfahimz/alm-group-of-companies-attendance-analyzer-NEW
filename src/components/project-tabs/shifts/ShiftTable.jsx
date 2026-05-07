@@ -40,7 +40,6 @@ export default function ShiftTable({
                                         className="border-slate-300 data-[state=checked]:bg-indigo-600 shadow-sm"
                                     />
                                 </TableHead>
-                                <TableHead className="w-24 text-slate-500 font-medium">Record ID</TableHead>
                                 <SortableTableHead sortKey="attendance_id" currentSort={sort} onSort={onSort} className="text-slate-900 font-semibold">
                                     Emp ID
                                 </SortableTableHead>
@@ -63,9 +62,18 @@ export default function ShiftTable({
                                 
                                 let applicableDays = [];
                                 try {
-                                    applicableDays = JSON.parse(shift.applicable_days || '[]');
+                                    if (shift.applicable_days) {
+                                        const parsed = JSON.parse(shift.applicable_days);
+                                        applicableDays = Array.isArray(parsed) ? parsed : [parsed];
+                                    }
                                 } catch {
-                                    applicableDays = shift.applicable_days ? [shift.applicable_days] : [];
+                                    applicableDays = shift.applicable_days 
+                                        ? shift.applicable_days.split(',').map(d => d.trim())
+                                        : [];
+                                }
+
+                                if (shift.is_friday_shift && !applicableDays.includes('Friday')) {
+                                    applicableDays.push('Friday');
                                 }
 
                                 const isRamadan = shift.applicable_days?.includes('Ramadan');
@@ -78,9 +86,6 @@ export default function ShiftTable({
                                                 onCheckedChange={(checked) => onSelectShift(shift, checked)}
                                                 className="border-slate-300 shadow-sm"
                                             />
-                                        </TableCell>
-                                        <TableCell className="text-[10px] text-slate-400 font-mono">
-                                            {shift.id.substring(0, 8)}
                                         </TableCell>
                                         <TableCell className="font-bold text-slate-900">{shift.attendance_id}</TableCell>
                                         <TableCell>
