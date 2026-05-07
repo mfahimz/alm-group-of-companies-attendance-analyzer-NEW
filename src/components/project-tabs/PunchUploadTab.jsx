@@ -22,7 +22,9 @@ export default function PunchUploadTab({ project }) {
     const [selectedPunches, setSelectedPunches] = useState([]);
     const [sort, setSort] = useState({ key: 'attendance_id', direction: 'asc' });
     const [uploadProgress, setUploadProgress] = useState(null);
+    const [previewPunches, setPreviewPunches] = useState([]);
     const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+    const [isPreviewing, setIsPreviewing] = useState(false);
     const [editingPunch, setEditingPunch] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [punchToDelete, setPunchToDelete] = useState(null);
@@ -95,11 +97,130 @@ export default function PunchUploadTab({ project }) {
             toast.success(`Upload completed successfully! ${activeJob.records_saved} records processed.`);
             // Clean up the job status so it doesn't keep showing as completed in a way that blocks UI
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived' });
+            setUploadProgress(null);
         } else if (activeJob?.status === 'failed') {
             toast.error(activeJob.error_message || 'The upload failed. Please try again.', { duration: 8000 });
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived_failed' });
+            setUploadProgress(null);
         }
     }, [activeJob?.status, project.id, queryClient]);
+
+    const parseFileForPreview = async (selectedFile) => {
+        try {
+            setIsPreviewing(true);
+            const data = await selectedFile.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const upload_type = project.company === 'Astra Auto Parts' ? 'astra' : 'universal';
+            
+            let parsedRecords = [];
+            
+            if (upload_type === 'astra') {
+                if (!project.date_from) throw new Error("Astra Excel: Project dates are missing");
+                const reportYear = project.date_from.split('-')[0];
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+
+                const dayToDateMap = {};
+                let daysRowIndex = -1;
+                const monthMap = {
+                    Jan: '01', Feb: '02', Mar: '03', Apr: '04',
+                    May: '05', Jun: '06', Jul: '07', Aug: '08',
+                    Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+                };
+
+                for (let r = 0; r < rows.length; r++) {
+                    if (rows[r] && rows[r][1] && String(rows[r][1]).trim() === 'Days') {
+                        daysRowIndex = r;
+                        break;
+                    }
+                }
+
+                if (daysRowIndex !== -1) {
+                    const dateRow = rows[daysRowIndex];
+                    for (let c = 0; c < dateRow.length; c++) {
+                        const cellVal = dateRow[c];
+                        if (cellVal && typeof cellVal === 'string') {
+                            const dateMatch = cellVal.trim().match(/^(\d{2})-([A-Za-z]{3})$/);
+                            if (dateMatch) {
+                                const monthAbbr = dateMatch[2].charAt(0).toUpperCase() + dateMatch[2].slice(1).toLowerCase();
+                                if (monthMap[monthAbbr]) {
+                                    dayToDateMap[c] = `${reportYear}-${monthMap[monthAbbr]}-${dateMatch[1]}`;
+                                }
+                            }
+                        }
+                    }
+
+                    for (let r = 0; r < rows.length; r++) {
+                        const row = rows[r];
+                        if (row && typeof row[1] === 'string' && row[1].trim().startsWith('Employee Code:-')) {
+                            const empCode = row[6] != null ? String(row[6]).trim() : '';
+                            let inTimeRow = null, outTimeRow = null;
+                            for (let offset = 1; offset <= 12 && (r + offset) < rows.length; offset++) {
+                                const label = rows[r + offset]?.[1];
+                                if (label === 'In Time') inTimeRow = rows[r + offset];
+                                else if (label === 'Out Time') outTimeRow = rows[r + offset];
+                            }
+
+                            const convertToAmPm = (time24, dateStr) => {
+                                const cleaned = time24.replace(/\s*\(SE\)\s*$/i, '').trim();
+                                const [hhRaw, mm] = cleaned.split(':');
+                                let hh = parseInt(hhRaw || '0', 10);
+                                const period = hh >= 12 ? 'PM' : 'AM';
+                                if (hh > 12) hh -= 12;
+                                if (hh === 0) hh = 12;
+                                const [y, m, d] = dateStr.split('-');
+                                return `${d}/${m}/${y} ${hh}:${(mm || '00').padStart(2, '0')} ${period}`;
+                            };
+
+                            for (const [colIndexStr, punch_date] of Object.entries(dayToDateMap)) {
+                                const colIndex = parseInt(colIndexStr, 10);
+                                const inStr = String(inTimeRow?.[colIndex] || '').trim();
+                                const outStr = String(outTimeRow?.[colIndex] || '').trim();
+
+                                if (inStr && inStr !== '00:00') {
+                                    parsedRecords.push({ attendance_id: empCode, punch_date, timestamp_raw: convertToAmPm(inStr, punch_date) });
+                                }
+                                if (outStr && outStr !== '00:00' && !/\(SE\)\s*$/.test(outStr)) {
+                                    parsedRecords.push({ attendance_id: empCode, punch_date, timestamp_raw: convertToAmPm(outStr, punch_date) });
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const csvData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                
+                for (let i = 1; i < csvData.length; i++) {
+                    const values = csvData[i];
+                    if (values.length < 2) continue;
+                    
+                    const attendance_id = String(values[0]).trim();
+                    let timestamp_raw = '';
+                    if (values.length >= 4 && (String(values[2]).includes('/') || String(values[2]).includes('-'))) {
+                        timestamp_raw = `${values[2]} ${values[3]}`;
+                    } else if (values.length >= 3 && (String(values[2]).includes('/') || String(values[2]).includes('-'))) {
+                        timestamp_raw = values[2];
+                    } else {
+                        timestamp_raw = values[1] || '';
+                    }
+
+                    if (attendance_id && timestamp_raw) {
+                        parsedRecords.push({ attendance_id, timestamp_raw });
+                    }
+                }
+            }
+
+            setPreviewPunches(parsedRecords);
+            setShowPreviewDialog(true);
+            setFile(selectedFile);
+        } catch (err) {
+            toast.error('Failed to read file: ' + err.message);
+        } finally {
+            setIsPreviewing(false);
+        }
+    };
 
     const uploadMutation = useMutation({
         mutationFn: async (selectedFile) => {
@@ -130,6 +251,8 @@ export default function PunchUploadTab({ project }) {
         },
         onSuccess: () => {
             setFile(null);
+            setShowPreviewDialog(false);
+            setPreviewPunches([]);
             refetchJob();
         },
         onError: (error) => {
@@ -141,9 +264,7 @@ export default function PunchUploadTab({ project }) {
     const handleFileChange = async (e) => {
         const selectedFile = e.target.files[0];
         if (selectedFile) {
-            if (window.confirm(`Start uploading ${selectedFile.name}? This will process records in the background.`)) {
-                uploadMutation.mutate(selectedFile);
-            }
+            parseFileForPreview(selectedFile);
         }
     };
 
@@ -512,6 +633,55 @@ export default function PunchUploadTab({ project }) {
                     )}
                 </CardContent>
             </Card>
+            <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Preview Punch Records</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-auto py-4">
+                        <p className="text-sm text-slate-500 mb-4">
+                            Found {previewPunches.length} potential records in <strong>{file?.name}</strong>. 
+                            Please review the first few records below.
+                        </p>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Employee ID</TableHead>
+                                    <TableHead>Employee Name</TableHead>
+                                    <TableHead>Timestamp (Raw)</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {previewPunches.slice(0, 10).map((p, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{p.attendance_id}</TableCell>
+                                        <TableCell>{employees.find(e => String(e.attendance_id) === String(p.attendance_id))?.name || 'Unknown'}</TableCell>
+                                        <TableCell>{p.timestamp_raw}</TableCell>
+                                    </TableRow>
+                                ))}
+                                {previewPunches.length > 10 && (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center text-slate-400 italic">
+                                            ... and {previewPunches.length - 10} more records
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                        <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            onClick={() => uploadMutation.mutate(file)}
+                            disabled={uploadMutation.isPending}
+                        >
+                            {uploadMutation.isPending ? 'Starting Upload...' : `Confirm Upload (${previewPunches.length} records)`}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

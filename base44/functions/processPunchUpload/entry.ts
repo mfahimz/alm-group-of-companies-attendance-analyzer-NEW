@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.27';
 import * as XLSX from 'npm:xlsx@0.18.5';
 
 Deno.serve(async (req) => {
@@ -35,16 +35,21 @@ Deno.serve(async (req) => {
 
         try {
             // 2. Download file content
-            // Assuming DownloadPrivateFile exists based on UploadPrivateFile pattern
-            let fileContent;
-            try {
-                const downloadResult = await base44.integrations.Core.GetPrivateFile({ file_uri });
-                fileContent = downloadResult.file;
-            } catch (err) {
-                // Try alternate naming if GetPrivateFile fails
-                const downloadResult = await base44.integrations.Core.DownloadPrivateFile({ file_uri });
-                fileContent = downloadResult.file;
+            const { url: signedUrl } = await base44.integrations.Core.CreateFileSignedUrl({ 
+                file_uri,
+                expires_in: 300 // 5 minutes
+            });
+
+            if (!signedUrl) {
+                throw new Error('Could not generate signed URL for file access');
             }
+
+            const response = await fetch(signedUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch file: ${response.statusText}`);
+            }
+            
+            const fileContent = await response.arrayBuffer();
 
             if (!fileContent) {
                 throw new Error('Could not retrieve file content from storage');
