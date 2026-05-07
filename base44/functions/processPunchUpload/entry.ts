@@ -293,33 +293,36 @@ Deno.serve(async (req) => {
                 throw new Error('No punch records could be imported. Please verify that the attendance IDs in the file match the employee master list.');
             }
 
-            // 5. Save in batches of 10 with 300ms delay and retry
-            const batchSize = 10;
+            // 5. Save in larger, throttled batches with strong retry protection
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            const getStatus = (err) => err?.status || err?.response?.status || err?.originalError?.response?.status || 0;
+            const batchSize = 50;
             let records_saved = 0;
 
             for (let i = 0; i < validRecords.length; i += batchSize) {
                 const batch = validRecords.slice(i, i + batchSize);
-                
                 let attempt = 0;
-                const MAX_ATTEMPTS = 3;
+                const MAX_ATTEMPTS = 6;
+
                 while (attempt < MAX_ATTEMPTS) {
                     try {
                         await base44.asServiceRole.entities.Punch.bulkCreate(batch);
                         break;
                     } catch (err) {
                         attempt++;
-                        if (err.status === 429 && attempt < MAX_ATTEMPTS) {
-                            await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-                        } else {
-                            throw err;
+                        const status = getStatus(err);
+                        if ((status === 429 || status >= 500) && attempt < MAX_ATTEMPTS) {
+                            await sleep(Math.min(30000, 2000 * Math.pow(2, attempt)));
+                            continue;
                         }
+                        throw err;
                     }
                 }
 
                 records_saved += batch.length;
                 const progress = 50 + Math.floor((records_saved / validRecords.length) * 50);
                 await updateJob({ progress, records_saved });
-                await new Promise(r => setTimeout(r, 300));
+                await sleep(1200);
             }
 
             await updateJob({ status: 'completed', progress: 100 });
@@ -338,19 +341,40 @@ Deno.serve(async (req) => {
             // 6. Rollback
             await updateJob({ status: 'rolling_back', error_message: jobError.message });
             
-            const toRollback = await base44.asServiceRole.entities.Punch.filter({ 
-                project_id, 
-                import_batch_id: uploadJob.import_batch_id 
-            });
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            const getStatus = (err) => err?.status || err?.response?.status || err?.originalError?.response?.status || 0;
+            const toRollback = [];
+            let rollbackSkip = 0;
+            const rollbackLimit = 100;
+            while (true) {
+                const page = await base44.asServiceRole.entities.Punch.filter({ 
+                    project_id, 
+                    import_batch_id: uploadJob.import_batch_id 
+                }, null, rollbackLimit, rollbackSkip);
+                toRollback.push(...page);
+                if (!Array.isArray(page) || page.length < rollbackLimit) break;
+                rollbackSkip += rollbackLimit;
+            }
             
             let records_rolled_back = 0;
             for (const p of toRollback) {
-                try {
-                    await base44.asServiceRole.entities.Punch.delete(p.id);
-                    records_rolled_back++;
-                } catch (delErr) {
-                    console.error('Rollback delete failed:', p.id, delErr);
+                let deleted = false;
+                for (let attempt = 0; attempt < 5 && !deleted; attempt++) {
+                    try {
+                        await base44.asServiceRole.entities.Punch.delete(p.id);
+                        records_rolled_back++;
+                        deleted = true;
+                    } catch (delErr) {
+                        const status = getStatus(delErr);
+                        if (status === 429 || status >= 500) {
+                            await sleep(Math.min(20000, 2000 * Math.pow(2, attempt + 1)));
+                        } else {
+                            console.error('Rollback delete failed:', p.id, delErr);
+                            deleted = true;
+                        }
+                    }
                 }
+                await sleep(500);
             }
 
             await updateJob({ 

@@ -96,6 +96,8 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
+    const visibleJob = activeJob && !['archived', 'archived_failed'].includes(activeJob.status) ? activeJob : null;
+
     // Handle job completion/failure and always clear local progress so the page never gets stuck
     React.useEffect(() => {
         if (!activeJob?.id) return;
@@ -296,9 +298,17 @@ export default function PunchUploadTab({ project }) {
     };
 
     const uploadMutation = useMutation({
+        onMutate: () => {
+            setShowPreviewDialog(false);
+            setUploadProgress({
+                phase: 'Uploading file...',
+                current: 0,
+                total: previewPunches.length || 1
+            });
+        },
         mutationFn: async (selectedFile) => {
             // 1. Upload to private storage
-            setUploadProgress({ phase: 'Uploading file...', current: 0, total: 100 });
+            setUploadProgress({ phase: 'Uploading file...', current: 0, total: previewPunches.length || 1 });
             const { file_uri } = await base44.integrations.Core.UploadPrivateFile({
                 file: selectedFile
             });
@@ -329,7 +339,6 @@ export default function PunchUploadTab({ project }) {
             return response.data;
         },
         onSuccess: (result) => {
-            setShowPreviewDialog(false);
             setPreviewPunches([]);
             refetchJob();
 
@@ -341,7 +350,9 @@ export default function PunchUploadTab({ project }) {
             }
         },
         onError: (error) => {
+            setShowPreviewDialog(false);
             setUploadProgress(null);
+            setPreviewPunches([]);
             refetchJob();
             const message = error?.response?.data?.error || error?.message || 'Upload failed. No punch records were saved.';
             toast.error(message, { duration: 10000 });
@@ -479,21 +490,21 @@ export default function PunchUploadTab({ project }) {
     return (
         <div className="space-y-6">
             {/* Upload Progress (Backend Job) */}
-            {(uploadProgress || activeJob) && (
+            {(uploadProgress || visibleJob) && (
                 <Card className="border-0 shadow-sm bg-indigo-50/50 ring-1 ring-indigo-100 rounded-xl">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="flex-1">
                                 <p className="font-semibold text-indigo-900">
-                                    {activeJob?.status === 'processing' ? 'Processing records...' : 
-                                     activeJob?.status === 'rolling_back' ? 'Cleaning up failed upload...' :
+                                    {visibleJob?.status === 'processing' ? 'Processing records...' : 
+                                     visibleJob?.status === 'rolling_back' ? 'Cleaning up failed upload...' :
                                      uploadProgress?.phase || 'Initializing...'}
                                 </p>
                                 <p className="text-sm text-indigo-700 mt-1">
-                                    {activeJob ? (
+                                    {visibleJob ? (
                                         <>
-                                            {activeJob.records_saved} / {activeJob.records_total} records processed 
-                                            {activeJob.records_invalid_data > 0 && ` (${activeJob.records_invalid_data} invalid)`}
+                                            {visibleJob.records_saved} / {visibleJob.records_total} records processed 
+                                            {visibleJob.records_invalid_data > 0 && ` (${visibleJob.records_invalid_data} invalid)`}
                                         </>
                                     ) : (
                                         `${uploadProgress?.total || 0} records selected for import`
@@ -501,7 +512,7 @@ export default function PunchUploadTab({ project }) {
                                 </p>
                             </div>
                         </div>
-                        <Progress value={activeJob ? (activeJob.progress || 0) : (uploadProgress?.current / uploadProgress?.total) * 100} className="bg-indigo-100" />
+                        <Progress value={visibleJob ? (visibleJob.progress || 0) : (uploadProgress?.current / uploadProgress?.total) * 100} className="bg-indigo-100" />
                     </CardContent>
                 </Card>
             )}
@@ -806,7 +817,7 @@ export default function PunchUploadTab({ project }) {
                         </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>
+                        <Button variant="outline" onClick={() => setShowPreviewDialog(false)} disabled={uploadMutation.isPending}>
                             Cancel
                         </Button>
                         <Button 
