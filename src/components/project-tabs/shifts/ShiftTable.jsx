@@ -61,19 +61,43 @@ export default function ShiftTable({
                                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
                                 
                                 let applicableDays = [];
-                                try {
-                                    if (shift.applicable_days) {
+                                if (shift.applicable_days) {
+                                    try {
                                         const parsed = JSON.parse(shift.applicable_days);
                                         applicableDays = Array.isArray(parsed) ? parsed : [parsed];
+                                    } catch {
+                                        if (typeof shift.applicable_days === 'string') {
+                                            if (shift.applicable_days.includes(',')) {
+                                                applicableDays = shift.applicable_days.split(',').map(d => d.trim()).filter(Boolean);
+                                            } else {
+                                                const str = shift.applicable_days.trim().toLowerCase();
+                                                if (str === 'monday to thursday and saturday') {
+                                                    applicableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+                                                } else if (str === 'monday to saturday') {
+                                                    applicableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                                } else if (str === 'monday to friday') {
+                                                    applicableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                                                } else if (str === 'sunday to thursday') {
+                                                    applicableDays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+                                                } else {
+                                                    applicableDays = [shift.applicable_days.trim()];
+                                                }
+                                            }
+                                        }
                                     }
-                                } catch {
-                                    applicableDays = shift.applicable_days 
-                                        ? shift.applicable_days.split(',').map(d => d.trim())
-                                        : [];
                                 }
 
                                 if (shift.is_friday_shift && !applicableDays.includes('Friday')) {
                                     applicableDays.push('Friday');
+                                }
+
+                                // Defaulting for legacy/untouched records
+                                if (applicableDays.length === 0) {
+                                    if (shift.is_friday_shift) {
+                                        applicableDays = ['Friday'];
+                                    } else {
+                                        applicableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+                                    }
                                 }
 
                                 const isRamadan = shift.applicable_days?.includes('Ramadan');
@@ -91,7 +115,6 @@ export default function ShiftTable({
                                         <TableCell>
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-slate-700">{employee?.name || '-'}</span>
-                                                <span className="text-[10px] text-slate-400">{employee?.id?.substring(0, 8)}</span>
                                             </div>
                                         </TableCell>
                                         <TableCell>
