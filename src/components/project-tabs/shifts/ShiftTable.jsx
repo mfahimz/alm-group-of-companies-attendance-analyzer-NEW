@@ -7,22 +7,23 @@ import TablePagination from '@/components/ui/TablePagination';
 import { formatInUAE, parseDateInUAE } from '@/components/ui/timezone';
 import { ShiftBadge, DayBadge } from './ShiftBadge';
 
-export default function ShiftTable({ 
-    shifts, 
-    employees, 
-    selectedShifts, 
-    onSelectShift, 
-    onSelectAll, 
-    onEdit, 
-    onDelete, 
-    sort, 
+export default function ShiftTable({
+    shifts,
+    employees,
+    selectedShifts,
+    onSelectShift,
+    onSelectAll,
+    onEdit,
+    onDelete,
+    sort,
     onSort,
     currentPage,
     rowsPerPage,
     onPageChange,
     onRowsPerPageChange,
     company,
-    formatTime
+    formatTime,
+    totalItems
 }) {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -59,7 +60,7 @@ export default function ShiftTable({
                         <TableBody>
                             {shifts.map((shift) => {
                                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
-                                
+
                                 let applicableDays = [];
                                 if (shift.applicable_days) {
                                     try {
@@ -169,7 +170,7 @@ export default function ShiftTable({
                                                         {formatInUAE(parseDateInUAE(shift.date), 'dd MMM')}
                                                     </span>
                                                 ) : isRamadan ? (
-                                                     <span className="text-[10px] font-medium text-purple-600">Dynamic</span>
+                                                    <span className="text-[10px] font-medium text-purple-600">Dynamic</span>
                                                 ) : (
                                                     days.map(d => (
                                                         <DayBadge key={d} day={d} active={applicableDays.includes(d)} />
@@ -204,9 +205,9 @@ export default function ShiftTable({
                     </Table>
                 </div>
             </div>
-            {shifts.length > 0 && (
+            {totalItems > 0 && (
                 <TablePagination
-                    totalItems={shifts.length}
+                    totalItems={totalItems}
                     currentPage={currentPage}
                     rowsPerPage={rowsPerPage}
                     onPageChange={onPageChange}

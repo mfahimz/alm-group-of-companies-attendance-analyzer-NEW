@@ -71,7 +71,7 @@ export default function ShiftTimingsTab({ project }) {
         data: [],
         headers: [],
         fileName: '',
-        onConfirm: () => {}
+        onConfirm: () => { }
     });
 
     const queryClient = useQueryClient();
@@ -138,6 +138,11 @@ export default function ShiftTimingsTab({ project }) {
             setBlockDateRanges(defaultRanges);
         }
     }, [project.shift_block_ranges, project.date_from, project.date_to, project.shift_blocks_count]);
+    
+    // Reset page to 1 when filters or search change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, departmentFilter, applicableDayFilter, shiftTypeFilter]);
 
     const shiftsByBlock = useMemo(() => {
         const blocksCount = project.shift_blocks_count || 2;
@@ -163,14 +168,14 @@ export default function ShiftTimingsTab({ project }) {
         return activeBlockShifts
             .filter(shift => {
                 const employee = employees.find(e => String(e.attendance_id) === String(shift.attendance_id));
-                const matchesSearch = !searchTerm || 
+                const matchesSearch = !searchTerm ||
                     String(shift.attendance_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                     employee?.name.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesDept = departmentFilter === 'all' || employee?.department === departmentFilter;
-                const matchesShiftType = shiftTypeFilter === 'all' || 
+                const matchesShiftType = shiftTypeFilter === 'all' ||
                     (shiftTypeFilter === 'single' && shift.is_single_shift) ||
                     (shiftTypeFilter === 'regular' && !shift.is_single_shift);
-                
+
                 let matchesDay = true;
                 if (applicableDayFilter !== 'all') {
                     let applicableDays = [];
@@ -215,7 +220,7 @@ export default function ShiftTimingsTab({ project }) {
 
                     matchesDay = applicableDays.some(day => day.toLowerCase() === applicableDayFilter.toLowerCase());
                 }
-                
+
                 return matchesSearch && matchesDept && matchesShiftType && matchesDay;
             })
             .sort((a, b) => {
@@ -309,25 +314,25 @@ export default function ShiftTimingsTab({ project }) {
         try {
             const parsed = JSON.parse(value);
             if (Array.isArray(parsed)) return value;
-        } catch {}
+        } catch { }
         const str = String(value).trim().toLowerCase();
         if (str === 'friday') return JSON.stringify(['Friday']);
         if (str === 'monday to thursday and saturday' || str === 'mon to thu and sat')
-            return JSON.stringify(['Monday','Tuesday','Wednesday','Thursday','Saturday']);
+            return JSON.stringify(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday']);
         if (str === 'monday to saturday' || str === 'mon to sat')
-            return JSON.stringify(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']);
+            return JSON.stringify(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
         if (str === 'monday to friday' || str === 'mon to fri')
-            return JSON.stringify(['Monday','Tuesday','Wednesday','Thursday','Friday']);
+            return JSON.stringify(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']);
         if (str === 'sunday to thursday' || str === 'sun to thu')
-            return JSON.stringify(['Sunday','Monday','Tuesday','Wednesday','Thursday']);
+            return JSON.stringify(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
         const dayMap = {
-            'sunday':'Sunday','sun':'Sunday',
-            'monday':'Monday','mon':'Monday',
-            'tuesday':'Tuesday','tue':'Tuesday',
-            'wednesday':'Wednesday','wed':'Wednesday',
-            'thursday':'Thursday','thu':'Thursday',
-            'friday':'Friday','fri':'Friday',
-            'saturday':'Saturday','sat':'Saturday'
+            'sunday': 'Sunday', 'sun': 'Sunday',
+            'monday': 'Monday', 'mon': 'Monday',
+            'tuesday': 'Tuesday', 'tue': 'Tuesday',
+            'wednesday': 'Wednesday', 'wed': 'Wednesday',
+            'thursday': 'Thursday', 'thu': 'Thursday',
+            'friday': 'Friday', 'fri': 'Friday',
+            'saturday': 'Saturday', 'sat': 'Saturday'
         };
         const parts = str.split(',').map(s => s.trim()).filter(Boolean);
         const mapped = parts.map(p => dayMap[p]).filter(Boolean);
@@ -359,7 +364,7 @@ export default function ShiftTimingsTab({ project }) {
                         try {
                             const daysArray = JSON.parse(applicableDays);
                             is_friday_shift = daysArray.some(day => String(day).toLowerCase() === 'friday') && daysArray.length === 1;
-                        } catch {}
+                        } catch { }
                     }
                     const employeeExists = employees.some(e => String(e.attendance_id) === String(attendance_id));
                     if (!employeeExists) {
@@ -467,7 +472,7 @@ export default function ShiftTimingsTab({ project }) {
                                     try {
                                         const daysArray = JSON.parse(applicableDays);
                                         is_friday_shift = daysArray.some(d => String(d).toLowerCase() === 'friday') && daysArray.length === 1;
-                                    } catch {}
+                                    } catch { }
                                 }
                                 records.push({
                                     project_id: project.id,
@@ -632,16 +637,16 @@ export default function ShiftTimingsTab({ project }) {
             queryClient.invalidateQueries(['shifts', project.id]);
             toast.success('Added');
             setShowAddForm(false);
-            setFormData({ 
-                attendance_id: '', 
-                am_start: '', 
-                am_end: '', 
-                pm_start: '', 
-                pm_end: '', 
-                is_single_shift: false, 
-                is_friday_shift: false, 
-                applicable_days: project.company === 'Naser Mohsin Auto Parts' 
-                    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'] 
+            setFormData({
+                attendance_id: '',
+                am_start: '',
+                am_end: '',
+                pm_start: '',
+                pm_end: '',
+                is_single_shift: false,
+                is_friday_shift: false,
+                applicable_days: project.company === 'Naser Mohsin Auto Parts'
+                    ? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday']
                     : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday']
             });
         }
@@ -689,7 +694,7 @@ export default function ShiftTimingsTab({ project }) {
         <div className="space-y-8 animate-in fade-in duration-500">
             <RamadanShiftSection project={project} shifts={shifts} employees={employees} />
 
-            <ShiftCommandCenter 
+            <ShiftCommandCenter
                 onAddShift={() => setShowAddForm(true)}
                 onExportAll={exportShiftsToCSV}
                 isAstra={isAstra}
@@ -748,7 +753,7 @@ export default function ShiftTimingsTab({ project }) {
                     )}
                 </div>
 
-                <BlockSettings 
+                <BlockSettings
                     blockId={selectedBlock}
                     blockRange={blockDateRanges[selectedBlock]}
                     isEditing={editingBlockRange === selectedBlock}
@@ -765,7 +770,7 @@ export default function ShiftTimingsTab({ project }) {
                     maxDate={project.date_to}
                 />
 
-                <ShiftFilters 
+                <ShiftFilters
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
                     departmentFilter={departmentFilter}
@@ -778,7 +783,7 @@ export default function ShiftTimingsTab({ project }) {
                     onReset={() => { setSearchTerm(''); setDepartmentFilter('all'); setShiftTypeFilter('all'); setApplicableDayFilter('all'); }}
                 />
 
-                <ShiftTable 
+                <ShiftTable
                     shifts={paginatedShifts}
                     employees={employees}
                     selectedShifts={selectedShifts}
@@ -796,6 +801,7 @@ export default function ShiftTimingsTab({ project }) {
                     onRowsPerPageChange={(v) => { setRowsPerPage(v); setCurrentPage(1); }}
                     company={project.company}
                     formatTime={formatTime}
+                    totalItems={filteredShifts.length}
                 />
             </div>
 
@@ -815,10 +821,10 @@ export default function ShiftTimingsTab({ project }) {
                                 <Label className="font-bold text-slate-700">AI Quick Entry</Label>
                             </div>
                             <div className="flex gap-2">
-                                <Input 
-                                    value={nlpText} 
-                                    onChange={e => setNlpText(e.target.value)} 
-                                    placeholder="e.g. Ali 8am-5pm single shift..." 
+                                <Input
+                                    value={nlpText}
+                                    onChange={e => setNlpText(e.target.value)}
+                                    placeholder="e.g. Ali 8am-5pm single shift..."
                                     onKeyDown={(e) => { if (e.key === 'Enter') handleNlpParse(); }}
                                     className="bg-white"
                                 />
@@ -854,11 +860,11 @@ export default function ShiftTimingsTab({ project }) {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
                                         {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
                                             <div key={day} className="flex items-center space-x-2">
-                                                <Checkbox 
-                                                    id={`new-day-${day}`} 
+                                                <Checkbox
+                                                    id={`new-day-${day}`}
                                                     checked={formData.applicable_days.includes(day)}
                                                     onCheckedChange={(checked) => {
-                                                        const newDays = checked 
+                                                        const newDays = checked
                                                             ? [...formData.applicable_days, day]
                                                             : formData.applicable_days.filter(d => d !== day);
                                                         setFormData({ ...formData, applicable_days: newDays });
@@ -869,12 +875,12 @@ export default function ShiftTimingsTab({ project }) {
                                         ))}
                                     </div>
                                 ) : (
-                                    <Select 
+                                    <Select
                                         value={
-                                            formData.applicable_days.length === 1 && formData.applicable_days.includes('Friday') 
-                                                ? 'Friday' 
-                                                : formData.applicable_days.length === 6 
-                                                    ? 'Monday to Saturday' 
+                                            formData.applicable_days.length === 1 && formData.applicable_days.includes('Friday')
+                                                ? 'Friday'
+                                                : formData.applicable_days.length === 6
+                                                    ? 'Monday to Saturday'
                                                     : 'Monday to Thursday and Saturday'
                                         }
                                         onValueChange={(value) => {
@@ -929,7 +935,7 @@ export default function ShiftTimingsTab({ project }) {
 
             <EditShiftDialog open={!!editingShift} onClose={() => setEditingShift(null)} shift={editingShift} projectId={project.id} />
             <BulkEditShiftDialog open={showBulkEdit} onClose={() => { setShowBulkEdit(false); setSelectedShifts([]); }} selectedShifts={selectedShifts} projectId={project.id} company={project.company} />
-            
+
             {/* Copy Shifts Dialog */}
             <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
                 <DialogContent>
