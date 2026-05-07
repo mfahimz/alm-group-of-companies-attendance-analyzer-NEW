@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
             import_batch_id: `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
         });
 
-        const updateJob = async (updates: any) => {
+        const updateJob = async (updates) => {
             await base44.asServiceRole.entities.UploadJob.update(uploadJob.id, updates);
         };
 
