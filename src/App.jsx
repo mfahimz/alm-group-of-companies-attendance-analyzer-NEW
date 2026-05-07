@@ -1,4 +1,4 @@
-// Cache bust 2026-03-28T16:00 - force rebuild after cleanup
+// Cache bust 2026-05-07T12:00 - force rebuild to surface latest Shift tab UI
 import './App.css'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
