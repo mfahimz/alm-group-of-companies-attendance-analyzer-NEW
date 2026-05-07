@@ -1,0 +1,116 @@
+{
+  "name": "UploadJob",
+  "type": "object",
+  "description": "Tracks the lifecycle of a punch file upload processed by the processPunchUpload backend function. Used for progress polling, error reporting, and rollback bookkeeping.",
+  "properties": {
+    "project_id": {
+      "type": "string",
+      "description": "The Project this upload belongs to."
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user who initiated the upload."
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Original file name."
+    },
+    "file_mime_type": {
+      "type": "string",
+      "description": "MIME type of the uploaded file."
+    },
+    "file_size_bytes": {
+      "type": "number",
+      "description": "Size of the uploaded file in bytes."
+    },
+    "file_uri": {
+      "type": "string",
+      "description": "Private storage URI of the uploaded file."
+    },
+    "upload_type": {
+      "type": "string",
+      "enum": [
+        "astra",
+        "universal"
+      ],
+      "description": "Parser variant used: 'astra' for Astra Auto Parts layout, 'universal' for all other companies."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "rolling_back",
+        "completed",
+        "failed",
+        "archived",
+        "archived_failed"
+      ],
+      "default": "pending",
+      "description": "Current lifecycle state of the upload job."
+    },
+    "progress": {
+      "type": "number",
+      "default": 0,
+      "description": "Progress percentage (0-100)."
+    },
+    "import_batch_id": {
+      "type": "string",
+      "description": "Unique batch identifier stamped on every Punch saved by this job. Used for rollback."
+    },
+    "records_total": {
+      "type": "number",
+      "default": 0,
+      "description": "Total records detected in the file."
+    },
+    "records_parsed": {
+      "type": "number",
+      "default": 0,
+      "description": "Records successfully parsed."
+    },
+    "records_to_save": {
+      "type": "number",
+      "default": 0,
+      "description": "Records that passed validation and deduplication and are queued for saving."
+    },
+    "records_saved": {
+      "type": "number",
+      "default": 0,
+      "description": "Records actually written to the Punch entity."
+    },
+    "records_invalid_format": {
+      "type": "number",
+      "default": 0,
+      "description": "Records skipped due to invalid format (missing date or attendance_id)."
+    },
+    "records_invalid_data": {
+      "type": "number",
+      "default": 0,
+      "description": "Records skipped due to invalid data (e.g., unknown employee)."
+    },
+    "records_duplicate": {
+      "type": "number",
+      "default": 0,
+      "description": "Records skipped because they already existed."
+    },
+    "records_rolled_back": {
+      "type": "number",
+      "default": 0,
+      "description": "Records deleted during rollback after a failure."
+    },
+    "warnings_json": {
+      "type": "string",
+      "description": "JSON-stringified array of warning messages (capped to first 50 unique entries)."
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Final error message if the job failed."
+    }
+  },
+  "required": [
+    "project_id",
+    "user_email",
+    "file_uri",
+    "status"
+  ]
+}
