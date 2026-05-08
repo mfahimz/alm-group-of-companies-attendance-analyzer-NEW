@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import SortableTableHead from '../ui/SortableTableHead';
+import TablePagination from '../ui/TablePagination';
 import ReportTableRow from './ReportTableRow';
 
 /**
@@ -34,6 +35,25 @@ export default function ReportResultsTable({
     resultsLoading,
     employeesLoading,
 }) {
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const [rowsPerPage, setRowsPerPage] = React.useState(25);
+
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [filteredResults.length, sort?.key, sort?.direction]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredResults.length / rowsPerPage));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const paginatedResults = filteredResults.slice(
+        (safeCurrentPage - 1) * rowsPerPage,
+        safeCurrentPage * rowsPerPage
+    );
+
+    const handleRowsPerPageChange = (value) => {
+        setRowsPerPage(value);
+        setCurrentPage(1);
+    };
+
     return (
         <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
             <CardHeader className="border-b border-slate-200 px-4 sm:px-5 py-4">
@@ -48,7 +68,7 @@ export default function ReportResultsTable({
                 </div>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="relative overflow-x-auto overflow-y-auto max-h-[680px] bg-white">
+                <div className="relative overflow-x-auto bg-white">
                     <table className="w-full min-w-max caption-bottom text-sm">
                         <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
                             <tr className="border-b border-slate-200">
@@ -91,7 +111,7 @@ export default function ReportResultsTable({
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
-                            {filteredResults.map((result) => (
+                            {paginatedResults.map((result) => (
                                 <ReportTableRow
                                     key={result.id}
                                     result={result}
@@ -117,6 +137,13 @@ export default function ReportResultsTable({
                         </tbody>
                     </table>
                 </div>
+                <TablePagination
+                    totalItems={filteredResults.length}
+                    currentPage={safeCurrentPage}
+                    rowsPerPage={rowsPerPage}
+                    onPageChange={setCurrentPage}
+                    onRowsPerPageChange={handleRowsPerPageChange}
+                />
             </CardContent>
         </Card>
     );
