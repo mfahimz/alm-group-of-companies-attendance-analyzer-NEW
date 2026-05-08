@@ -569,140 +569,224 @@ export default function PunchUploadTab({ project }) {
     })();
 
     return (
-        <div className="space-y-6">
-            {/* Upload Progress (Backend Job) */}
+        <div className="space-y-8 max-w-7xl mx-auto pb-12">
+            {/* 1. Strong Section Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="space-y-1.5">
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Punch Data Management</h2>
+                    <p className="text-slate-500 text-base max-w-2xl">
+                        Upload employee attendance records, verify data integrity, and manage existing punch logs for this project.
+                    </p>
+                </div>
+            </div>
+
+            {/* 3. Upload status / active job card - Improved */}
             {((uploadMutation.isPending && uploadProgress) || visibleJob) && (
-                <Card className="border-0 shadow-sm bg-indigo-50/50 ring-1 ring-indigo-100 rounded-xl">
-                    <CardContent className="p-4">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="flex-1">
-                                <p className="font-semibold text-indigo-900">
-                                    {uploadFeedback.title}
-                                </p>
-                                <p className="text-sm text-indigo-700 mt-1">
-                                    {uploadFeedback.detail}
-                                </p>
+                <Card className="border-0 shadow-lg bg-white overflow-hidden ring-1 ring-indigo-100 rounded-2xl">
+                    <div className="h-1.5 bg-indigo-100 w-full overflow-hidden">
+                        <div 
+                            className="h-full bg-indigo-600 transition-all duration-500 ease-out" 
+                            style={{ width: `${uploadFeedback.value}%` }}
+                        />
+                    </div>
+                    <CardContent className="p-6">
+                        <div className="flex items-center gap-5">
+                            <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+                                <div className="animate-spin rounded-full h-6 w-6 border-2 border-indigo-600 border-t-transparent" />
+                            </div>
+                            <div className="flex-1 space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <p className="font-bold text-lg text-slate-900">
+                                        {uploadFeedback.title}
+                                    </p>
+                                    <span className="text-sm font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full">
+                                        {Math.round(uploadFeedback.value)}%
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-4 text-sm text-slate-500">
+                                    <p>
+                                        {uploadFeedback.detail}
+                                    </p>
+                                    <div className="h-1 w-1 rounded-full bg-slate-300" />
+                                    <p className="italic">Please do not close this window</p>
+                                </div>
                             </div>
                         </div>
-                        <Progress value={uploadFeedback.value} className="bg-indigo-100" />
                     </CardContent>
                 </Card>
             )}
 
-            {/* Upload Section */}
-            <Card className="border-0 shadow-sm">
-                <CardHeader>
-                    <CardTitle>Upload Punch Data</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Input
-                            type="file"
-                            accept=".csv, .xlsx, .xls"
-                            onChange={handleFileChange}
-                            disabled={uploadMutation.isPending || (activeJob && ['pending', 'processing', 'rolling_back'].includes(activeJob.status))}
-                        />
-                        {project.company === 'Al Maraghi Automotive' ? (
-                            <>
-                                <p className="text-sm text-slate-500 mt-2">
-                                    CSV format: attendance_id, name, timestamp
-                                </p>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Timestamp format: M/D/YYYY H:MM:SS AM/PM (e.g., 11/1/2025 8:28:22 AM)
-                                </p>
-                            </>
-                        ) : project.company === 'Naser Mohsin Auto Parts' ? (
-                            <>
-                                <p className="text-sm text-slate-500 mt-2">
-                                    CSV format: attendance_id, first_name, date, time
-                                </p>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Date format: DD/MM/YYYY (Day/Month/Year), Time format: HH:MM (will be converted to AM/PM automatically)
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-sm text-slate-500 mt-2">
-                                    CSV format: attendance_id, name (optional), timestamp
-                                </p>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Timestamp format: DD/MM/YYYY HH:MM AM/PM (e.g., 02/10/2025 8:54 AM)
-                                </p>
-                            </>
-                        )}
-                    </div>
-
-                </CardContent>
-            </Card>
-
-            {/* Current Punches */}
-            <Card className="border-0 shadow-sm">
-                <CardHeader>
-                    <CardTitle>Current Punch Data</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {punches.length === 0 ? (
-                        <p className="text-slate-500 text-center py-8">No punches uploaded yet</p>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm text-slate-600">
-                                    Total: {punches.length} punch records from {new Set(punches.map(p => p.attendance_id)).size} employees
-                                    {enrichedPunches.length !== punches.length && ` (${enrichedPunches.length} shown)`}
-                                </p>
-                                <div className="flex gap-3">
-                                    {selectedPunches.length > 0 && !isUser && (
-                                        <Button 
-                                            onClick={handleBulkDelete}
-                                            variant="destructive"
-                                            size="sm"
-                                            disabled={bulkDeleteMutation.isPending}
-                                        >
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            Delete {selectedPunches.length} Selected
-                                        </Button>
-                                    )}
-                                    <Input
-                                        type="date"
-                                        value={dateFrom}
-                                        onChange={(e) => {
-                                            const newDate = e.target.value;
-                                            if (newDate >= project.date_from && newDate <= project.date_to) {
-                                                setDateFrom(newDate);
-                                            }
-                                        }}
-                                        min={project.date_from}
-                                        max={project.date_to}
-                                        className="w-40"
-                                        placeholder="From date"
-                                        title="Date range must be within project period"
-                                    />
-                                    <Input
-                                        type="date"
-                                        value={dateTo}
-                                        onChange={(e) => {
-                                            const newDate = e.target.value;
-                                            if (newDate >= dateFrom && newDate <= project.date_to && newDate >= project.date_from) {
-                                                setDateTo(newDate);
-                                            }
-                                        }}
-                                        min={dateFrom}
-                                        max={project.date_to}
-                                        className="w-40"
-                                        placeholder="To date"
-                                        title="Date range must be within project period"
-                                    />
-                                    <div className="relative w-64">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <Input
-                                            placeholder="Filter by attendance ID..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="pl-9"
-                                        />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* 2. Upload card - Prominent & Polished */}
+                <Card className="lg:col-span-4 border-0 shadow-sm bg-white overflow-hidden rounded-2xl flex flex-col">
+                    <CardHeader className="border-b border-slate-50 bg-slate-50/30">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
+                                <Upload className="w-5 h-5" />
+                            </div>
+                            <CardTitle className="text-xl">Import Data</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6 flex-1 flex flex-col justify-between">
+                        <div className="space-y-6">
+                            <div className="relative group">
+                                <input
+                                    type="file"
+                                    id="punch-upload"
+                                    className="hidden"
+                                    accept=".csv, .xlsx, .xls"
+                                    onChange={handleFileChange}
+                                    disabled={uploadMutation.isPending || (visibleJob && ACTIVE_UPLOAD_STATUSES.includes(visibleJob.status))}
+                                />
+                                <label 
+                                    htmlFor="punch-upload"
+                                    className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300
+                                        ${uploadMutation.isPending || (visibleJob && ACTIVE_UPLOAD_STATUSES.includes(visibleJob.status))
+                                            ? 'bg-slate-50 border-slate-200 cursor-not-allowed opacity-60' 
+                                            : 'border-slate-200 bg-slate-50/50 hover:bg-white hover:border-indigo-400 hover:shadow-md'
+                                        }`}
+                                >
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6 px-4 text-center">
+                                        <div className={`p-3 rounded-full mb-3 transition-colors ${uploadMutation.isPending ? 'bg-slate-100' : 'bg-indigo-50 group-hover:bg-indigo-100'}`}>
+                                            <Upload className={`w-8 h-8 ${uploadMutation.isPending ? 'text-slate-400' : 'text-indigo-600'}`} />
+                                        </div>
+                                        <p className="mb-2 text-sm text-slate-700 font-semibold">
+                                            {isPreviewing ? 'Reading file...' : 'Click to upload or drag and drop'}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            Excel or CSV files only
+                                        </p>
                                     </div>
+                                </label>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Instructions</h4>
+                                <div className="space-y-4">
+                                    {project.company === 'Astra Auto Parts' ? (
+                                        <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100 text-amber-900">
+                                            <p className="text-xs font-semibold mb-1">Astra Format Detected</p>
+                                            <p className="text-xs leading-relaxed opacity-80">
+                                                Please upload the monthly "In-Out" report. Ensure the project dates match the report month.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="flex gap-3">
+                                                <div className="h-5 w-5 rounded bg-slate-100 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</div>
+                                                <p className="text-xs text-slate-600 leading-relaxed">
+                                                    Required columns: <span className="font-semibold text-slate-900">attendance_id</span> and <span className="font-semibold text-slate-900">timestamp</span>.
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <div className="h-5 w-5 rounded bg-slate-100 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</div>
+                                                <p className="text-xs text-slate-600 leading-relaxed">
+                                                    Timestamp format: <code className="bg-slate-100 px-1 rounded text-indigo-600">DD/MM/YYYY HH:MM AM/PM</code>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-slate-50 mt-auto">
+                            <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+                                For best results, use the standard attendance export from your ZKTeco or BioTime machine.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 4. Punch data workspace card - Cleaner & Stronger */}
+                <Card className="lg:col-span-8 border-0 shadow-sm bg-white overflow-hidden rounded-2xl">
+                    <CardHeader className="border-b border-slate-50 bg-slate-50/30 flex-row items-center justify-between space-y-0 py-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                                <Search className="w-5 h-5" />
+                            </div>
+                            <CardTitle className="text-xl">Records Explorer</CardTitle>
+                        </div>
+                        <div className="flex items-center gap-2">
+                             <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                                {punches.length} total records
+                            </span>
+                        </div>
+                    </CardHeader>
+
+                    <CardContent className="p-0">
+                        {punches.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+                                <div className="h-20 w-20 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+                                    <Upload className="w-10 h-10 text-slate-200" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-slate-900">No punch data yet</h3>
+                                <p className="text-slate-500 max-w-sm mt-1">
+                                    Start by uploading an attendance file. Once processed, your records will appear here for management.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col h-full">
+                                {/* Toolbar */}
+                                <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <div className="flex items-center gap-2 p-1 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                            <input
+                                                type="date"
+                                                value={dateFrom}
+                                                onChange={(e) => {
+                                                    const newDate = e.target.value;
+                                                    if (newDate >= project.date_from && newDate <= project.date_to) {
+                                                        setDateFrom(newDate);
+                                                    }
+                                                }}
+                                                min={project.date_from}
+                                                max={project.date_to}
+                                                className="bg-transparent border-0 text-sm focus:ring-0 w-36 px-2 py-1 h-8"
+                                            />
+                                            <div className="h-4 w-px bg-slate-200" />
+                                            <input
+                                                type="date"
+                                                value={dateTo}
+                                                onChange={(e) => {
+                                                    const newDate = e.target.value;
+                                                    if (newDate >= dateFrom && newDate <= project.date_to && newDate >= project.date_from) {
+                                                        setDateTo(newDate);
+                                                    }
+                                                }}
+                                                min={dateFrom}
+                                                max={project.date_to}
+                                                className="bg-transparent border-0 text-sm focus:ring-0 w-36 px-2 py-1 h-8"
+                                            />
+                                        </div>
+
+                                        <div className="relative group">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                            <Input
+                                                placeholder="Search ID..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-9 h-10 w-48 bg-white border-slate-200 focus:border-indigo-400 focus:ring-indigo-100 transition-all rounded-lg"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        {selectedPunches.length > 0 && !isUser && (
+                                            <Button 
+                                                onClick={handleBulkDelete}
+                                                variant="destructive"
+                                                size="sm"
+                                                className="h-10 px-4 rounded-lg shadow-sm animate-in fade-in slide-in-from-right-2"
+                                                disabled={bulkDeleteMutation.isPending}
+                                            >
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Delete Selected ({selectedPunches.length})
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+
                             <div className="overflow-auto">
                                 <Table>
                                     <TableHeader className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 border-b border-slate-200/60 shadow-sm">
@@ -729,17 +813,20 @@ export default function PunchUploadTab({ project }) {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                       {paginatedPunches.map((punch) => (
-                                           <TableRow key={punch.id} className="hover:bg-slate-50/80 transition-colors duration-200 border-b border-slate-100 last:border-0 text-slate-700">
+                                        {paginatedPunches.map((punch) => (
+                                            <TableRow key={punch.id} className="hover:bg-indigo-50/30 transition-colors duration-200 border-b border-slate-100 last:border-0 text-slate-700 group">
                                                {!isUser && (
-                                                   <TableCell>
+                                                   <TableCell className="py-4">
                                                        <Checkbox
                                                            checked={selectedPunches.includes(punch.id)}
                                                            onCheckedChange={() => toggleSelectPunch(punch.id)}
+                                                           className="border-slate-300 data-[state=checked]:bg-indigo-600 shadow-sm"
                                                        />
                                                    </TableCell>
                                                )}
-                                                <TableCell className="font-medium">
+
+                                                <TableCell className="font-semibold text-slate-900 py-4">
+
                                                     {editingPunch?.id === punch.id ? (
                                                         <Input
                                                             value={editingPunch.attendance_id}
@@ -768,22 +855,24 @@ export default function PunchUploadTab({ project }) {
                                                     )}
                                                 </TableCell>
                                                 {!isUser && (
-                                                    <TableCell className="text-right">
-                                                        <div className="flex gap-1 justify-end">
+                                                    <TableCell className="text-right py-4">
+                                                        <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <Button
-                                                                size="sm"
+                                                                size="icon"
                                                                 variant="ghost"
+                                                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                                                                 onClick={() => {
                                                                     if (window.confirm('Delete this punch record?')) {
                                                                         deleteMutation.mutate(punch.id);
                                                                     }
                                                                 }}
                                                             >
-                                                                <Trash2 className="w-4 h-4 text-red-600" />
+                                                                <Trash2 className="w-4 h-4" />
                                                             </Button>
                                                         </div>
                                                     </TableCell>
                                                 )}
+
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -804,104 +893,152 @@ export default function PunchUploadTab({ project }) {
                 </CardContent>
             </Card>
             <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Preview Punch Records</DialogTitle>
+                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 border-0 shadow-2xl rounded-2xl overflow-hidden">
+                    <DialogHeader className="p-6 bg-white border-b">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <DialogTitle className="text-2xl font-bold text-slate-900">Verify Import Data</DialogTitle>
+                                <p className="text-slate-500 text-sm">Review identified records and potential issues before saving.</p>
+                            </div>
+                        </div>
                     </DialogHeader>
-                    <div className="flex-1 overflow-auto py-4">
-                        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {previewIssues.layoutError ? (
-                                <div className="col-span-full bg-red-50 border border-red-100 p-4 rounded-lg flex items-start gap-3">
-                                    <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-semibold text-red-900">Unsupported File Layout</p>
-                                        <p className="text-sm text-red-700">The file structure doesn't match what we expect. Please check the sample format above.</p>
+                    
+                    <div className="flex-1 overflow-auto bg-slate-50/50 p-6 space-y-6">
+                        {previewIssues.layoutError ? (
+                            <div className="bg-red-50 border border-red-100 p-5 rounded-2xl flex items-start gap-4">
+                                <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-red-900 text-lg">Unsupported File Layout</p>
+                                    <p className="text-sm text-red-700 mt-1 leading-relaxed">
+                                        The file structure doesn't match our required template. Please ensure your file matches the column format shown in the instructions.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Summary Grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className={`p-4 rounded-2xl border bg-white shadow-sm transition-all ${previewIssues.missingId > 0 ? 'border-red-100' : 'border-slate-100'}`}>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Missing IDs</p>
+                                        <div className="flex items-baseline gap-2">
+                                            <p className={`text-2xl font-black ${previewIssues.missingId > 0 ? 'text-red-600' : 'text-slate-900'}`}>{previewIssues.missingId}</p>
+                                            {previewIssues.missingId > 0 && <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />}
+                                        </div>
+                                    </div>
+                                    <div className={`p-4 rounded-2xl border bg-white shadow-sm transition-all ${previewIssues.unmatchedId > 0 ? 'border-amber-100' : 'border-slate-100'}`}>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Unknown Staff</p>
+                                        <p className={`text-2xl font-black ${previewIssues.unmatchedId > 0 ? 'text-amber-600' : 'text-slate-900'}`}>{previewIssues.unmatchedId}</p>
+                                    </div>
+                                    <div className={`p-4 rounded-2xl border bg-white shadow-sm transition-all ${previewIssues.invalidTime > 0 ? 'border-red-100' : 'border-slate-100'}`}>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Invalid Time</p>
+                                        <p className={`text-2xl font-black ${previewIssues.invalidTime > 0 ? 'text-red-600' : 'text-slate-900'}`}>{previewIssues.invalidTime}</p>
+                                    </div>
+                                    <div className={`p-4 rounded-2xl border bg-white shadow-sm transition-all ${previewIssues.duplicates > 0 ? 'border-blue-100' : 'border-slate-100'}`}>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Duplicates</p>
+                                        <p className={`text-2xl font-black ${previewIssues.duplicates > 0 ? 'text-blue-600' : 'text-slate-900'}`}>{previewIssues.duplicates}</p>
                                     </div>
                                 </div>
-                            ) : (
-                                <>
-                                    <div className={`p-3 rounded-lg border ${previewIssues.missingId > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
-                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Missing IDs</p>
-                                        <p className={`text-2xl font-bold ${previewIssues.missingId > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{previewIssues.missingId}</p>
-                                    </div>
-                                    <div className={`p-3 rounded-lg border ${previewIssues.unmatchedId > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
-                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Unknown Employees</p>
-                                        <p className={`text-2xl font-bold ${previewIssues.unmatchedId > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{previewIssues.unmatchedId}</p>
-                                    </div>
-                                    <div className={`p-3 rounded-lg border ${previewIssues.invalidTime > 0 ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
-                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Invalid Times</p>
-                                        <p className={`text-2xl font-bold ${previewIssues.invalidTime > 0 ? 'text-amber-600' : 'text-slate-600'}`}>{previewIssues.invalidTime}</p>
-                                    </div>
-                                    <div className={`p-3 rounded-lg border ${previewIssues.duplicates > 0 ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-100'}`}>
-                                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Duplicate Rows</p>
-                                        <p className={`text-2xl font-bold ${previewIssues.duplicates > 0 ? 'text-blue-600' : 'text-slate-600'}`}>{previewIssues.duplicates}</p>
-                                    </div>
-                                </>
-                            )}
-                        </div>
 
-                        <p className="text-sm text-slate-500 mb-4">
-                            Showing first 50 records from <strong>{file?.name}</strong>. 
-                            {previewIssues.unmatchedId > 0 && " Records with unknown IDs will be skipped during upload."}
-                        </p>
-                        
-                        <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableHeader className="bg-slate-50">
-                                    <TableRow>
-                                        <TableHead>Employee ID</TableHead>
-                                        <TableHead>Employee Name</TableHead>
-                                        <TableHead>Timestamp (Raw)</TableHead>
-                                        <TableHead className="w-24 text-center">Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {previewPunches.slice(0, 50).map((p, i) => {
-                                        const hasError = p._issues.missingId || p._issues.unmatchedId || p._issues.invalidTime;
-                                        const isWarning = p._issues.duplicate;
-                                        
-                                        return (
-                                            <TableRow key={i} className={hasError ? 'bg-red-50/50' : isWarning ? 'bg-amber-50/50' : ''}>
-                                                <TableCell className="font-mono text-xs">{p.attendance_id || <span className="text-red-500 font-sans italic">Missing</span>}</TableCell>
-                                                <TableCell>{employees.find(e => String(e.attendance_id) === String(p.attendance_id))?.name || <span className="text-slate-400 italic">Unknown</span>}</TableCell>
-                                                <TableCell className={p._issues.invalidTime ? 'text-red-600' : ''}>{p.timestamp_raw}</TableCell>
-                                                <TableCell className="text-center">
-                                                    {hasError ? (
-                                                        <AlertTriangle className="w-4 h-4 text-red-500 mx-auto" />
-                                                    ) : isWarning ? (
-                                                        <AlertTriangle className="w-4 h-4 text-amber-500 mx-auto" title="Duplicate record" />
-                                                    ) : (
-                                                        <span className="text-green-600 text-xs font-medium">Ready</span>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                    {previewPunches.length > 50 && (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center text-slate-400 italic py-4">
-                                                ... and {previewPunches.length - 50} more records
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between px-1">
+                                        <h3 className="text-sm font-bold text-slate-900">Data Preview (First 50 records)</h3>
+                                        <p className="text-xs text-slate-500">Source: <span className="font-medium text-slate-700 italic">{file?.name}</span></p>
+                                    </div>
+                                    <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                                        <Table>
+                                            <TableHeader className="bg-slate-50/50">
+                                                <TableRow className="hover:bg-transparent border-b border-slate-100">
+                                                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Employee ID</TableHead>
+                                                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Employee Name</TableHead>
+                                                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Timestamp (Raw)</TableHead>
+                                                    <TableHead className="text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">Status</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {previewPunches.slice(0, 50).map((p, i) => {
+                                                    const hasError = p._issues.missingId || p._issues.unmatchedId || p._issues.invalidTime;
+                                                    const isWarning = p._issues.duplicate;
+                                                    
+                                                    return (
+                                                        <TableRow key={i} className={`border-b border-slate-50 last:border-0 ${hasError ? 'bg-red-50/30' : isWarning ? 'bg-amber-50/20' : ''}`}>
+                                                            <TableCell className="py-3">
+                                                                <span className={`font-mono text-xs px-2 py-1 rounded bg-slate-100 ${p._issues.missingId ? 'text-red-600 bg-red-100 font-bold' : 'text-slate-700'}`}>
+                                                                    {p.attendance_id || 'MISSING'}
+                                                                </span>
+                                                            </TableCell>
+                                                            <TableCell className="py-3">
+                                                                {employees.find(e => String(e.attendance_id) === String(p.attendance_id))?.name || (
+                                                                    <span className="text-slate-400 italic text-sm">Unknown Employee</span>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell className={`py-3 text-sm ${p._issues.invalidTime ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
+                                                                {p.timestamp_raw}
+                                                            </TableCell>
+                                                            <TableCell className="py-3 text-right">
+                                                                {hasError ? (
+                                                                    <div className="flex items-center justify-end gap-1.5 text-red-600">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-tighter">Fix Required</span>
+                                                                        <AlertTriangle className="w-3.5 h-3.5" />
+                                                                    </div>
+                                                                ) : isWarning ? (
+                                                                    <div className="flex items-center justify-end gap-1.5 text-amber-600">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-tighter">Duplicate</span>
+                                                                        <AlertTriangle className="w-3.5 h-3.5" />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-end gap-1.5 text-emerald-600">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-tighter">Ready</span>
+                                                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                                                    </div>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                                {previewPunches.length > 50 && (
+                                                    <TableRow>
+                                                        <TableCell colSpan={4} className="text-center text-slate-400 italic py-6 bg-slate-50/30">
+                                                            And {previewPunches.length - 50} more records in this file...
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button variant="outline" onClick={() => setShowPreviewDialog(false)} disabled={uploadMutation.isPending}>
-                            Cancel
-                        </Button>
-                        <Button 
-                            onClick={() => uploadMutation.mutate(file)}
-                            disabled={uploadMutation.isPending || previewIssues.layoutError || previewPunches.length === 0}
-                            className="bg-indigo-600 hover:bg-indigo-700"
-                        >
-                            {uploadMutation.isPending ? 'Starting Upload...' : `Confirm & Save ${previewPunches.length} Records`}
-                        </Button>
+                    
+                    <div className="p-6 bg-white border-t flex items-center justify-between">
+                        <div className="text-xs text-slate-400">
+                            {previewIssues.unmatchedId > 0 && "* Unknown records will be automatically ignored."}
+                        </div>
+                        <div className="flex gap-3">
+                            <Button variant="ghost" onClick={() => setShowPreviewDialog(false)} className="px-6 text-slate-500 hover:text-slate-900">
+                                Cancel
+                            </Button>
+                            <Button 
+                                onClick={() => uploadMutation.mutate(file)}
+                                disabled={uploadMutation.isPending || previewIssues.layoutError || previewPunches.length === 0}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 h-11 rounded-xl shadow-md shadow-indigo-200 transition-all active:scale-95"
+                            >
+                                {uploadMutation.isPending ? (
+                                    <div className="flex items-center gap-2">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                                        <span>Saving...</span>
+                                    </div>
+                                ) : (
+                                    `Confirm & Save ${previewPunches.length} Records`
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
+
         </div>
     );
 }
