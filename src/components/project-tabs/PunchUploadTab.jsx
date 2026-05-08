@@ -83,8 +83,9 @@ export default function PunchUploadTab({ project }) {
             const jobs = await base44.entities.UploadJob.filter({ 
                 project_id: project.id, 
                 user_email: currentUser?.email
-            }, '-created_date', 1);
-            return jobs[0] || null;
+            }, '-created_date', 10);
+            const activeStatuses = ['pending', 'processing', 'rolling_back'];
+            return jobs.find(job => activeStatuses.includes(job.status)) || null;
         },
         enabled: !!currentUser?.email,
         refetchInterval: (query) => {
@@ -96,7 +97,7 @@ export default function PunchUploadTab({ project }) {
         }
     });
 
-    const visibleJob = activeJob && !['archived', 'archived_failed'].includes(activeJob.status) ? activeJob : null;
+    const visibleJob = activeJob && ['pending', 'processing', 'rolling_back'].includes(activeJob.status) ? activeJob : null;
 
     // Handle job completion/failure and always clear local progress so the page never gets stuck
     React.useEffect(() => {
@@ -496,7 +497,7 @@ export default function PunchUploadTab({ project }) {
     return (
         <div className="space-y-6">
             {/* Upload Progress (Backend Job) */}
-            {(uploadProgress || visibleJob) && (
+            {((uploadMutation.isPending && uploadProgress) || visibleJob) && (
                 <Card className="border-0 shadow-sm bg-indigo-50/50 ring-1 ring-indigo-100 rounded-xl">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3 mb-2">
@@ -504,7 +505,7 @@ export default function PunchUploadTab({ project }) {
                                 <p className="font-semibold text-indigo-900">
                                     {visibleJob?.status === 'processing' ? 'Processing records...' : 
                                      visibleJob?.status === 'rolling_back' ? 'Cleaning up failed upload...' :
-                                     uploadProgress?.phase || 'Initializing...'}
+                                     (uploadMutation.isPending ? uploadProgress?.phase : null) || 'Processing upload...'}
                                 </p>
                                 <p className="text-sm text-indigo-700 mt-1">
                                     {visibleJob ? (
@@ -513,12 +514,12 @@ export default function PunchUploadTab({ project }) {
                                             {visibleJob.records_invalid_data > 0 && ` (${visibleJob.records_invalid_data} invalid)`}
                                         </>
                                     ) : (
-                                        `${uploadProgress?.total || 0} records selected for import`
+                                        uploadMutation.isPending ? `${previewPunches.length || 0} records selected for import` : 'Checking latest upload status...'
                                     )}
                                 </p>
                             </div>
                         </div>
-                        <Progress value={visibleJob ? (visibleJob.progress || 0) : (uploadProgress?.current / uploadProgress?.total) * 100} className="bg-indigo-100" />
+                        <Progress value={visibleJob ? (visibleJob.progress || 0) : ((uploadProgress?.current || 0) / (uploadProgress?.total || 100)) * 100} className="bg-indigo-100" />
                     </CardContent>
                 </Card>
             )}
