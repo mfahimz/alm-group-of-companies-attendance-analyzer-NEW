@@ -59,9 +59,9 @@ function EntryCell({ value, onSave, title, disabled, isAdminOrCEO }) {
         }}>
             <PopoverTrigger asChild>
                 <div 
-                    className={`h-9 min-w-[5rem] px-3 py-1 rounded-md border border-dashed flex items-center justify-center cursor-pointer transition-all
-                        ${grandTotal > 0 ? 'bg-white border-indigo-200 text-indigo-700 font-medium' : 'bg-slate-50 border-slate-300 text-slate-400 hover:bg-slate-100'}
-                        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-400 hover:shadow-sm'}
+                    className={`h-10 min-w-[6rem] px-3 py-1 rounded-xl border flex items-center justify-center cursor-pointer transition-all shadow-sm
+                        ${grandTotal > 0 ? 'bg-white border-indigo-200 text-indigo-700 font-semibold ring-1 ring-indigo-50' : 'bg-slate-50/80 border-dashed border-slate-300 text-slate-400 hover:bg-white'}
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-indigo-400 hover:shadow-md hover:shadow-indigo-100/50'}
                     `}
                     onClick={(e) => {
                         if (disabled) {
@@ -675,33 +675,38 @@ export default function OvertimeTab({ project }) {
     // ============================================
     if (loadingCompanies || loadingEmployees || loadingOT || loadingReports || loadingSnapshots || loadingSalaries) {
         return (
-            <Card className="border-0 shadow-lg">
+            <Card className="border border-slate-200 shadow-sm rounded-2xl bg-white">
                 <CardContent className="p-12 text-center">
-                    <p className="text-slate-500">Loading data...</p>
+                    <div className="mx-auto mb-4 h-10 w-10 rounded-full border-2 border-orange-200 border-t-orange-600 animate-spin" />
+                    <p className="text-sm font-medium text-slate-500">Loading adjustments data...</p>
                 </CardContent>
             </Card>
         );
     }
 
     return (
-        <>
-        <Card className="border-0 shadow-lg">
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            <Clock className="w-6 h-6 text-orange-600" />
-                            Overtime Management
-                        </CardTitle>
-                        <p className="text-sm text-slate-500 mt-1">
-                            Enter overtime hours for employees
-                        </p>
+        <div className="space-y-8">
+        <Card className="border border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-orange-50/80 via-white to-white px-5 sm:px-6 py-5">
+                <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+                    <div className="flex items-start gap-3">
+                        <div className="h-11 w-11 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center shrink-0 shadow-sm">
+                            <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                                Overtime Management
+                            </CardTitle>
+                            <p className="text-sm text-slate-500 mt-1">
+                                Enter overtime hours for employees
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white/80 p-2 shadow-sm">
                         <Button
                             variant="outline"
                             onClick={handleExportTemplate}
-                            className="border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-200"
+                            className="border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-200 rounded-xl shadow-sm"
                         >
                             <Download className="w-4 h-4 mr-2" />
                             Export Template
@@ -715,7 +720,7 @@ export default function OvertimeTab({ project }) {
                             />
                             <Button
                                 variant="outline"
-                                className="border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-200"
+                                className="border-slate-200 text-slate-700 hover:bg-slate-50 transition-all duration-200 rounded-xl shadow-sm"
                                 asChild
                             >
                                 <span>
@@ -727,7 +732,7 @@ export default function OvertimeTab({ project }) {
                         <Button
                             onClick={handleSave}
                             disabled={isSaving || Object.keys(editableData).length === 0}
-                            className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200"
+                            className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 rounded-xl shadow-sm shadow-indigo-100"
                         >
                             <Save className="w-4 h-4 mr-2" />
                             {isSaving ? 'Saving...' : 'Save Changes'}
@@ -735,14 +740,17 @@ export default function OvertimeTab({ project }) {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-5 sm:p-6 space-y-5">
                 {/* Info Banner */}
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4 text-sm text-orange-800">
-                    <strong>Note:</strong> OT hours entered here will be included in generated salary reports.
+                <div className="flex items-start gap-3 bg-orange-50/80 border border-orange-200 rounded-2xl p-4 text-sm text-orange-900 shadow-sm">
+                    <div className="h-8 w-8 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+                        <FileSpreadsheet className="w-4 h-4 text-orange-700" />
+                    </div>
+                    <p className="leading-relaxed"><strong>Note:</strong> OT hours entered here will be included in generated salary reports.</p>
                 </div>
 
                 {/* Search */}
-                <div className="mb-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm">
                     <div className="relative max-w-md">
                         <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                         <input
@@ -750,24 +758,24 @@ export default function OvertimeTab({ project }) {
                             placeholder="Search by name, ID, or department..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
                         />
                     </div>
                     <p className="text-sm text-slate-500 mt-2">
                         <Users className="w-4 h-4 inline mr-1" />
                         Showing {filteredData.length} of {overtimeData.length} employees
                         {Object.keys(editableData).length > 0 && (
-                            <span className="ml-2 text-amber-600 font-medium">
-                                • {Object.keys(editableData).length} unsaved change(s)
+                            <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-700 font-semibold border border-amber-200">
+                                {Object.keys(editableData).length} unsaved change(s)
                             </span>
                         )}
                     </p>
                 </div>
 
                 {/* OT Table */}
-                <div className="border rounded-lg overflow-auto max-h-[500px]">
+                <div className="border border-slate-200 rounded-2xl overflow-auto max-h-[540px] shadow-sm bg-white">
                     <Table>
-                        <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
+                        <TableHeader className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
                             <TableRow className="hover:bg-transparent border-none">
                                 <SortableTableHead label="Att. ID" sortKey="attendance_id" currentSort={sortColumn} onSort={setSortColumn}>Att. ID</SortableTableHead>
                                 <SortableTableHead label="Name" sortKey="name" currentSort={sortColumn} onSort={setSortColumn}>Name</SortableTableHead>
@@ -787,14 +795,14 @@ export default function OvertimeTab({ project }) {
                             ) : filteredData.map(row => {
                                 const hasEdits = editableData[row.attendance_id];
                                 return (
-                                    <TableRow key={row.attendance_id} className={`${hasEdits ? 'bg-amber-50/70 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-100/50'} transition-all duration-200`}>
-                                        <TableCell className="font-medium">{row.attendance_id}</TableCell>
-                                        <TableCell className="font-medium">
+                                    <TableRow key={row.attendance_id} className={`${hasEdits ? 'bg-amber-50/80 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-50'} transition-all duration-200 border-b border-slate-100 last:border-0`}>
+                                        <TableCell className="font-semibold text-slate-900 py-4">{row.attendance_id}</TableCell>
+                                        <TableCell className="font-semibold text-slate-900 py-4">
                                             <div>{row.name?.split(' ').slice(0, 2).join(' ')}</div>
 
                                         </TableCell>
-                                        <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
-                                        <TableCell className="bg-blue-50 p-1">
+                                        <TableCell className="text-slate-600 py-4">{row.department || '-'}</TableCell>
+                                        <TableCell className="bg-blue-50/70 p-2">
                                             <EntryCell 
                                                 title="Normal OT Hours"
                                                 value={getValue(row, 'normalOtHours')}
@@ -803,7 +811,7 @@ export default function OvertimeTab({ project }) {
                                                 isAdminOrCEO={isAdminOrCEO}
                                             />
                                         </TableCell>
-                                        <TableCell className="bg-cyan-50 p-1">
+                                        <TableCell className="bg-cyan-50/70 p-2">
                                             <EntryCell 
                                                 title="Special OT Hours"
                                                 value={getValue(row, 'specialOtHours')}
@@ -822,27 +830,31 @@ export default function OvertimeTab({ project }) {
         </Card>
 
         {/* ADJUSTMENTS SECTION - Always visible */}
-        <div className="mt-6">
-            <Card className="border-0 shadow-lg">
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <DollarSign className="w-6 h-6 text-green-600" />
-                                Salary Adjustments
-                                {isProjectClosed && <Lock className="w-4 h-4 text-slate-400" />}
-                            </CardTitle>
-                            <p className="text-sm text-slate-500 mt-1">
-                                {isAlMaraghiMotors
-                                    ? 'Enter bonus, incentives, and deductions at any report status'
-                                    : 'Enter bonus, incentives, and deductions for finalized report'}
-                            </p>
+        <div>
+            <Card className="border border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
+                <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-white px-5 sm:px-6 py-5">
+                    <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
+                        <div className="flex items-start gap-3">
+                            <div className="h-11 w-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-sm">
+                                <DollarSign className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                                    Salary Adjustments
+                                    {isProjectClosed && <Lock className="w-4 h-4 text-slate-400" />}
+                                </CardTitle>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    {isAlMaraghiMotors
+                                        ? 'Enter bonus, incentives, and deductions at any report status'
+                                        : 'Enter bonus, incentives, and deductions for finalized report'}
+                                </p>
+                            </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white/80 p-2 shadow-sm">
                             <Button
                                 onClick={handleSaveAdjustments}
                                 disabled={!canEditAdjustments || isSavingAdjustments || Object.keys(editableAdjustments).length === 0}
-                                className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200"
+                                className="bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 rounded-xl shadow-sm shadow-indigo-100"
                             >
                                 <Save className="w-4 h-4 mr-2" />
                                 {isSavingAdjustments ? 'Saving...' : 'Save Adjustments'}
@@ -850,14 +862,17 @@ export default function OvertimeTab({ project }) {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-5 sm:p-6 space-y-5">
                     {/* Info Banner */}
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 text-sm text-green-800">
-                        <strong>Note:</strong> These adjustments will be included in generated salary reports. Bonus and Incentive add to salary; Other Deduction and Advance Salary Deduction subtract from salary.
+                    <div className="flex items-start gap-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 text-sm text-emerald-900 shadow-sm">
+                        <div className="h-8 w-8 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                            <DollarSign className="w-4 h-4 text-emerald-700" />
+                        </div>
+                        <p className="leading-relaxed"><strong>Note:</strong> These adjustments will be included in generated salary reports. Bonus and Incentive add to salary; Other Deduction and Advance Salary Deduction subtract from salary.</p>
                     </div>
 
                     {/* Search for Adjustments */}
-                    <div className="mb-4">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 shadow-sm">
                         <div className="relative max-w-md">
                             <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                             <input
@@ -865,15 +880,15 @@ export default function OvertimeTab({ project }) {
                                 placeholder="Search by name, ID, or department..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
+                                className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all duration-200"
                             />
                         </div>
                         <p className="text-sm text-slate-500 mt-2">
                             <Users className="w-4 h-4 inline mr-1" />
                             Showing {filteredData.length} of {overtimeData.length} employees
                             {Object.keys(editableAdjustments).length > 0 && (
-                                <span className="ml-2 text-amber-600 font-medium">
-                                    • {Object.keys(editableAdjustments).length} unsaved adjustment change(s)
+                                <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs text-amber-700 font-semibold border border-amber-200">
+                                    {Object.keys(editableAdjustments).length} unsaved adjustment change(s)
                                 </span>
                             )}
                         </p>
@@ -906,11 +921,11 @@ export default function OvertimeTab({ project }) {
                                 ) : filteredData.map(row => {
                                    const hasAdjustmentEdits = editableAdjustments[row.attendance_id];
                                    return (
-                                        <TableRow key={`adj-${row.attendance_id}`} className={`${hasAdjustmentEdits ? 'bg-amber-50/70 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-100/50'} transition-all duration-200`}>
-                                           <TableCell className="font-medium">{row.attendance_id}</TableCell>
-                                           <TableCell className="font-medium">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
-                                           <TableCell className="text-slate-600">{row.department || '-'}</TableCell>
-                                            <TableCell className="bg-green-50 p-1">
+                                        <TableRow key={`adj-${row.attendance_id}`} className={`${hasAdjustmentEdits ? 'bg-amber-50/80 hover:bg-amber-100/80 shadow-inner' : 'hover:bg-slate-50'} transition-all duration-200 border-b border-slate-100 last:border-0`}>
+                                           <TableCell className="font-semibold text-slate-900 py-4">{row.attendance_id}</TableCell>
+                                           <TableCell className="font-semibold text-slate-900 py-4">{row.name?.split(' ').slice(0, 2).join(' ')}</TableCell>
+                                           <TableCell className="text-slate-600 py-4">{row.department || '-'}</TableCell>
+                                            <TableCell className="bg-green-50/70 p-2">
                                                 <EntryCell 
                                                     title="Bonus"
                                                     value={getAdjustmentValue(row, 'bonus')}
@@ -919,7 +934,7 @@ export default function OvertimeTab({ project }) {
                                                     isAdminOrCEO={isAdminOrCEO}
                                                 />
                                             </TableCell>
-                                            <TableCell className="bg-green-50 p-1">
+                                            <TableCell className="bg-green-50/70 p-2">
                                                 <EntryCell 
                                                     title="Incentive"
                                                     value={getAdjustmentValue(row, 'incentive')}
@@ -929,7 +944,7 @@ export default function OvertimeTab({ project }) {
                                                 />
                                             </TableCell>
                                             {isAlMaraghiMotors && (
-                                                <TableCell className="bg-green-50 p-1">
+                                                <TableCell className="bg-green-50/70 p-2">
                                                     <EntryCell 
                                                         title="Open Leave Salary"
                                                         value={getAdjustmentValue(row, 'open_leave_salary')}
@@ -940,7 +955,7 @@ export default function OvertimeTab({ project }) {
                                                 </TableCell>
                                             )}
                                             {isAlMaraghiMotors && (
-                                                <TableCell className="bg-green-50 p-1">
+                                                <TableCell className="bg-green-50/70 p-2">
                                                     <EntryCell 
                                                         title="Variable Salary"
                                                         value={getAdjustmentValue(row, 'variable_salary')}
@@ -950,7 +965,7 @@ export default function OvertimeTab({ project }) {
                                                     />
                                                 </TableCell>
                                             )}
-                                            <TableCell className="bg-red-50 p-1">
+                                            <TableCell className="bg-red-50/70 p-2">
                                                 <EntryCell 
                                                     title="Other Deduction"
                                                     value={getAdjustmentValue(row, 'otherDeduction')}
@@ -959,7 +974,7 @@ export default function OvertimeTab({ project }) {
                                                     isAdminOrCEO={isAdminOrCEO}
                                                 />
                                             </TableCell>
-                                            <TableCell className="bg-red-50 p-1">
+                                            <TableCell className="bg-red-50/70 p-2">
                                                 <EntryCell 
                                                     title="Advance Salary Deduction"
                                                     value={getAdjustmentValue(row, 'advanceSalaryDeduction')}
@@ -989,6 +1004,6 @@ export default function OvertimeTab({ project }) {
                 fileName={`OT_Template_${project.name}_${new Date().toISOString().split('T')[0]}.xlsx`}
                 onConfirm={executeDownload}
             />
-        </>
+        </div>
     );
 }
