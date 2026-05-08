@@ -330,54 +330,45 @@ export default function ProjectDetail() {
       { label: 'Projects', href: 'Projects' },
       { label: project.name }]
       } />
-            {/* Header - Project Summary */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-5 sm:px-6 py-5 border-b border-slate-200 bg-white">
-                    <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
-                        <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Payroll Project</span>
-                                <span className={cn(
-                                    "px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset",
-                                    project.status === 'draft' ? "bg-amber-50 text-amber-700 ring-amber-200" :
-                                    project.status === 'analyzed' ? "bg-green-50 text-green-700 ring-green-200" :
-                                    project.status === 'locked' ? "bg-blue-50 text-blue-700 ring-blue-200" :
-                                    "bg-red-50 text-red-700 ring-red-200"
-                                )}>
-                                    {project.status}
-                                </span>
+            {/* Header - Compact Context Bar */}
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={cn(
+                                "w-1 h-8 rounded-full",
+                                project.status === 'draft' ? "bg-amber-500" :
+                                project.status === 'analyzed' ? "bg-green-500" :
+                                project.status === 'locked' ? "bg-slate-500" :
+                                "bg-red-500"
+                            )} />
+                            <div>
+                                <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                                    {project.name}
+                                    <span className={cn(
+                                        "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-inset",
+                                        project.status === 'draft' ? "bg-amber-50 text-amber-700 ring-amber-200" :
+                                        project.status === 'analyzed' ? "bg-green-50 text-green-700 ring-green-200" :
+                                        project.status === 'locked' ? "bg-blue-50 text-blue-700 ring-blue-200" :
+                                        "bg-red-50 text-red-700 ring-red-200"
+                                    )}>
+                                        {project.status}
+                                    </span>
+                                </h1>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    {project.company}
+                                    <span>•</span>
+                                    {formatInUAE(parseDateInUAE(project.date_from), 'dd/MM/yyyy')} → {formatInUAE(parseDateInUAE(project.date_to), 'dd/MM/yyyy')}
+                                </p>
                             </div>
-                            <h1 className="text-2xl sm:text-3xl font-semibold text-slate-950 tracking-tight truncate">
-                                {project.name}
-                            </h1>
-                            <p className="mt-2 text-sm text-slate-500">
-                                Manage shifts, punches, exceptions, attendance verification, and payroll finalization for this period.
-                            </p>
                         </div>
 
-                        <div className="flex items-start gap-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0 xl:min-w-[620px]">
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Company</p>
-                                    <p className="mt-1 text-sm font-semibold text-slate-900 truncate">{project.company}</p>
-                                </div>
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Period</p>
-                                    <p className="mt-1 text-sm font-semibold text-slate-900 whitespace-nowrap">
-                                        {formatInUAE(parseDateInUAE(project.date_from), 'dd/MM/yyyy')} → {formatInUAE(parseDateInUAE(project.date_to), 'dd/MM/yyyy')}
-                                    </p>
-                                </div>
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Current Area</p>
-                                    <p className="mt-1 text-sm font-semibold text-slate-900 capitalize">{activeTab.replace(/_/g, ' ')}</p>
-                                </div>
-                            </div>
-
+                        <div className="flex items-center gap-2">
                             {/* Project Settings Dropdown */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon" className="shrink-0 rounded-xl">
-                                        <Settings2 className="w-4 h-4 text-slate-600" />
+                                    <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-200/50 transition-colors">
+                                        <Settings2 className="w-5 h-5 text-slate-500" />
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56">
@@ -469,13 +460,7 @@ export default function ProjectDetail() {
                 </div>
 
                 {/* Workflow Stepper integration */}
-                <div className="px-5 sm:px-6 py-4 bg-slate-50">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-semibold text-slate-900">Project Workflow</p>
-                            <p className="text-xs text-slate-500">Follow the steps from data setup to payroll readiness.</p>
-                        </div>
-                    </div>
+                <div className="px-6 py-2 bg-white">
                     <WorkflowStepper currentStatus={project.status} currentTab={activeTab} />
                 </div>
             </div>
