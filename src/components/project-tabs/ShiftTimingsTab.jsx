@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
@@ -76,6 +76,7 @@ export default function ShiftTimingsTab({ project }) {
     });
 
     const queryClient = useQueryClient();
+    const copyLockRef = useRef(false);
     const isAstra = project.company === 'Astra Auto Parts';
 
     const { data: shifts = [] } = useQuery({
@@ -694,8 +695,17 @@ export default function ShiftTimingsTab({ project }) {
         },
         onError: (error) => {
             toast.error(error.message || 'Failed to copy shifts');
+        },
+        onSettled: () => {
+            copyLockRef.current = false;
         }
     });
+
+    const handleCopyShifts = () => {
+        if (copyLockRef.current || copyShiftsMutation.isPending) return;
+        copyLockRef.current = true;
+        copyShiftsMutation.mutate({ ...copySource, targetBlockId: selectedBlock });
+    };
 
     const createShiftMutation = useMutation({
         mutationFn: (data) => base44.entities.ShiftTiming.create({
@@ -1048,8 +1058,8 @@ export default function ShiftTimingsTab({ project }) {
                                 </Select>
                             </div>
                         )}
-                        <Button className="w-full mt-4" onClick={() => copyShiftsMutation.mutate({ ...copySource, targetBlockId: selectedBlock })} disabled={copyShiftsMutation.isPending}>
-                            {copyShiftsMutation.isPending ? 'Copying...' : 'Copy Now'}
+                        <Button className="w-full mt-4" onClick={handleCopyShifts} disabled={copyShiftsMutation.isPending || copyLockRef.current}>
+                            {copyShiftsMutation.isPending || copyLockRef.current ? 'Copying...' : 'Copy Now'}
                         </Button>
                     </div>
                 </DialogContent>
