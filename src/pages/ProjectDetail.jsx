@@ -15,7 +15,6 @@ import ExceptionsTab from '../components/project-tabs/ExceptionsTab';
 import ReportTab from '../components/project-tabs/ReportTab';
 import SalaryTab from '../components/project-tabs/SalaryTab';
 import OvertimeTab from '../components/project-tabs/OvertimeTab';
-import WorkflowStepper from '../components/project-detail/WorkflowStepper';
 import EditProjectDialog from '../components/project-detail/EditProjectDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Settings, Settings2, Trash2, Copy, Lock, RefreshCw, Pencil } from 'lucide-react';
@@ -330,23 +329,25 @@ export default function ProjectDetail() {
       { label: 'Projects', href: 'Projects' },
       { label: project.name }]
       } />
-            {/* Header - Compact Context Bar */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+            {/* Header - Minimal Context Bar */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200/70 overflow-hidden">
+                <div className="px-5 py-3">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
                             <div className={cn(
-                                "w-1 h-8 rounded-full",
+                                "w-1 h-7 rounded-full shrink-0",
                                 project.status === 'draft' ? "bg-amber-500" :
                                 project.status === 'analyzed' ? "bg-green-500" :
                                 project.status === 'locked' ? "bg-slate-500" :
                                 "bg-red-500"
                             )} />
-                            <div>
-                                <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-                                    {project.name}
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <h1 className="text-lg font-semibold text-slate-900 tracking-tight truncate">
+                                        {project.name}
+                                    </h1>
                                     <span className={cn(
-                                        "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-inset",
+                                        "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset shrink-0",
                                         project.status === 'draft' ? "bg-amber-50 text-amber-700 ring-amber-200" :
                                         project.status === 'analyzed' ? "bg-green-50 text-green-700 ring-green-200" :
                                         project.status === 'locked' ? "bg-blue-50 text-blue-700 ring-blue-200" :
@@ -354,16 +355,16 @@ export default function ProjectDetail() {
                                     )}>
                                         {project.status}
                                     </span>
-                                </h1>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    {project.company}
+                                </div>
+                                <p className="text-xs text-slate-500 flex items-center gap-2 truncate">
+                                    <span className="truncate">{project.company}</span>
                                     <span>•</span>
-                                    {formatInUAE(parseDateInUAE(project.date_from), 'dd/MM/yyyy')} → {formatInUAE(parseDateInUAE(project.date_to), 'dd/MM/yyyy')}
+                                    <span>{formatInUAE(parseDateInUAE(project.date_from), 'dd/MM/yyyy')} → {formatInUAE(parseDateInUAE(project.date_to), 'dd/MM/yyyy')}</span>
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             {/* Project Settings Dropdown */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -457,11 +458,6 @@ export default function ProjectDetail() {
                             </DropdownMenu>
                         </div>
                     </div>
-                </div>
-
-                {/* Workflow Stepper integration */}
-                <div className="px-6 py-2 bg-white">
-                    <WorkflowStepper currentStatus={project.status} currentTab={activeTab} />
                 </div>
             </div>
 
