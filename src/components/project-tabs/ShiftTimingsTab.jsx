@@ -620,23 +620,80 @@ export default function ShiftTimingsTab({ project }) {
             if (sourceType === 'block') {
                 srcShifts = shiftsByBlock[sourceBlockId] || [];
             } else {
-                srcShifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProjectId });
+                if (!sourceProjectId) throw new Error('Select a source project first');
+                srcShifts = await base44.entities.ShiftTiming.filter({ project_id: sourceProjectId }, null, 500);
             }
+
             const targetRange = blockDateRanges[targetBlockId];
-            const newRecords = srcShifts.map(s => ({
-                ...s,
-                id: undefined,
-                project_id: project.id,
-                shift_block: targetBlockId,
-                effective_from: targetRange.from,
-                effective_to: targetRange.to
-            }));
-            await base44.entities.ShiftTiming.bulkCreate(newRecords);
+            if (!targetRange?.from || !targetRange?.to) throw new Error('Target block date range is missing');
+
+            const uniqueSourceShifts = Array.from(
+                new Map(srcShifts.map(s => [
+                    [s.attendance_id, s.date || '', s.is_friday_shift ? 'fri' : 'std', s.is_single_shift ? 'single' : 'regular', s.applicable_days || '', s.am_start || '', s.am_end || '', s.pm_start || '', s.pm_end || ''].join('|'),
+                    s
+                ])).values()
+            );
+
+            if (uniqueSourceShifts.length === 0) throw new Error('No shifts found to copy');
+            if (uniqueSourceShifts.length > 500) throw new Error(`Copy stopped: source has ${uniqueSourceShifts.length} shifts. Please clean duplicates before copying.`);
+
+            const existingTargetKeys = new Set(shifts.map(s => [
+                s.attendance_id,
+                s.date || '',
+                targetBlockId,
+                s.is_friday_shift ? 'fri' : 'std',
+                s.is_single_shift ? 'single' : 'regular',
+                s.applicable_days || '',
+                s.am_start || '',
+                s.am_end || '',
+                s.pm_start || '',
+                s.pm_end || ''
+            ].join('|')));
+
+            const newRecords = uniqueSourceShifts
+                .map(s => ({
+                    project_id: project.id,
+                    attendance_id: String(s.attendance_id),
+                    date: s.date || null,
+                    is_friday_shift: !!s.is_friday_shift,
+                    is_single_shift: !!s.is_single_shift,
+                    applicable_days: s.applicable_days || null,
+                    am_start: s.am_start || '',
+                    am_end: s.am_end || '',
+                    pm_start: s.pm_start || '',
+                    pm_end: s.pm_end || '',
+                    shift_block: targetBlockId,
+                    effective_from: targetRange.from,
+                    effective_to: targetRange.to
+                }))
+                .filter(s => !existingTargetKeys.has([
+                    s.attendance_id,
+                    s.date || '',
+                    s.shift_block,
+                    s.is_friday_shift ? 'fri' : 'std',
+                    s.is_single_shift ? 'single' : 'regular',
+                    s.applicable_days || '',
+                    s.am_start || '',
+                    s.am_end || '',
+                    s.pm_start || '',
+                    s.pm_end || ''
+                ].join('|')));
+
+            if (newRecords.length === 0) throw new Error('All selected shifts already exist in the target block');
+
+            for (let i = 0; i < newRecords.length; i += 50) {
+                await base44.entities.ShiftTiming.bulkCreate(newRecords.slice(i, i + 50));
+            }
+
+            return newRecords.length;
         },
-        onSuccess: () => {
+        onSuccess: (count) => {
             queryClient.invalidateQueries(['shifts', project.id]);
-            toast.success('Copied');
+            toast.success(`${count} shift${count === 1 ? '' : 's'} copied`);
             setShowCopyDialog(false);
+        },
+        onError: (error) => {
+            toast.error(error.message || 'Failed to copy shifts');
         }
     });
 
