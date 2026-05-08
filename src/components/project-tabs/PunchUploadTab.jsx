@@ -893,6 +893,7 @@ export default function PunchUploadTab({ project }) {
                 </CardContent>
             </Card>
             </div>
+            {/* Build refresh: PunchUploadTab JSX structure fix */}
             <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
                 <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 border-0 shadow-2xl rounded-2xl overflow-hidden">
                     <DialogHeader className="p-6 bg-white border-b">
