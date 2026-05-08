@@ -1058,7 +1058,11 @@ export default function ShiftTimingsTab({ project }) {
                                 </Select>
                             </div>
                         )}
-                        <Button className="w-full mt-4" onClick={handleCopyShifts} disabled={copyShiftsMutation.isPending || copyLockRef.current}>
+                        <Button 
+                            className="w-full mt-4" 
+                            onClick={handleCopyShifts} 
+                            disabled={copyShiftsMutation.isPending || copyLockRef.current || (copySource.type === 'project' && !copySource.projectId)}
+                        >
                             {copyShiftsMutation.isPending || copyLockRef.current ? 'Copying...' : 'Copy Now'}
                         </Button>
                     </div>
