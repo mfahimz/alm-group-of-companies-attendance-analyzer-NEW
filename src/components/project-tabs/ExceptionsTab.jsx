@@ -702,26 +702,24 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                 canEditAllowedMinutes={canEditAllowedMinutes}
             />
 
-            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                 <div className="px-5 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-blue-50/40">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                         <div>
                             <h2 className="text-2xl font-bold tracking-tight text-slate-900">Exceptions Workspace</h2>
                             <p className="text-sm text-slate-500 mt-1">Manage manual exceptions, payroll checklist tasks, and report-generated adjustments for this project.</p>
                         </div>
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full lg:w-auto">
-                            <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex bg-slate-100 p-1 rounded-xl">
-                                <TabsTrigger value="exceptions" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Exceptions</TabsTrigger>
-                                <TabsTrigger value="checklist" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Checklist</TabsTrigger>
-                                {reportExceptions.length > 0 && (
-                                    <TabsTrigger value="report-generated" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Report Generated</TabsTrigger>
-                                )}
-                            </TabsList>
-                        </Tabs>
+                        <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex bg-slate-100 p-1 rounded-xl">
+                            <TabsTrigger value="exceptions" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Exceptions</TabsTrigger>
+                            <TabsTrigger value="checklist" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Checklist</TabsTrigger>
+                            {reportExceptions.length > 0 && (
+                                <TabsTrigger value="report-generated" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Report Generated</TabsTrigger>
+                            )}
+                        </TabsList>
                     </div>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsContent value="exceptions" className="m-0 p-5 space-y-5">
             {/* Exceptions Section */}
             <Card className="border border-slate-200 shadow-sm bg-white rounded-2xl overflow-hidden">
@@ -958,8 +956,8 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                             </div>
                         </TabsContent>
                     )}
-                </Tabs>
-            </div>
+                </div>
+            </Tabs>
 
             {/* Edit Exception Dialog */}
             <EditExceptionDialog open={!!editingException} onClose={() => setEditingException(null)} exception={editingException} projectId={project.id} canEditAllowedMinutes={canEditAllowedMinutes} />
