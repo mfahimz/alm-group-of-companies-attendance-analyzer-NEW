@@ -14,6 +14,10 @@ import SortableTableHead from '../ui/SortableTableHead';
 import TablePagination from '../ui/TablePagination';
 import { toast } from 'sonner';
 
+const ACTIVE_UPLOAD_STATUSES = ['pending', 'processing', 'rolling_back'];
+const FINAL_UPLOAD_STATUSES = ['completed', 'failed'];
+const TRACKED_UPLOAD_STATUSES = [...ACTIVE_UPLOAD_STATUSES, ...FINAL_UPLOAD_STATUSES];
+
 export default function PunchUploadTab({ project }) {
     const [file, setFile] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +42,7 @@ export default function PunchUploadTab({ project }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const queryClient = useQueryClient();
+    const handledUploadJobsRef = React.useRef(new Set());
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
@@ -71,12 +76,36 @@ export default function PunchUploadTab({ project }) {
         queryFn: () => fetchAllPunches(project.id)
     });
 
+    React.useEffect(() => {
+        if (!project?.id) return;
+
+        let refreshTimer;
+        const scheduleRefresh = () => {
+            clearTimeout(refreshTimer);
+            refreshTimer = setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
+                refetchPunches();
+            }, 800);
+        };
+
+        const unsubscribe = base44.entities.Punch.subscribe((event) => {
+            if (event?.data?.project_id === project.id) {
+                scheduleRefresh();
+            }
+        });
+
+        return () => {
+            clearTimeout(refreshTimer);
+            if (typeof unsubscribe === 'function') unsubscribe();
+        };
+    }, [project?.id, queryClient, refetchPunches]);
+
     // Note: Astra Excel parsing logic is now handled in the backend processPunchUpload function
     // parseAstraExcel frontend version is preserved here only as a reference for Phase 2 previews if needed
     // or removed if strictly following "small and safe" Phase 1.
     // I will remove it to avoid confusion.
 
-    // Poll latest UploadJob so the UI can always resolve processing, success, or failure states
+    // Poll latest UploadJob so the UI can show active progress and also catch completion/failure once.
     const { data: activeJob, refetch: refetchJob } = useQuery({
         queryKey: ['activeUploadJob', project.id, currentUser?.email],
         queryFn: async () => {
@@ -84,24 +113,25 @@ export default function PunchUploadTab({ project }) {
                 project_id: project.id, 
                 user_email: currentUser?.email
             }, '-created_date', 10);
-            const activeStatuses = ['pending', 'processing', 'rolling_back'];
-            return jobs.find(job => activeStatuses.includes(job.status)) || null;
+            return jobs.find(job => TRACKED_UPLOAD_STATUSES.includes(job.status)) || null;
         },
         enabled: !!currentUser?.email,
         refetchInterval: (query) => {
             const job = query.state.data;
-            if (uploadProgress || (job && ['pending', 'processing', 'rolling_back'].includes(job.status))) {
+            if (uploadProgress || (job && ACTIVE_UPLOAD_STATUSES.includes(job.status))) {
                 return 2000;
             }
             return false;
         }
     });
 
-    const visibleJob = activeJob && ['pending', 'processing', 'rolling_back'].includes(activeJob.status) ? activeJob : null;
+    const visibleJob = activeJob && ACTIVE_UPLOAD_STATUSES.includes(activeJob.status) ? activeJob : null;
 
-    // Handle job completion/failure and always clear local progress so the page never gets stuck
+    // Handle job completion/failure and always clear local progress so the page never gets stuck.
     React.useEffect(() => {
-        if (!activeJob?.id) return;
+        if (!activeJob?.id || !FINAL_UPLOAD_STATUSES.includes(activeJob.status)) return;
+        if (handledUploadJobsRef.current.has(activeJob.id)) return;
+        handledUploadJobsRef.current.add(activeJob.id);
 
         if (activeJob.status === 'completed') {
             queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
@@ -113,6 +143,7 @@ export default function PunchUploadTab({ project }) {
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived' });
             setUploadProgress(null);
             setFile(null);
+            setPreviewPunches([]);
         } else if (activeJob.status === 'failed') {
             toast.error(activeJob.error_message || 'Upload failed. No punch records were saved.', { duration: 10000 });
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived_failed' });
@@ -345,6 +376,7 @@ export default function PunchUploadTab({ project }) {
         },
         onSuccess: async (result) => {
             setPreviewPunches([]);
+            await queryClient.invalidateQueries({ queryKey: ['activeUploadJob', project.id, currentUser?.email] });
             await refetchJob();
 
             if (result?.success) {
@@ -353,7 +385,10 @@ export default function PunchUploadTab({ project }) {
                 setCurrentPage(1);
                 setUploadProgress(null);
                 setFile(null);
-                toast.success(`Upload finished. ${result.records_saved || 0} punch records saved${result.records_skipped ? `, ${result.records_skipped} skipped` : ''}.`);
+
+                if (!result.upload_job_id) {
+                    toast.success(`Upload finished. ${result.records_saved || 0} punch records saved${result.records_skipped ? `, ${result.records_skipped} skipped` : ''}.`);
+                }
             }
         },
         onError: (error) => {
@@ -494,6 +529,43 @@ export default function PunchUploadTab({ project }) {
         }
     };
 
+    const uploadFeedback = (() => {
+        const localValue = ((uploadProgress?.current || 0) / (uploadProgress?.total || 100)) * 100;
+
+        if (!visibleJob) {
+            return {
+                title: uploadProgress?.phase || uploadProgress?.status || 'Preparing upload...',
+                detail: uploadMutation.isPending
+                    ? `${previewPunches.length || 0} records selected. Upload is starting...`
+                    : 'Checking latest upload status...',
+                value: localValue
+            };
+        }
+
+        const total = visibleJob.records_total || visibleJob.records_parsed || 0;
+        const toSave = visibleJob.records_to_save || 0;
+        const saved = visibleJob.records_saved || 0;
+        const skipped = (visibleJob.records_invalid_data || 0) + (visibleJob.records_invalid_format || 0) + (visibleJob.records_duplicate || 0);
+        const progress = visibleJob.progress || 0;
+
+        let title = 'Processing upload...';
+        if (visibleJob.status === 'pending') title = 'Upload queued...';
+        if (visibleJob.status === 'processing') {
+            if (progress < 30 || total === 0) title = 'Reading and parsing punch file...';
+            else if (progress < 50) title = 'Validating employees and duplicates...';
+            else title = 'Saving punch records...';
+        }
+        if (visibleJob.status === 'rolling_back') title = 'Cleaning up failed upload...';
+
+        return {
+            title,
+            detail: total > 0
+                ? `Scanned ${total} records. Saved ${saved}${toSave ? ` of ${toSave} valid records` : ''}${skipped ? `. Skipped ${skipped}` : ''}.`
+                : 'Reading the file and detecting punch rows...',
+            value: progress
+        };
+    })();
+
     return (
         <div className="space-y-6">
             {/* Upload Progress (Backend Job) */}
@@ -503,23 +575,14 @@ export default function PunchUploadTab({ project }) {
                         <div className="flex items-center gap-3 mb-2">
                             <div className="flex-1">
                                 <p className="font-semibold text-indigo-900">
-                                    {visibleJob?.status === 'processing' ? 'Processing records...' : 
-                                     visibleJob?.status === 'rolling_back' ? 'Cleaning up failed upload...' :
-                                     (uploadMutation.isPending ? uploadProgress?.phase : null) || 'Processing upload...'}
+                                    {uploadFeedback.title}
                                 </p>
                                 <p className="text-sm text-indigo-700 mt-1">
-                                    {visibleJob ? (
-                                        <>
-                                            {visibleJob.records_saved} / {visibleJob.records_total} records processed 
-                                            {visibleJob.records_invalid_data > 0 && ` (${visibleJob.records_invalid_data} invalid)`}
-                                        </>
-                                    ) : (
-                                        uploadMutation.isPending ? `${previewPunches.length || 0} records selected for import` : 'Checking latest upload status...'
-                                    )}
+                                    {uploadFeedback.detail}
                                 </p>
                             </div>
                         </div>
-                        <Progress value={visibleJob ? (visibleJob.progress || 0) : ((uploadProgress?.current || 0) / (uploadProgress?.total || 100)) * 100} className="bg-indigo-100" />
+                        <Progress value={uploadFeedback.value} className="bg-indigo-100" />
                     </CardContent>
                 </Card>
             )}
