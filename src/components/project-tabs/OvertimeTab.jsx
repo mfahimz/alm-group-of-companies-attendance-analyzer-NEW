@@ -689,10 +689,10 @@ export default function OvertimeTab({ project }) {
         <div className="space-y-8">
             <Tabs defaultValue="overtime" className="space-y-6">
                 <TabsList className="grid w-full max-w-xl grid-cols-2 rounded-2xl bg-slate-100 p-1.5">
-                    <TabsTrigger value="overtime" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                    <TabsTrigger value="overtime" className="rounded-xl text-slate-600 hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">
                         Overtime Management
                     </TabsTrigger>
-                    <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                    <TabsTrigger value="salary" className="rounded-xl text-slate-600 hover:text-slate-900 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">
                         Salary Adjustments
                     </TabsTrigger>
                 </TabsList>
