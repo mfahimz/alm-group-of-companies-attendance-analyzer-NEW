@@ -155,57 +155,31 @@ export default function ReportDetailPage() {
     }
 
     return (
-        <div className="space-y-7 max-w-[1900px] mx-auto">
+        <div className="space-y-5 max-w-[1900px] mx-auto">
             {/* Header */}
-            <div className="relative overflow-hidden rounded-[2rem] border border-slate-800/20 bg-slate-950 shadow-2xl shadow-slate-300/60">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.35),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.18),transparent_34%)]" />
-                <div className="relative px-5 sm:px-7 py-6 sm:py-8 text-white">
-                    <div className="flex flex-col xl:flex-row xl:items-stretch xl:justify-between gap-6">
-                        <div className="flex flex-col sm:flex-row sm:items-start gap-5 min-w-0">
-                            {/* preserve context: from_tab query parameter tells us which tab we came from (default: overview) */}
-                            <Link to={createPageUrl('ProjectDetail') + `?id=${projectId}&tab=${fromTab}`}>
-                                <Button variant="ghost" size="sm" className="bg-white text-slate-900 hover:bg-indigo-50 hover:text-slate-950 border border-white/40 rounded-2xl shrink-0 shadow-lg shadow-slate-950/20">
-                                    <ArrowLeft className="w-4 h-4 mr-2" />
-                                    Back to Project
-                                </Button>
-                            </Link>
-                            <div className="min-w-0 space-y-4">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.28em] text-indigo-200 font-black mb-3">Attendance Verifier Command Center</p>
-                                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight truncate">
-                                        {reportRun.report_name || `Report: ${formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - ${formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}`}
-                                    </h1>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                    <span className="rounded-2xl bg-white/12 border border-white/15 px-4 py-3 shadow-inner">
-                                        <span className="block text-[11px] uppercase tracking-wide text-slate-300 font-bold">Generated</span>
-                                        <span className="font-bold text-white">{formatInUAE(reportRun.created_date?.endsWith('Z') ? reportRun.created_date : (reportRun.created_date + 'Z'), 'MM/dd/yyyy hh:mm a')}</span>
-                                    </span>
-                                    <span className="rounded-2xl bg-white/12 border border-white/15 px-4 py-3 shadow-inner">
-                                        <span className="block text-[11px] uppercase tracking-wide text-slate-300 font-bold">Report Period</span>
-                                        <span className="font-bold text-white">{formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - {formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}</span>
-                                    </span>
-                                </div>
+            <div className="bg-white border border-slate-200 rounded-xl px-5 sm:px-6 py-4 shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-4 min-w-0">
+                        {/* preserve context: from_tab query parameter tells us which tab we came from (default: overview) */}
+                        <Link to={createPageUrl('ProjectDetail') + `?id=${projectId}&tab=${fromTab}`}>
+                            <Button variant="outline" size="sm" className="shrink-0">
+                                <ArrowLeft className="w-4 h-4 mr-2" />
+                                Back to Project
+                            </Button>
+                        </Link>
+                        <div className="min-w-0">
+                            <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight truncate">
+                                {reportRun.report_name || `Report: ${formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - ${formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}`}
+                            </h1>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
+                                <span>Generated: {formatInUAE(reportRun.created_date?.endsWith('Z') ? reportRun.created_date : (reportRun.created_date + 'Z'), 'MM/dd/yyyy hh:mm a')}</span>
+                                <span>Period: {formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - {formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}</span>
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3 xl:w-72 shrink-0">
-                            <div className="rounded-3xl bg-indigo-500/20 border border-indigo-300/30 px-5 py-4 shadow-xl shadow-slate-950/10">
-                                <span className="block text-xs uppercase tracking-wide text-indigo-100 font-black">Review Timer</span>
-                                <div className="mt-2 flex items-center gap-3 text-2xl font-black tabular-nums">
-                                    <Timer className="w-6 h-6 text-indigo-200" />
-                                    {displayTime}
-                                </div>
-                            </div>
-                            <div className="rounded-3xl bg-emerald-500/20 border border-emerald-300/30 px-5 py-4 shadow-xl shadow-slate-950/10">
-                                <span className="block text-xs uppercase tracking-wide text-emerald-100 font-black">Verifier Goal</span>
-                                <span className="mt-2 block text-lg font-black text-white">Review → Verify → Save</span>
-                            </div>
-                            <div className="rounded-3xl bg-white/10 border border-white/15 px-5 py-4 shadow-xl shadow-slate-950/10">
-                                <span className="block text-xs uppercase tracking-wide text-slate-300 font-black">Workflow State</span>
-                                <span className="mt-2 block text-lg font-black text-white">Attendance Review</span>
-                            </div>
-                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <Timer className="w-4 h-4" />
+                        <span className="tabular-nums">{displayTime}</span>
                     </div>
                 </div>
             </div>

@@ -1559,54 +1559,53 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </Card>
             )}
 
-            <Card className="border-0 shadow-xl shadow-slate-200/80 rounded-[2rem] bg-white overflow-hidden">
+            <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
                 <CardContent className="p-0">
-                    <div className="grid grid-cols-1 2xl:grid-cols-[1fr_620px]">
-                        <div className="p-6 sm:p-7 bg-gradient-to-br from-white via-slate-50 to-indigo-50/50 border-b 2xl:border-b-0 2xl:border-r border-slate-200">
-                            <div className="flex flex-wrap items-center gap-3 mb-5">
-                                <span className={`inline-flex items-center rounded-2xl px-4 py-2 text-sm font-black border-2 shadow-sm ${reportRun.is_final ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300'}`}>
+                    <div className="grid grid-cols-1 2xl:grid-cols-[1fr_520px]">
+                        <div className="p-4 sm:p-5 border-b 2xl:border-b-0 2xl:border-r border-slate-200">
+                            <div className="flex flex-wrap items-center gap-2 mb-4 text-sm">
+                                <span className={`inline-flex items-center rounded-md px-2.5 py-1 border ${reportRun.is_final ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
                                     {reportRun.is_final ? 'Final report' : 'Verification in progress'}
                                 </span>
                                 {reportRun.is_saved && (
-                                    <div className="flex items-center gap-2 text-sm text-blue-800 bg-blue-100 border-2 border-blue-300 px-4 py-2 rounded-2xl font-black shadow-sm">
+                                    <div className="flex items-center gap-1.5 text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-md">
                                         <Save className="w-4 h-4" />
                                         Report Saved
                                     </div>
                                 )}
                                 {hasEdits && (
-                                    <p className="text-sm text-amber-800 bg-amber-100 border-2 border-amber-300 px-4 py-2 rounded-2xl font-black shadow-sm">
-                                        ⚠️ Unsaved edits
+                                    <p className="text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md">
+                                        Unsaved edits
                                     </p>
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/70">
-                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Report Period</p>
-                                    <p className="mt-3 text-lg font-black text-slate-950">{new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <p className="text-slate-500">Report Period</p>
+                                    <p className="mt-1 font-medium text-slate-900">{new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}</p>
                                 </div>
-                                <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-lg shadow-emerald-100/80">
-                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Verified Employees</p>
-                                    <p className="mt-3 text-3xl font-black text-emerald-900">{verifiedCount}<span className="text-lg text-emerald-700"> / {results.length}</span></p>
+                                <div>
+                                    <p className="text-slate-500">Verified Employees</p>
+                                    <p className="mt-1 font-medium text-slate-900">{verifiedCount} / {results.length}</p>
                                 </div>
-                                <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-lg shadow-indigo-100/80">
-                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">Primary Workflow</p>
-                                    <p className="mt-3 text-lg font-black text-indigo-950">Review risky rows first</p>
+                                <div>
+                                    <p className="text-slate-500">Primary Workflow</p>
+                                    <p className="mt-1 font-medium text-slate-900">Review risky rows first</p>
                                 </div>
                             </div>
 
                             {/* IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs) */}
                             {project.company === 'Al Maraghi Auto Repairs' && (
-                                <p className="mt-5 inline-flex rounded-2xl border-2 border-purple-300 bg-purple-100 px-4 py-3 text-sm text-purple-800 font-black shadow-sm">
-                                    🔒 Finalized Report - Locked for Salary Calculation (edits: grace/deductible only)
+                                <p className="mt-4 inline-flex rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-700">
+                                    Finalized Report - Locked for Salary Calculation (edits: grace/deductible only)
                                 </p>
                             )}
                         </div>
-                        <div className="p-6 sm:p-7 bg-slate-950 text-white">
-                            <div className="mb-4">
-                                <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-200">Action Center</p>
-                                <h3 className="mt-2 text-2xl font-black tracking-tight">Complete the report safely</h3>
-                                <p className="mt-1 text-sm text-slate-300">Export and save actions are separated from finalization controls.</p>
+                        <div className="p-4 sm:p-5 bg-slate-50">
+                            <div className="mb-3">
+                                <h3 className="text-sm font-semibold text-slate-900">Actions</h3>
+                                <p className="mt-1 text-sm text-slate-500">Export, save, reanalyze, and finalization controls.</p>
                             </div>
                             <ReportActionButtons
                                 isAstra={isAstra}

@@ -28,7 +28,7 @@ export default function ReportTableRow({
     onSkipEarlyCheckout = null
 }) {
     return (
-        <tr className={`group border-b-4 border-slate-50 transition-all duration-150 ${result.isVerified ? 'bg-emerald-50/35 hover:bg-emerald-100/70' : 'bg-white hover:bg-indigo-50/70'} ${((result.full_absence_count || 0) > 0 || (result.effective_deductible_minutes || result.deductible_minutes || 0) > 0) ? 'border-l-8 border-l-amber-500' : 'border-l-8 border-l-emerald-400'} ${isSelected ? 'bg-amber-100/80 ring-2 ring-amber-300' : ''}`}>
+        <tr className={`group border-b border-slate-100 transition-colors ${result.isVerified ? 'bg-slate-50/40 hover:bg-slate-50' : 'bg-white hover:bg-slate-50'} ${isSelected ? 'bg-amber-50' : ''}`}>
             {isAstra && (
                 <td className="w-8 px-2" onClick={e => e.stopPropagation()}>
                     <input
@@ -39,16 +39,16 @@ export default function ReportTableRow({
                     />
                 </td>
             )}
-            <td className="p-3 align-middle sticky left-0 bg-inherit z-10 shadow-[2px_0_0_0_rgba(15,23,42,0.08)]">
+            <td className="p-2 align-middle sticky left-0 bg-inherit z-10 border-r border-slate-100">
                 <Checkbox
                     checked={result.isVerified}
                     onCheckedChange={() => onToggleVerification(result.attendance_id)}
                 />
             </td>
-            <td className="p-3 align-middle font-black text-slate-950 sticky left-[48px] bg-inherit z-10 tabular-nums">{result.attendance_id}</td>
-            <td className="p-3 align-middle sticky left-[120px] bg-inherit z-10 shadow-[3px_0_0_0_rgba(99,102,241,0.18)]">
+            <td className="p-2 align-middle font-medium text-slate-900 sticky left-[48px] bg-inherit z-10 tabular-nums border-r border-slate-100">{result.attendance_id}</td>
+            <td className="p-2 align-middle sticky left-[120px] bg-inherit z-10 border-r border-slate-100">
                 <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-950 whitespace-nowrap">{result.name}</span>
+                    <span className="font-medium text-slate-900 whitespace-nowrap">{result.name}</span>
                     {result.has_no_punches && (
                         <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded whitespace-nowrap" title="No punch data for this period">
                             No punches
@@ -56,7 +56,7 @@ export default function ReportTableRow({
                     )}
                 </div>
             </td>
-            <td className="p-3 align-middle font-bold tabular-nums text-slate-800">{Math.max(0, result.working_days || 0)}</td>
+            <td className="p-2 align-middle tabular-nums text-slate-700">{Math.max(0, result.working_days || 0)}</td>
             <td className="p-2 align-middle">
                 <InlineEditableCell
                     value={Math.max(0, result.manual_present_days ?? result.present_days)}
@@ -172,10 +172,10 @@ export default function ReportTableRow({
                     onSave={(storeValue) => onUpdateManualOverride({ id: result.id, field: 'manual_deductible_minutes', value: storeValue })}
                 />
             </td>
-            <td className="p-3 align-middle text-xs text-slate-700 max-w-xs truncate" title={result.notes || ''}>
-                {result.notes ? <span className="inline-flex rounded-xl bg-slate-100 border border-slate-200 px-2.5 py-1 font-semibold">{result.notes}</span> : <span className="text-slate-300 font-bold">-</span>}
+            <td className="p-2 align-middle text-xs text-slate-600 max-w-xs truncate" title={result.notes || ''}>
+                {result.notes || <span className="text-slate-300">-</span>}
             </td>
-            <td className="p-3 align-middle text-right">
+            <td className="p-2 align-middle text-right">
                 <div className="flex items-center justify-end gap-1">
                     {onSkipEarlyCheckout && (
                         <button
