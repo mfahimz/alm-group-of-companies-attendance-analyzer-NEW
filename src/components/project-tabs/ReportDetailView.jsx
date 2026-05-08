@@ -1559,56 +1559,75 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
                 </Card>
             )}
 
-            <Card className="border-0 shadow-sm">
-                <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                            {reportRun.report_name && (
-                                <h2 className="text-xl font-bold text-slate-900">{reportRun.report_name}</h2>
-                            )}
-                            <p className="text-sm text-slate-600">
-                                Period: <span className="font-medium text-slate-900">{new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}</span>
-                            </p>
-                            <p className="text-sm text-slate-600">
-                                Verified: <span className="font-medium text-slate-900">{verifiedCount} / {results.length} employees</span>
-                            </p>
-                            {reportRun.is_saved && (
-                                <div className="flex items-center gap-1.5 text-sm text-blue-600 font-medium">
-                                    <Save className="w-3.5 h-3.5" />
-                                    Report Saved
+            <Card className="border-0 shadow-xl shadow-slate-200/80 rounded-[2rem] bg-white overflow-hidden">
+                <CardContent className="p-0">
+                    <div className="grid grid-cols-1 2xl:grid-cols-[1fr_620px]">
+                        <div className="p-6 sm:p-7 bg-gradient-to-br from-white via-slate-50 to-indigo-50/50 border-b 2xl:border-b-0 2xl:border-r border-slate-200">
+                            <div className="flex flex-wrap items-center gap-3 mb-5">
+                                <span className={`inline-flex items-center rounded-2xl px-4 py-2 text-sm font-black border-2 shadow-sm ${reportRun.is_final ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300'}`}>
+                                    {reportRun.is_final ? 'Final report' : 'Verification in progress'}
+                                </span>
+                                {reportRun.is_saved && (
+                                    <div className="flex items-center gap-2 text-sm text-blue-800 bg-blue-100 border-2 border-blue-300 px-4 py-2 rounded-2xl font-black shadow-sm">
+                                        <Save className="w-4 h-4" />
+                                        Report Saved
+                                    </div>
+                                )}
+                                {hasEdits && (
+                                    <p className="text-sm text-amber-800 bg-amber-100 border-2 border-amber-300 px-4 py-2 rounded-2xl font-black shadow-sm">
+                                        ⚠️ Unsaved edits
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/70">
+                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">Report Period</p>
+                                    <p className="mt-3 text-lg font-black text-slate-950">{new Date(reportRun.date_from).toLocaleDateString()} - {new Date(reportRun.date_to).toLocaleDateString()}</p>
                                 </div>
-                            )}
+                                <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-lg shadow-emerald-100/80">
+                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Verified Employees</p>
+                                    <p className="mt-3 text-3xl font-black text-emerald-900">{verifiedCount}<span className="text-lg text-emerald-700"> / {results.length}</span></p>
+                                </div>
+                                <div className="rounded-3xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-lg shadow-indigo-100/80">
+                                    <p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">Primary Workflow</p>
+                                    <p className="mt-3 text-lg font-black text-indigo-950">Review risky rows first</p>
+                                </div>
+                            </div>
+
                             {/* IMMUTABLE FOR SALARY (Al Maraghi Auto Repairs) */}
                             {project.company === 'Al Maraghi Auto Repairs' && (
-                                <p className="text-xs text-purple-600 font-medium">
+                                <p className="mt-5 inline-flex rounded-2xl border-2 border-purple-300 bg-purple-100 px-4 py-3 text-sm text-purple-800 font-black shadow-sm">
                                     🔒 Finalized Report - Locked for Salary Calculation (edits: grace/deductible only)
                                 </p>
                             )}
-                            {hasEdits && (
-                                <p className="text-sm text-amber-600">
-                                    ⚠️ This report has unsaved edits
-                                </p>
-                            )}
                         </div>
-                        <ReportActionButtons
-                            isAstra={isAstra}
-                            isDepartmentHead={isDepartmentHead}
-                            isZeroingEarlyMin={isZeroingEarlyMin}
-                            resultsLoading={resultsLoading}
-                            selectedRowIds={selectedRowIds}
-                            onZeroEarlyMinutes={handleZeroEarlyMinutes}
-                            onExport={exportToExcel}
-                            project={project}
-                            reportRun={reportRun}
-                            isSaving={isSaving}
-                            isReanalyzing={isReanalyzing}
-                            onSaveReport={() => setShowSaveConfirmation(true)}
-                            onReanalyze={handleReanalyze}
-                            onFinalize={() => finalizeReportMutation.mutate()}
-                            onUnfinalize={() => unfinalizeReportMutation.mutate()}
-                            isFinalizing={finalizeReportMutation.isPending}
-                            isUnfinalizing={unfinalizeReportMutation.isPending}
-                        />
+                        <div className="p-6 sm:p-7 bg-slate-950 text-white">
+                            <div className="mb-4">
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-200">Action Center</p>
+                                <h3 className="mt-2 text-2xl font-black tracking-tight">Complete the report safely</h3>
+                                <p className="mt-1 text-sm text-slate-300">Export and save actions are separated from finalization controls.</p>
+                            </div>
+                            <ReportActionButtons
+                                isAstra={isAstra}
+                                isDepartmentHead={isDepartmentHead}
+                                isZeroingEarlyMin={isZeroingEarlyMin}
+                                resultsLoading={resultsLoading}
+                                selectedRowIds={selectedRowIds}
+                                onZeroEarlyMinutes={handleZeroEarlyMinutes}
+                                onExport={exportToExcel}
+                                project={project}
+                                reportRun={reportRun}
+                                isSaving={isSaving}
+                                isReanalyzing={isReanalyzing}
+                                onSaveReport={() => setShowSaveConfirmation(true)}
+                                onReanalyze={handleReanalyze}
+                                onFinalize={() => finalizeReportMutation.mutate()}
+                                onUnfinalize={() => unfinalizeReportMutation.mutate()}
+                                isFinalizing={finalizeReportMutation.isPending}
+                                isUnfinalizing={unfinalizeReportMutation.isPending}
+                            />
+                        </div>
                     </div>
                 </CardContent>
             </Card>
