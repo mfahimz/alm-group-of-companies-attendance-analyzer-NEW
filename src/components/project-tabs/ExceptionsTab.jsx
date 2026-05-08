@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,7 @@ const TYPE_MAP = EXCEPTION_TYPES.reduce((acc, type) => {
 });
 
 export default function ExceptionsTab({ project }) {
+    const [activeTab, setActiveTab] = useState('exceptions');
     const [showForm, setShowForm] = useState(false);
     const [isImportingLeaves, setIsImportingLeaves] = useState(false);
     const [employeeSearch, setEmployeeSearch] = useState('');
@@ -700,12 +702,36 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                 canEditAllowedMinutes={canEditAllowedMinutes}
             />
 
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-5 py-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-blue-50/40">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Exceptions Workspace</h2>
+                            <p className="text-sm text-slate-500 mt-1">Manage manual exceptions, payroll checklist tasks, and report-generated adjustments for this project.</p>
+                        </div>
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full lg:w-auto">
+                            <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex bg-slate-100 p-1 rounded-xl">
+                                <TabsTrigger value="exceptions" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Exceptions</TabsTrigger>
+                                <TabsTrigger value="checklist" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Checklist</TabsTrigger>
+                                {reportExceptions.length > 0 && (
+                                    <TabsTrigger value="report-generated" className="rounded-lg px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">Report Generated</TabsTrigger>
+                                )}
+                            </TabsList>
+                        </Tabs>
+                    </div>
+                </div>
+
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                    <TabsContent value="exceptions" className="m-0 p-5 space-y-5">
             {/* Exceptions Section */}
-            <Card className="border-0 shadow-sm bg-blue-50/30">
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <CardTitle>Exceptions ({filteredExceptions.length})</CardTitle>
-                        <div className="flex gap-2">
+            <Card className="border border-slate-200 shadow-sm bg-white rounded-2xl overflow-hidden">
+                <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                        <div>
+                            <CardTitle className="text-xl text-slate-900">Exception Records</CardTitle>
+                            <p className="text-sm text-slate-500 mt-1">{filteredExceptions.length} matching records from {exceptions.length} manual exception entries</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
                             <div className="relative">
                                 <Button variant="outline" size="sm" disabled={isImportingLeaves} onClick={async () => {
                                     try {
@@ -738,22 +764,22 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-4">
+                <CardContent className="p-0">
+                    <div>
+                        <div className="p-4 bg-white border-b border-slate-100 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
                             {selectedExceptions.length > 0 && !isUser && (
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-2 shadow-sm">
                                     <Button size="sm" onClick={() => setShowBulkEdit(true)} className="bg-indigo-600 hover:bg-indigo-700"><Edit className="w-4 h-4 mr-2" />Edit ({selectedExceptions.length})</Button>
                                     <Button size="sm" variant="outline" onClick={() => handleBulkToggleUse(true)}>Enable Use</Button>
                                     <Button size="sm" variant="outline" onClick={() => handleBulkToggleUse(false)}>Disable Use</Button>
                                     <Button size="sm" variant="destructive" onClick={handleBulkDelete}><Trash2 className="w-4 h-4 mr-2" />Delete</Button>
                                 </div>
                             )}
-                            <div className="relative flex-1 max-w-xs">
+                            <div className="relative w-full xl:w-80">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <Input className="border-slate-200 pl-9" placeholder="Search ID, name, or details..." value={filter.search} onChange={(e) => setFilter({ ...filter, search: e.target.value })} />
+                                <Input className="border-slate-200 pl-9 h-10 bg-slate-50/60 focus:bg-white" placeholder="Search ID, name, or details..." value={filter.search} onChange={(e) => setFilter({ ...filter, search: e.target.value })} />
                             </div>
-                            <Button size="sm" variant="outline" onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className="relative">
+                            <Button size="sm" variant="outline" onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} className="relative h-10 border-slate-200 bg-white">
                                 <Filter className="w-4 h-4 mr-2" />{showAdvancedFilters ? 'Hide' : 'Show'} Filters
                                 {hasAdvancedFiltersActive && (
                                     <span className="absolute -top-1 -right-1 flex h-2 w-2">
@@ -762,11 +788,24 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     </span>
                                 )}
                             </Button>
-                            {hasActiveFilters && <Button size="sm" variant="ghost" onClick={clearFilters} className="text-red-600 hover:text-red-700">Clear All</Button>}
+                            {hasActiveFilters && <Button size="sm" variant="ghost" onClick={clearFilters} className="h-10 text-red-600 hover:text-red-700 hover:bg-red-50">Clear All</Button>}
                         </div>
+                        {hasActiveFilters && (
+                            <div className="px-4 py-3 bg-blue-50/60 border-b border-blue-100 flex flex-wrap items-center gap-2 text-xs">
+                                <span className="font-semibold text-blue-900">Active filters:</span>
+                                {filter.search && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">Search: {filter.search}</span>}
+                                {filter.type !== 'all' && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">Type: {filter.type.replace(/_/g, ' ')}</span>}
+                                {filter.department !== 'all' && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">Department: {filter.department}</span>}
+                                {filter.dateFrom && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">From: {filter.dateFrom}</span>}
+                                {filter.dateTo && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">To: {filter.dateTo}</span>}
+                                {filter.createdFromReport !== 'all' && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">From Report: {filter.createdFromReport}</span>}
+                                {filter.useInAnalysis !== 'all' && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">Use: {filter.useInAnalysis}</span>}
+                                {filter.approvalStatus !== 'all' && <span className="px-2.5 py-1 rounded-full bg-white border border-blue-200 text-blue-700">Approval: {filter.approvalStatus.replace(/_/g, ' ')}</span>}
+                            </div>
+                        )}
 
                         {showAdvancedFilters && (
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-lg border">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 p-4 bg-slate-50/80 border-b border-slate-100">
                                 <div>
                                     <Label className="text-xs text-slate-600 mb-1">Type</Label>
                                     <Select value={filter.type} onValueChange={(value) => setFilter({ ...filter, type: value })}>
@@ -829,12 +868,18 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                     </div>
 
                     {filteredExceptions.length === 0 ? (
-                        <p className="text-slate-500 text-center py-8">No exceptions found</p>
+                        <div className="py-16 text-center bg-white">
+                            <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                                <Sparkles className="w-5 h-5 text-slate-400" />
+                            </div>
+                            <p className="font-semibold text-slate-900">No exceptions found</p>
+                            <p className="text-sm text-slate-500 mt-1">Try clearing filters or add a new exception for this project.</p>
+                        </div>
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto bg-white">
                             <Table>
-                                <TableHeader className="sticky top-0 bg-slate-50/80 backdrop-blur-md z-10 border-b border-slate-200">
-                                    <TableRow className="hover:bg-transparent border-none">
+                                <TableHeader className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10 border-b border-slate-200 shadow-sm">
+                                    <TableRow className="hover:bg-transparent border-b border-slate-200">
                                         {!isUser && (
                                             <TableHead className="w-12">
                                                 <Checkbox checked={selectedExceptions.length === filteredExceptions.length && filteredExceptions.length > 0} onCheckedChange={(checked) => { if (checked) { setSelectedExceptions(filteredExceptions); } else { setSelectedExceptions([]); } }} />
@@ -853,25 +898,25 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                                     {paginatedExceptions.map((exception) => {
                                         const employeeName = employees.find(e => String(e.attendance_id) === String(exception.attendance_id) && e.company === project.company)?.name || '—';
                                         return (
-                                            <TableRow key={exception.id} className="hover:bg-slate-100/50 transition-colors duration-200">
+                                            <TableRow key={exception.id} className="hover:bg-blue-50/40 transition-colors duration-200 border-b border-slate-100 last:border-0 group">
                                                 {!isUser && (
-                                                    <TableCell className="p-1">
+                                                    <TableCell className="py-4">
                                                         <Checkbox checked={selectedExceptions.some(e => e.id === exception.id)} onCheckedChange={(checked) => { if (checked) { setSelectedExceptions([...selectedExceptions, exception]); } else { setSelectedExceptions(selectedExceptions.filter(e => e.id !== exception.id)); } }} />
                                                     </TableCell>
                                                 )}
-                                                <TableCell className="p-1 text-sm font-mono text-slate-900">{exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}</TableCell>
-                                                <TableCell className="p-1 text-sm text-slate-900">{exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}</TableCell>
-                                                <TableCell className="p-1">
+                                                <TableCell className="py-4 text-sm font-mono text-slate-900">{exception.type === 'PUBLIC_HOLIDAY' ? 'ALL' : exception.attendance_id}</TableCell>
+                                                <TableCell className="py-4 text-sm text-slate-900">{exception.type === 'PUBLIC_HOLIDAY' ? '—' : employeeName}</TableCell>
+                                                <TableCell className="py-4">
                                                     {exception.is_custom_type ? (
                                                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">{exception.custom_type_name || 'Custom'}</span>
                                                     ) : (
-                                                        <span className={`px-2 py-0.5 rounded-md text-xs font-medium border ${getTypeColor(exception.type)}`}>{exception.type.replace(/_/g, ' ')}</span>
+                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${getTypeColor(exception.type)}`}>{exception.type.replace(/_/g, ' ')}</span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="p-1 text-sm">{exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) ? '—' : new Date(exception.date_from).toLocaleDateString()}</TableCell>
-                                                <TableCell className="p-1 text-sm">{exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) ? '—' : new Date(exception.date_to).toLocaleDateString()}</TableCell>
-                                                <TableCell className="p-1 text-sm max-w-xs truncate">{exception.details || '-'}</TableCell>
-                                                <TableCell className="text-right p-1">
+                                                <TableCell className="py-4 text-sm">{exception.is_custom_type && (!exception.date_from || exception.date_from === project.date_from) ? '—' : new Date(exception.date_from).toLocaleDateString()}</TableCell>
+                                                <TableCell className="py-4 text-sm">{exception.is_custom_type && (!exception.date_to || exception.date_to === project.date_to) ? '—' : new Date(exception.date_to).toLocaleDateString()}</TableCell>
+                                                <TableCell className="py-4 text-sm max-w-xs truncate text-slate-600">{exception.details || '-'}</TableCell>
+                                                <TableCell className="text-right py-4">
                                                     <div className="flex gap-1 justify-end">
                                                         <Button size="sm" variant="ghost" onClick={() => setViewingException(exception)} title="View exception"><Eye className="w-4 h-4 text-indigo-600" /></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => { if (exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes) { toast.error("Only Admin and CEO can edit allowed minutes."); return; } setEditingException(exception); }} disabled={exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes}><Edit className={`w-4 h-4 ${exception.type === 'ALLOWED_MINUTES' && !canEditAllowedMinutes ? 'text-slate-400' : 'text-blue-600'}`} /></Button>
@@ -891,16 +936,30 @@ ALL,All Employees,2025-11-15,2025-11-15,Public Holiday,National Day,0
                 </CardContent>
             </Card>
 
-            {/* Payroll Checklist Section */}
-            <ChecklistSection project={project} checklistItems={sortedChecklistItems} currentUser={currentUser} reportRunId={undefined} />
+                    </TabsContent>
 
-            {/* Report-Generated Exceptions (grouped by report) */}
-            <ReportGeneratedExceptions
-                project={project}
-                reportExceptions={reportExceptions}
-                employees={employees}
-                canEditAllowedMinutes={canEditAllowedMinutes}
-            />
+                    {/* Payroll Checklist Section */}
+                    <TabsContent value="checklist" className="m-0 p-5">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/40 p-4 shadow-sm">
+                            <ChecklistSection project={project} checklistItems={sortedChecklistItems} currentUser={currentUser} reportRunId={undefined} />
+                        </div>
+                    </TabsContent>
+
+                    {/* Report-Generated Exceptions (grouped by report) */}
+                    {reportExceptions.length > 0 && (
+                        <TabsContent value="report-generated" className="m-0 p-5">
+                            <div className="rounded-2xl border border-slate-200 bg-emerald-50/30 p-4 shadow-sm">
+                                <ReportGeneratedExceptions
+                                    project={project}
+                                    reportExceptions={reportExceptions}
+                                    employees={employees}
+                                    canEditAllowedMinutes={canEditAllowedMinutes}
+                                />
+                            </div>
+                        </TabsContent>
+                    )}
+                </Tabs>
+            </div>
 
             {/* Edit Exception Dialog */}
             <EditExceptionDialog open={!!editingException} onClose={() => setEditingException(null)} exception={editingException} projectId={project.id} canEditAllowedMinutes={canEditAllowedMinutes} />
