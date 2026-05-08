@@ -113,7 +113,7 @@ export default function PunchUploadTab({ project }) {
                 project_id: project.id, 
                 user_email: currentUser?.email
             }, '-created_date', 10);
-            return jobs.find(job => TRACKED_UPLOAD_STATUSES.includes(job.status)) || null;
+            return jobs.find(job => ACTIVE_UPLOAD_STATUSES.includes(job.status)) || null;
         },
         enabled: !!currentUser?.email,
         refetchInterval: (query) => {
@@ -386,8 +386,10 @@ export default function PunchUploadTab({ project }) {
                 setUploadProgress(null);
                 setFile(null);
 
-                if (!result.upload_job_id) {
-                    toast.success(`Upload finished. ${result.records_saved || 0} punch records saved${result.records_skipped ? `, ${result.records_skipped} skipped` : ''}.`);
+                toast.success(`Upload finished. ${result.records_saved || 0} punch records saved${result.records_skipped ? `, ${result.records_skipped} skipped` : ''}.`);
+
+                if (result.upload_job_id) {
+                    await base44.entities.UploadJob.update(result.upload_job_id, { status: 'archived' });
                 }
             }
         },
