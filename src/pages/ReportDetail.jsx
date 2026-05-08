@@ -155,30 +155,41 @@ export default function ReportDetailPage() {
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-[1800px] mx-auto">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    {/* preserve context: from_tab query parameter tells us which tab we came from (default: overview) */}
-                    <Link to={createPageUrl('ProjectDetail') + `?id=${projectId}&tab=${fromTab}`}>
-                        <Button variant="ghost" size="sm">
-                            <ArrowLeft className="w-4 h-4 mr-2" />
-                            Back to Project
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">
-                            {reportRun.report_name || `Report: ${formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - ${formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}`}
-                        </h1>
-                        <p className="text-sm text-slate-600 mt-1">
-                            Generated on {formatInUAE(reportRun.created_date?.endsWith('Z') ? reportRun.created_date : (reportRun.created_date + 'Z'), 'MM/dd/yyyy hh:mm a')}
-                        </p>
-                    </div>
-                </div>
+            <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 px-5 sm:px-6 py-5 text-white">
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                        <div className="flex items-start gap-4 min-w-0">
+                            {/* preserve context: from_tab query parameter tells us which tab we came from (default: overview) */}
+                            <Link to={createPageUrl('ProjectDetail') + `?id=${projectId}&tab=${fromTab}`}>
+                                <Button variant="ghost" size="sm" className="bg-white/10 text-white hover:bg-white/20 hover:text-white border border-white/10 rounded-xl shrink-0">
+                                    <ArrowLeft className="w-4 h-4 mr-2" />
+                                    Back to Project
+                                </Button>
+                            </Link>
+                            <div className="min-w-0">
+                                <p className="text-xs uppercase tracking-[0.2em] text-indigo-200 font-semibold mb-2">Attendance Verification Report</p>
+                                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+                                    {reportRun.report_name || `Report: ${formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - ${formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}`}
+                                </h1>
+                                <div className="flex flex-wrap items-center gap-2 mt-3 text-sm text-slate-200">
+                                    <span className="inline-flex items-center rounded-full bg-white/10 border border-white/10 px-3 py-1">
+                                        Generated {formatInUAE(reportRun.created_date?.endsWith('Z') ? reportRun.created_date : (reportRun.created_date + 'Z'), 'MM/dd/yyyy hh:mm a')}
+                                    </span>
+                                    <span className="inline-flex items-center rounded-full bg-white/10 border border-white/10 px-3 py-1">
+                                        Period {formatInUAE(reportRun.date_from, 'MM/dd/yyyy')} - {formatInUAE(reportRun.date_to, 'MM/dd/yyyy')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
 
-                <div className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full select-none shadow-sm">
-                    <Timer className="w-3.5 h-3.5" />
-                    <span>{displayTime}</span>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-indigo-100 bg-white/10 border border-white/15 px-4 py-2 rounded-2xl select-none shadow-sm shrink-0">
+                            <Timer className="w-4 h-4" />
+                            <span>Review time</span>
+                            <span className="text-white tabular-nums">{displayTime}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
