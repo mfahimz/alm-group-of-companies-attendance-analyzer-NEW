@@ -52,21 +52,21 @@ export default function PunchUploadTab({ project }) {
         queryFn: () => base44.entities.Employee.filter({ company: project.company })
     });
 
-    // Non-truncating punch fetch for Phase 1
+    // Non-truncating punch fetch with correct SDK pagination
     const fetchAllPunches = async (projectId) => {
         const all = [];
         let skip = 0;
-        const limit = 1000;
+        const limit = 500;
         while (true) {
-            const batch = await base44.entities.Punch.filter({ project_id: projectId }, { skip, limit });
+            const batch = await base44.entities.Punch.filter({ project_id: projectId }, '-created_date', limit, skip);
             all.push(...batch);
-            if (batch.length < limit) break;
+            if (!Array.isArray(batch) || batch.length < limit) break;
             skip += limit;
         }
         return all;
     };
 
-    const { data: punches = [], isFetching: isFetchingPunches } = useQuery({
+    const { data: punches = [], isFetching: isFetchingPunches, refetch: refetchPunches } = useQuery({
         queryKey: ['punches', project.id],
         queryFn: () => fetchAllPunches(project.id)
     });
@@ -83,13 +83,13 @@ export default function PunchUploadTab({ project }) {
             const jobs = await base44.entities.UploadJob.filter({ 
                 project_id: project.id, 
                 user_email: currentUser?.email
-            }, { sort: { created_date: 'desc' }, limit: 1 });
+            }, '-created_date', 1);
             return jobs[0] || null;
         },
         enabled: !!currentUser?.email,
         refetchInterval: (query) => {
             const job = query.state.data;
-            if (job && ['pending', 'processing', 'rolling_back'].includes(job.status)) {
+            if (uploadProgress || (job && ['pending', 'processing', 'rolling_back'].includes(job.status))) {
                 return 2000;
             }
             return false;
@@ -104,6 +104,8 @@ export default function PunchUploadTab({ project }) {
 
         if (activeJob.status === 'completed') {
             queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
+            refetchPunches();
+            setCurrentPage(1);
             const saved = activeJob.records_saved || 0;
             const skipped = (activeJob.records_invalid_data || 0) + (activeJob.records_invalid_format || 0) + (activeJob.records_duplicate || 0);
             toast.success(`Upload finished. ${saved} punch records saved${skipped ? `, ${skipped} skipped` : ''}.`);
@@ -115,7 +117,7 @@ export default function PunchUploadTab({ project }) {
             base44.entities.UploadJob.update(activeJob.id, { status: 'archived_failed' });
             setUploadProgress(null);
         }
-    }, [activeJob?.id, activeJob?.status, project.id, queryClient]);
+    }, [activeJob?.id, activeJob?.status, project.id, queryClient, refetchPunches]);
 
     const parseFileForPreview = async (selectedFile) => {
         try {
@@ -302,13 +304,14 @@ export default function PunchUploadTab({ project }) {
             setShowPreviewDialog(false);
             setUploadProgress({
                 phase: 'Uploading file...',
-                current: 0,
-                total: previewPunches.length || 1
+                current: 5,
+                total: 100
             });
+            setTimeout(() => refetchJob(), 1000);
         },
         mutationFn: async (selectedFile) => {
             // 1. Upload to private storage
-            setUploadProgress({ phase: 'Uploading file...', current: 0, total: previewPunches.length || 1 });
+            setUploadProgress({ phase: 'Uploading file...', current: 10, total: 100 });
             const { file_uri } = await base44.integrations.Core.UploadPrivateFile({
                 file: selectedFile
             });
@@ -316,9 +319,10 @@ export default function PunchUploadTab({ project }) {
             // 2. Start processPunchUpload
             setUploadProgress({
                 phase: 'Checking and saving punch records...',
-                current: 0,
-                total: previewPunches.length || 1
+                current: 20,
+                total: 100
             });
+            setTimeout(() => refetchJob(), 1500);
             
             // Determine upload type based on company
             let upload_type = 'universal';
@@ -338,12 +342,14 @@ export default function PunchUploadTab({ project }) {
 
             return response.data;
         },
-        onSuccess: (result) => {
+        onSuccess: async (result) => {
             setPreviewPunches([]);
-            refetchJob();
+            await refetchJob();
 
             if (result?.success) {
-                queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
+                await queryClient.invalidateQueries({ queryKey: ['punches', project.id] });
+                await refetchPunches();
+                setCurrentPage(1);
                 setUploadProgress(null);
                 setFile(null);
                 toast.success(`Upload finished. ${result.records_saved || 0} punch records saved${result.records_skipped ? `, ${result.records_skipped} skipped` : ''}.`);
