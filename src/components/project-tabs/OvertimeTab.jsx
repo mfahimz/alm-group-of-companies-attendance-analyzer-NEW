@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Save, Upload, Download, FileSpreadsheet, Users, DollarSign, Lock, Trash2, X, Clock } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -686,7 +687,18 @@ export default function OvertimeTab({ project }) {
 
     return (
         <div className="space-y-8">
-        <Card className="border border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
+            <Tabs defaultValue="overtime" className="space-y-6">
+                <TabsList className="grid w-full max-w-xl grid-cols-2 rounded-2xl bg-slate-100 p-1.5">
+                    <TabsTrigger value="overtime" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        Overtime Management
+                    </TabsTrigger>
+                    <TabsTrigger value="salary" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        Salary Adjustments
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overtime" className="mt-0">
+                    <Card className="border border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
             <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-orange-50/80 via-white to-white px-5 sm:px-6 py-5">
                 <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
                     <div className="flex items-start gap-3">
@@ -827,10 +839,12 @@ export default function OvertimeTab({ project }) {
                     </Table>
                 </div>
             </CardContent>
-        </Card>
+                    </Card>
+                </TabsContent>
 
-        {/* ADJUSTMENTS SECTION - Always visible */}
-        <div>
+                <TabsContent value="salary" className="mt-0">
+                    {/* ADJUSTMENTS SECTION */}
+                    <div>
             <Card className="border border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
                 <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-white px-5 sm:px-6 py-5">
                     <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5">
@@ -992,8 +1006,10 @@ export default function OvertimeTab({ project }) {
 
 
                 </CardContent>
-            </Card>
-            </div>
+                    </Card>
+                    </div>
+                </TabsContent>
+            </Tabs>
 
             {/* Excel Export Preview Dialog */}
             <ExcelPreviewDialog
