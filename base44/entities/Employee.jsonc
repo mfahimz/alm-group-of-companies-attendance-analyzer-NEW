@@ -1,0 +1,87 @@
+{
+  "name": "Employee",
+  "type": "object",
+  "properties": {
+    "hrms_id": {
+      "type": "string",
+      "description": "HRMS ID - Globally unique identifier",
+      "unique": true
+    },
+    "has_attendance_tracking": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this employee requires attendance tracking. If false, attendance_id is optional and employee is salary-only"
+    },
+    "attendance_id": {
+      "type": "string",
+      "description": "Attendance ID - Unique per company, used for punch matching. Optional if has_attendance_tracking is false"
+    },
+    "assumed_present_daily": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, employee is automatically marked present every working day (for salary-only executives)"
+    },
+    "exclude_from_attendance_deductions": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, no late/early/LOP deductions apply to this employee"
+    },
+    "name": {
+      "type": "string",
+      "description": "Employee full name"
+    },
+    "company": {
+      "type": "string",
+      "description": "Company the employee belongs to"
+    },
+    "department": {
+      "type": "string",
+      "description": "Employee Department"
+    },
+    "designation": {
+      "type": "string",
+      "description": "Employee job designation/title"
+    },
+    "weekly_off": {
+      "type": "string",
+      "enum": [
+        "Sunday",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday"
+      ],
+      "default": "Sunday",
+      "description": "Employee's weekly off day"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the employee is currently active"
+    },
+    "carried_grace_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Unused grace minutes carried forward from previous projects"
+    },
+    "approved_other_minutes_limit": {
+      "type": "number",
+      "default": 120,
+      "description": "Quarterly limit for other minutes that department head can approve (varies by company/department)"
+    }
+  },
+  "required": [
+    "hrms_id",
+    "name",
+    "company"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,254 @@
+{
+  "name": "CompensationMonthlyRecord",
+  "type": "object",
+  "description": "Frozen monthly compensation snapshot and calculation result for future payroll integration. This entity is standalone and must not directly mutate payroll entities.",
+  "properties": {
+    "company": {
+      "type": "string",
+      "description": "Company this monthly compensation record belongs to. Used for company filtering and access scoping."
+    },
+    "employee_hrms_id": {
+      "type": "string",
+      "description": "HRMS ID of the employee for this monthly compensation record."
+    },
+    "employee_name_snapshot": {
+      "type": "string",
+      "description": "Employee name captured when the monthly record is created."
+    },
+    "designation_snapshot": {
+      "type": "string",
+      "description": "Employee designation/title captured when the monthly record is created."
+    },
+    "record_month": {
+      "type": "string",
+      "format": "date",
+      "description": "Month marker for this compensation record. Store as the first day of the month in YYYY-MM-01 format."
+    },
+    "template_id": {
+      "type": "string",
+      "description": "ID of the EmployeeCompensationTemplate used to create this monthly record."
+    },
+    "template_name_snapshot": {
+      "type": "string",
+      "description": "Template name captured when the monthly record is created."
+    },
+    "template_snapshot": {
+      "type": "object",
+      "description": "Frozen structured copy of the employee compensation template at the time this monthly record is created or refreshed. This preserves historical calculation rules.",
+      "properties": {
+        "template_id": {
+          "type": "string"
+        },
+        "template_name": {
+          "type": "string"
+        },
+        "target_type": {
+          "type": "string"
+        },
+        "target_label": {
+          "type": "string"
+        },
+        "target_unit": {
+          "type": "string"
+        },
+        "calculation_mode": {
+          "type": "string",
+          "enum": [
+            "exact_range",
+            "cumulative"
+          ]
+        },
+        "slabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slab_label": {
+                "type": "string"
+              },
+              "from_value": {
+                "type": "number"
+              },
+              "to_value": {
+                "type": "number"
+              },
+              "payout_type": {
+                "type": "string",
+                "enum": [
+                  "fixed_amount",
+                  "percentage_of_value",
+                  "amount_per_unit"
+                ]
+              },
+              "payout_value": {
+                "type": "number"
+              },
+              "sort_order": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "effective_from": {
+          "type": "string",
+          "format": "date"
+        },
+        "effective_to": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "target_achieved_value": {
+      "type": "number",
+      "description": "Manually entered monthly achieved value for this employee/template/month."
+    },
+    "calculated_compensation": {
+      "type": "number",
+      "description": "Calculated compensation amount for this employee/template/month."
+    },
+    "matched_slab_snapshot": {
+      "type": "object",
+      "description": "Structured snapshot of the slab or slab breakdown used for the calculation result.",
+      "properties": {
+        "calculation_mode": {
+          "type": "string",
+          "enum": [
+            "exact_range",
+            "cumulative"
+          ]
+        },
+        "matched_slabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slab_label": {
+                "type": "string"
+              },
+              "from_value": {
+                "type": "number"
+              },
+              "to_value": {
+                "type": "number"
+              },
+              "payout_type": {
+                "type": "string"
+              },
+              "payout_value": {
+                "type": "number"
+              },
+              "calculated_amount": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Draft",
+        "Reviewed",
+        "Approved"
+      ],
+      "default": "Draft",
+      "description": "Approval status for this monthly compensation record. Reopen is tracked through audit fields, not as a primary status."
+    },
+    "review_notes": {
+      "type": "string",
+      "description": "Optional notes entered during review or approval."
+    },
+    "approved_by": {
+      "type": "string",
+      "description": "Email of the user who approved this monthly record."
+    },
+    "approved_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this monthly record was approved."
+    },
+    "reopened_by": {
+      "type": "string",
+      "description": "Email of the user who last reopened this approved monthly record."
+    },
+    "reopened_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when this monthly record was last reopened."
+    },
+    "was_reopened": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this monthly record has ever been reopened after approval."
+    }
+  },
+  "required": [
+    "company",
+    "employee_hrms_id",
+    "record_month",
+    "template_id",
+    "template_snapshot",
+    "status"
+  ],
+  "unique_together": [
+    [
+      "company",
+      "employee_hrms_id",
+      "record_month",
+      "template_id"
+    ]
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo",
+            "supervisor",
+            "hr_manager",
+            "senior_accountant"
+          ]
+        }
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo",
+            "supervisor",
+            "hr_manager",
+            "senior_accountant"
+          ]
+        }
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo",
+            "supervisor",
+            "hr_manager",
+            "senior_accountant"
+          ]
+        }
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "name": "EmployeeCompensationTemplate",
+  "type": "object",
+  "description": "Employee-owned reusable compensation template/rule for the Compensation Planning feature. Templates are standalone and do not mutate payroll entities.",
+  "properties": {
+    "company": {
+      "type": "string",
+      "description": "Company this employee compensation template belongs to. Used for company filtering and access scoping."
+    },
+    "employee_hrms_id": {
+      "type": "string",
+      "description": "HRMS ID of the employee who owns this compensation template. Final rule ownership is employee-level."
+    },
+    "employee_name_snapshot": {
+      "type": "string",
+      "description": "Employee name captured for display at the time the template is created or updated."
+    },
+    "designation_snapshot": {
+      "type": "string",
+      "description": "Employee designation/title captured for suggestion and filtering only. Does not determine rule ownership."
+    },
+    "template_name": {
+      "type": "string",
+      "description": "Name of the employee-owned compensation template."
+    },
+    "target_type": {
+      "type": "string",
+      "description": "Target category/type, such as revenue, units, score, percentage, or a custom type."
+    },
+    "target_label": {
+      "type": "string",
+      "description": "Custom display label for the target being measured."
+    },
+    "target_unit": {
+      "type": "string",
+      "description": "Custom unit for the target value, such as AED, %, units, cars, jobs, or score."
+    },
+    "calculation_mode": {
+      "type": "string",
+      "enum": [
+        "exact_range",
+        "cumulative"
+      ],
+      "description": "How slabs are evaluated. exact_range applies only the matching slab; cumulative applies qualifying slabs progressively."
+    },
+    "slabs": {
+      "type": "array",
+      "description": "Structured compensation slabs used for calculation. Each slab defines a target range and payout rule.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slab_label": {
+            "type": "string",
+            "description": "Optional display label for this slab."
+          },
+          "from_value": {
+            "type": "number",
+            "description": "Inclusive lower bound for the achieved target value."
+          },
+          "to_value": {
+            "type": "number",
+            "description": "Inclusive upper bound for the achieved target value. Leave empty/null in app logic for open-ended final slab."
+          },
+          "payout_type": {
+            "type": "string",
+            "enum": [
+              "fixed_amount",
+              "percentage_of_value",
+              "amount_per_unit"
+            ],
+            "description": "How compensation is calculated for this slab."
+          },
+          "payout_value": {
+            "type": "number",
+            "description": "Amount, percentage, or per-unit rate depending on payout_type."
+          },
+          "sort_order": {
+            "type": "number",
+            "description": "Display and evaluation order for the slab."
+          }
+        }
+      }
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this template is active and available for monthly compensation planning."
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date",
+      "description": "Optional first date this template is effective from."
+    },
+    "effective_to": {
+      "type": "string",
+      "format": "date",
+      "description": "Optional last date this template is effective until."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional internal notes for this compensation template."
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Email of the user who created this template."
+    }
+  },
+  "required": [
+    "company",
+    "employee_hrms_id",
+    "template_name",
+    "target_type",
+    "target_label",
+    "target_unit",
+    "calculation_mode",
+    "slabs"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo",
+            "supervisor",
+            "hr_manager",
+            "senior_accountant"
+          ]
+        }
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo",
+            "supervisor",
+            "hr_manager",
+            "senior_accountant"
+          ]
+        }
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo",
+            "supervisor",
+            "hr_manager",
+            "senior_accountant"
+          ]
+        }
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": {
+          "$in": [
+            "admin",
+            "ceo"
+          ]
+        }
+      }
+    }
+  }
+}
