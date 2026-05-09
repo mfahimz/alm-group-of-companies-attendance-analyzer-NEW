@@ -17,6 +17,7 @@ import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import PINLock from '../components/ui/PINLock';
 import { useCompanyFilter } from '../components/context/CompanyContext';
+import SalaryBulkEditDialog from '../components/salaries/SalaryBulkEditDialog';
 
 export default function Salaries() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -33,6 +34,8 @@ export default function Salaries() {
     const [unmatchedRecords, setUnmatchedRecords] = useState([]);
     const [showUnmatchedDialog, setShowUnmatchedDialog] = useState(false);
     const [pendingValidRecords, setPendingValidRecords] = useState([]);
+    const [selectedSalaryIds, setSelectedSalaryIds] = useState([]);
+    const [showBulkEditDialog, setShowBulkEditDialog] = useState(false);
     const { selectedCompany: companyFilter } = useCompanyFilter();
     
     const [formData, setFormData] = useState({
@@ -101,7 +104,7 @@ export default function Salaries() {
 
             const allowancesAmount = Number(data.allowances) || 0;
             const allowancesWithBonus = Number(data.allowances_with_bonus) || 0;
-            const total = Number((data.basic_salary + allowancesAmount + allowancesWithBonus).toFixed(2));
+            const total = Math.round(Number(data.basic_salary || 0) + allowancesAmount + allowancesWithBonus);
             
             return base44.entities.EmployeeSalary.create({
                 employee_id: data.employee_id,
@@ -132,7 +135,7 @@ export default function Salaries() {
         mutationFn: ({ id, data }) => {
             const allowancesAmount = Number(data.allowances) || 0;
             const allowancesWithBonus = Number(data.allowances_with_bonus) || 0;
-            const total = Number((data.basic_salary + allowancesAmount + allowancesWithBonus).toFixed(2));
+            const total = Math.round(Number(data.basic_salary || 0) + allowancesAmount + allowancesWithBonus);
             
             const updatePayload = {
                 working_hours: data.working_hours || 9,
@@ -450,7 +453,8 @@ export default function Salaries() {
                 const record = previewData.valid[i];
                 
                 try {
-                    const deductionPerMinute = Number((record.totalSalary / (30 * record.workingHours * 60)).toFixed(2));
+                    const roundedTotal = Math.round(record.totalSalary);
+                    const deductionPerMinute = roundedTotal / (30 * record.workingHours * 60);
 
                     const salaryData = {
                         employee_id: String(record.employee.hrms_id),
@@ -461,7 +465,7 @@ export default function Salaries() {
                         basic_salary: Number(record.basicSalary.toFixed(2)),
                         allowances: Number(record.allowances.toFixed(2)),
                         allowances_with_bonus: Number(record.bonus.toFixed(2)),
-                        total_salary: Number(record.totalSalary.toFixed(2)),
+                        total_salary: roundedTotal,
                         deduction_per_minute: deductionPerMinute
                     };
 
@@ -663,6 +667,16 @@ export default function Salaries() {
                             <RefreshCw className={`w-4 h-4 mr-2 ${syncIncrementsMutation.isPending ? 'animate-spin' : ''}`} />
                             Sync Increments
                         </Button>
+                        {selectedSalaryIds.length > 0 && (
+                            <Button 
+                                onClick={() => setShowBulkEditDialog(true)}
+                                variant="outline"
+                                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                            >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Bulk Edit ({selectedSalaryIds.length})
+                            </Button>
+                        )}
                         <Button onClick={() => setShowDialog(true)} className="bg-indigo-600 hover:bg-indigo-700">
                             <Plus className="w-4 h-4 mr-2" />
                             Add Salary Record
@@ -720,6 +734,18 @@ export default function Salaries() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-12">
+                                        <Checkbox
+                                            checked={selectedSalaryIds.length === filteredSalaries.length && filteredSalaries.length > 0}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                    setSelectedSalaryIds(filteredSalaries.map(s => s.id));
+                                                } else {
+                                                    setSelectedSalaryIds([]);
+                                                }
+                                            }}
+                                        />
+                                    </TableHead>
                                     <SortableTableHead sortKey="employee_id" currentSort={sort} onSort={setSort}>
                                         HRMS ID
                                     </SortableTableHead>
@@ -749,6 +775,18 @@ export default function Salaries() {
                                 {filteredSalaries.map((salary) => {
                                     return (
                                         <TableRow key={salary.id}>
+                                            <TableCell>
+                                                <Checkbox
+                                                    checked={selectedSalaryIds.includes(salary.id)}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            setSelectedSalaryIds(prev => [...prev, salary.id]);
+                                                        } else {
+                                                            setSelectedSalaryIds(prev => prev.filter(id => id !== salary.id));
+                                                        }
+                                                    }}
+                                                />
+                                            </TableCell>
                                             <TableCell className="font-medium text-slate-700">{salary.employee_id || '-'}</TableCell>
                                             <TableCell className="font-medium">{salary.attendance_id || '-'}</TableCell>
                                             <TableCell>{salary.name}</TableCell>
@@ -766,7 +804,7 @@ export default function Salaries() {
                                                 <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Number(salary.allowances_with_bonus || 0).toFixed(2)}</span>
                                             </TableCell>
                                             <TableCell className="font-bold text-green-700">
-                                                <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Number(salary.total_salary || 0).toFixed(2)}</span>
+                                                <span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Math.round(Number(salary.total_salary || 0))}</span>
                                             </TableCell>
                                             <TableCell>
                                                 {salary.company === 'Al Maraghi Motors' && salary.wps_cap_enabled ? (
@@ -960,7 +998,7 @@ export default function Salaries() {
                                     formData.basic_salary + 
                                     formData.allowances +
                                     formData.allowances_with_bonus
-                                ).toFixed(2)}
+                                ).toFixed(0)}
                             </div>
                         </div>
                     </div>
@@ -1031,7 +1069,7 @@ export default function Salaries() {
                                                         <TableCell><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.basicSalary}</span></TableCell>
                                                         <TableCell><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.allowances}</span></TableCell>
                                                         <TableCell><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.bonus}</span></TableCell>
-                                                        <TableCell className="font-semibold"><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{record.totalSalary}</span></TableCell>
+                                                        <TableCell className="font-semibold"><span className="inline-flex items-center gap-1"><AEDIcon className="w-3.5 h-3.5" />{Math.round(record.totalSalary)}</span></TableCell>
                                                         <TableCell>
                                                             <span className={`px-2 py-1 rounded text-xs ${
                                                                 record.action === 'Create' 
@@ -1191,6 +1229,17 @@ export default function Salaries() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <SalaryBulkEditDialog
+                open={showBulkEditDialog}
+                onClose={() => setShowBulkEditDialog(false)}
+                selectedIds={selectedSalaryIds}
+                allSalaries={salaries}
+                onSuccess={() => {
+                    setSelectedSalaryIds([]);
+                    setShowBulkEditDialog(false);
+                }}
+            />
                 </>
             )}
         </div>
