@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, CheckCircle, RotateCcw, Eye, Search, History } from 'lucide-react';
+import { Loader2, CheckCircle, RotateCcw, Eye, Search, History, Target } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePermissions } from '@/components/hooks/usePermissions';
 import { useCompanyFilter } from '@/components/context/CompanyContext';
@@ -258,6 +258,56 @@ export default function ApprovalHistory() {
                                     <div className="text-sm font-bold text-blue-800">AED {selectedRecord.calculated_payout.toLocaleString()}</div>
                                 </div>
                             </div>
+
+                            {(() => {
+                                try {
+                                    const snap = JSON.parse(selectedRecord.template_snapshot);
+                                    if (snap.kpi_values) {
+                                        return (
+                                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 space-y-3">
+                                                <h4 className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-2">
+                                                    <Target className="w-4 h-4 text-blue-500" />
+                                                    KPI Breakdown
+                                                </h4>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                    <div className="text-center">
+                                                        <div className="text-[9px] text-slate-400 uppercase">Units</div>
+                                                        <div className="text-xs font-bold">{snap.kpi_values.units}</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-[9px] text-slate-400 uppercase">SC</div>
+                                                        <div className="text-xs font-bold">{snap.kpi_values.sc}</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-[9px] text-slate-400 uppercase">IV</div>
+                                                        <div className="text-xs font-bold">{snap.kpi_values.iv}</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-[9px] text-slate-400 uppercase">NPS</div>
+                                                        <div className="text-xs font-bold">{snap.kpi_values.nps}</div>
+                                                    </div>
+                                                </div>
+                                                {snap.tier_result && (
+                                                    <div className="pt-2 border-t border-slate-200">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-xs font-medium text-slate-600">Matched: {snap.tier_result.tier}</span>
+                                                            <Badge variant="outline" className="text-[9px] uppercase bg-white">
+                                                                {snap.tier_result.status}
+                                                            </Badge>
+                                                        </div>
+                                                        {snap.tier_result.reasons?.length > 0 && (
+                                                            <p className="text-[10px] text-slate-500 italic mt-1">
+                                                                {snap.tier_result.reasons.join(', ')}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    }
+                                } catch(e) {}
+                                return null;
+                            })()}
                             
                             <div className="space-y-2 pt-4 border-t">
                                 <h4 className="text-xs font-semibold text-slate-500 uppercase">Audit Trail</h4>

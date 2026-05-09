@@ -317,6 +317,7 @@ export default function CompensationTemplates() {
                                     <SelectItem value="revenue">Revenue</SelectItem>
                                     <SelectItem value="units">Units Sold</SelectItem>
                                     <SelectItem value="tasks">Tasks Completed</SelectItem>
+                                    <SelectItem value="tier_based">Sales Tier Structure</SelectItem>
                                     <SelectItem value="custom">Custom</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -352,49 +353,68 @@ export default function CompensationTemplates() {
                                 <Layers className="w-5 h-5 text-blue-600" />
                                 Payout Slabs
                             </Label>
-                            <Button size="sm" variant="outline" onClick={handleAddSlab} className="border-blue-200 text-blue-600">
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={handleAddSlab} 
+                                className="border-blue-200 text-blue-600"
+                                disabled={formData.target_type === 'tier_based'}
+                            >
                                 <Plus className="w-4 h-4 mr-1" /> Add Slab
                             </Button>
                         </div>
                         
-                        <div className="space-y-3">
-                            {formData.slabs.map((slab, idx) => (
-                                <div key={idx} className="flex gap-3 items-end bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E6EC]">
-                                    <div className="flex-1 space-y-1">
-                                        <Label className="text-[10px] uppercase text-[#64748B]">Min {formData.unit}</Label>
-                                        <Input 
-                                            type="number" 
-                                            value={slab.min} 
-                                            onChange={(e) => handleSlabChange(idx, 'min', e.target.value)}
-                                        />
+                        {formData.target_type === 'tier_based' ? (
+                            <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-800">
+                                <p className="font-semibold mb-2">Tiered Salary Logic Enabled</p>
+                                <ul className="list-disc list-inside space-y-1 text-xs">
+                                    <li>AED 13,500: 240k Units, 6 SC, 460 IV, 4.5 NPS</li>
+                                    <li>AED 12,000: 230k Units, 4 SC, 430 IV, 4.4 NPS</li>
+                                    <li>AED 10,500: 220k Units only</li>
+                                    <li>AED 9,000: Below threshold</li>
+                                </ul>
+                                <p className="mt-2 text-[10px] text-blue-600 italic">* Slabs are ignored for this type as logic is hardcoded in Phase 1.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {formData.slabs.map((slab, idx) => (
+                                    <div key={idx} className="flex gap-3 items-end bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E6EC]">
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-[10px] uppercase text-[#64748B]">Min {formData.unit}</Label>
+                                            <Input 
+                                                type="number" 
+                                                value={slab.min} 
+                                                onChange={(e) => handleSlabChange(idx, 'min', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-[10px] uppercase text-[#64748B]">Max {formData.unit}</Label>
+                                            <Input 
+                                                type="number" 
+                                                value={slab.max} 
+                                                onChange={(e) => handleSlabChange(idx, 'max', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <Label className="text-[10px] uppercase text-[#64748B]">Payout (AED)</Label>
+                                            <Input 
+                                                type="number" 
+                                                value={slab.payout} 
+                                                onChange={(e) => handleSlabChange(idx, 'payout', e.target.value)}
+                                            />
+                                        </div>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={() => handleRemoveSlab(idx)}
+                                            className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
                                     </div>
-                                    <div className="flex-1 space-y-1">
-                                        <Label className="text-[10px] uppercase text-[#64748B]">Max {formData.unit}</Label>
-                                        <Input 
-                                            type="number" 
-                                            value={slab.max} 
-                                            onChange={(e) => handleSlabChange(idx, 'max', e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="flex-1 space-y-1">
-                                        <Label className="text-[10px] uppercase text-[#64748B]">Payout (AED)</Label>
-                                        <Input 
-                                            type="number" 
-                                            value={slab.payout} 
-                                            onChange={(e) => handleSlabChange(idx, 'payout', e.target.value)}
-                                        />
-                                    </div>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        onClick={() => handleRemoveSlab(idx)}
-                                        className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <DialogFooter className="mt-6">
