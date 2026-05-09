@@ -23,7 +23,8 @@ export const useCompanyFilter = () => {
 export const CompanyFilterProvider = ({ children }) => {
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me()
+        queryFn: () => base44.auth.me(),
+        refetchOnWindowFocus: false
     });
 
     // Get selected company from localStorage only

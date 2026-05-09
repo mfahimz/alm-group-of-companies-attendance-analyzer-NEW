@@ -118,17 +118,19 @@ export default function AnnualLeaveManagement() {
     const { data: leaves = [] } = useQuery({
         queryKey: ['annualLeaves', filterCompany],
         queryFn: async () => {
-            return base44.entities.AnnualLeave.filter({ company: filterCompany }, '-created_date');
+            return base44.entities.AnnualLeave.filter({ company: filterCompany }, '-created_date', 1000);
         },
-        enabled: !!filterCompany
+        enabled: !!filterCompany,
+        refetchOnWindowFocus: false
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', filterCompany],
         queryFn: async () => {
-            return base44.entities.Employee.filter({ active: true, company: filterCompany });
+            return base44.entities.Employee.filter({ active: true, company: filterCompany }, null, 1000);
         },
-        enabled: !!filterCompany
+        enabled: !!filterCompany,
+        refetchOnWindowFocus: false
     });
 
     const { data: companies = [] } = useQuery({
@@ -136,18 +138,17 @@ export default function AnnualLeaveManagement() {
         queryFn: async () => {
             const settings = await base44.entities.CompanySettings.list();
             return settings.map(s => s.company);
-        }
+        },
+        refetchOnWindowFocus: false
     });
 
     const { data: employeeSalaries = [] } = useQuery({
         queryKey: ['employeeSalaries', filterCompany],
         queryFn: async () => {
-            if (filterCompany) {
-                return base44.entities.EmployeeSalary.filter({ company: filterCompany, active: true }, null, 2000);
-            }
-            return [];
+            return base44.entities.EmployeeSalary.filter({ company: filterCompany, active: true }, null, 2000);
         },
-        enabled: !!filterCompany
+        enabled: !!filterCompany,
+        refetchOnWindowFocus: false
     });
 
     // =========================================================================
@@ -159,6 +160,7 @@ export default function AnnualLeaveManagement() {
         queryKey: ['allProjectsForLeave'],
         queryFn: () => base44.entities.Project.list('-created_date', 500),
         staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const projects = useMemo(() => {
@@ -521,7 +523,7 @@ export default function AnnualLeaveManagement() {
                 }
             }
             
-            queryClient.invalidateQueries(['annualLeaves']);
+            queryClient.invalidateQueries({ queryKey: ['annualLeaves'] });
             toast.success(`Import complete! ${successCount} records created.`);
             setIsImporting(false);
             setShowImportDialog(false);
@@ -544,7 +546,7 @@ export default function AnnualLeaveManagement() {
                 }
             }
 
-            queryClient.invalidateQueries(['annualLeaves']);
+            queryClient.invalidateQueries({ queryKey: ['annualLeaves'] });
             const isRateLimit = error?.status === 429 || /rate.?limit|too many/i.test(error?.message || '');
             const msg = isRateLimit 
                 ? 'Rate limit exceeded after retries. All uploaded records have been rolled back. Please wait a minute and try again.'
@@ -593,7 +595,7 @@ export default function AnnualLeaveManagement() {
             if (editingLeave && editingLeave.applied_to_projects) {
                 triggerChecklistSync(editingLeave.id, editingLeave.applied_to_projects, 'update');
             }
-            queryClient.invalidateQueries(['annualLeaves']);
+            queryClient.invalidateQueries({ queryKey: ['annualLeaves'] });
             setShowDialog(false);
             setEditingLeave(null);
             resetForm();
@@ -613,7 +615,7 @@ export default function AnnualLeaveManagement() {
             });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries(['annualLeaves']);
+            queryClient.invalidateQueries({ queryKey: ['annualLeaves'] });
             toast.success('Status updated');
         }
     });
@@ -638,7 +640,7 @@ export default function AnnualLeaveManagement() {
                 triggerChecklistSync(deletedLeave.id, deletedLeave.applied_to_projects, 'delete');
             }
             pendingDeleteLeaveRef.current = null;
-            queryClient.invalidateQueries(['annualLeaves']);
+            queryClient.invalidateQueries({ queryKey: ['annualLeaves'] });
             toast.success('Leave deleted');
         }
     });

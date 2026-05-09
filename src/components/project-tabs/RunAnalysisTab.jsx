@@ -173,16 +173,16 @@ export default function RunAnalysisTab({ project }) {
         try {
             const parsed = JSON.parse(value);
             if (Array.isArray(parsed)) return parsed;
-        } catch {}
+        } catch { }
         // Handle comma-separated
         if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
         // Handle known phrases
         const str = value.trim().toLowerCase();
         if (str === 'friday') return ['Friday'];
-        if (str === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
-        if (str === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-        if (str === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-        if (str === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+        if (str === 'monday to thursday and saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+        if (str === 'monday to saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        if (str === 'monday to friday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        if (str === 'sunday to thursday') return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
         // Single day name fallback
         return [value.trim()];
     };
@@ -479,7 +479,7 @@ export default function RunAnalysisTab({ project }) {
                     // Check if shift has applicable_days specified
                     if (s.applicable_days) {
                         const appDaysArray = normalizeApplicableDaysToArray(s.applicable_days);
-                        if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
+                        if (Array.isArray(appDaysArray) && appDaysArray.some(day =>
                             day.toLowerCase().trim() === currentDayName.toLowerCase()
                         )) {
                             shift = s;
@@ -719,7 +719,7 @@ export default function RunAnalysisTab({ project }) {
                 late_minutes += dayLateMinutes;
                 early_checkout_minutes += dayEarlyMinutes;
             }
-            
+
             // Step 4: Handle MANUAL_OTHER_MINUTES (The Highlander Fix)
             // Sum other_minutes from ALL exceptions of type MANUAL_OTHER_MINUTES for this day.
             // This ensures split exceptions (Status + Minutes) are both captured correctly.
@@ -968,7 +968,7 @@ export default function RunAnalysisTab({ project }) {
 
         const startDate = new Date(dateFrom);
         const endDate = new Date(dateTo);
-        
+
         // Group punches by employee and date
         const punchesMap = {};
         punches.forEach(p => {
@@ -982,7 +982,7 @@ export default function RunAnalysisTab({ project }) {
             const attIdStr = String(attId);
             const employee = employees.find(e => String(e.attendance_id) === attIdStr);
             const employeeShifts = shifts.filter(s => String(s.attendance_id) === attIdStr);
-            
+
             let weeklyOffDay = null;
             if (project.weekly_off_override && project.weekly_off_override !== 'None') {
                 weeklyOffDay = dayNameToNumber[project.weekly_off_override];
@@ -994,23 +994,23 @@ export default function RunAnalysisTab({ project }) {
                 const currentDate = new Date(d);
                 const dateStr = currentDate.toISOString().split('T')[0];
                 const dayOfWeek = currentDate.getDay();
-                
+
                 const punchCount = punchesMap[`${attIdStr}_${dateStr}`] || 0;
-                
+
                 if (punchCount > 0) {
                     const isWeeklyHoliday = (weeklyOffDay !== null && dayOfWeek === weeklyOffDay);
-                    
+
                     if (!isWeeklyHoliday) {
                         const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                         const currentDayName = dayNames[dayOfWeek];
-                        
+
                         const hasShift = employeeShifts.some(s => {
                             if (s.date === dateStr) return true;
                             if (!s.date && s.applicable_days) {
                                 try {
                                     const days = JSON.parse(s.applicable_days);
                                     if (Array.isArray(days) && days.some(day => day.toLowerCase() === currentDayName.toLowerCase())) return true;
-                                } catch(e) {}
+                                } catch (e) { }
                             }
                             if (!s.date && !s.applicable_days) {
                                 if (dayOfWeek === 5 && s.is_friday_shift) return true;
@@ -1019,7 +1019,7 @@ export default function RunAnalysisTab({ project }) {
                             }
                             return false;
                         });
-                        
+
                         if (!hasShift) {
                             missingShifts.push({
                                 name: employee?.name || `ID: ${attIdStr}`,
@@ -1089,7 +1089,7 @@ export default function RunAnalysisTab({ project }) {
         let grandTotal = 0;
         let totalProcessed = 0;
         let isError = false;
-        
+
         setProgress({ current: 0, total: uniqueEmployeeIds.length, status: 'Starting analysis on server...' });
 
         try {
@@ -1126,7 +1126,7 @@ export default function RunAnalysisTab({ project }) {
                     isComplete = response.data.is_complete;
                     offset += batchSize;
                     totalProcessed += response.data.processed_count;
-                    
+
                     const currentTotal = grandTotal || uniqueEmployeeIds.length;
 
                     setProgress({
@@ -1148,7 +1148,7 @@ export default function RunAnalysisTab({ project }) {
             queryClient.invalidateQueries(['reportRuns', project.id]);
             queryClient.invalidateQueries(['project', project.id]);
             queryClient.invalidateQueries(['projects']);
-            
+
             const finalTotal = grandTotal || uniqueEmployeeIds.length;
             if (totalProcessed < finalTotal) {
                 if (toast.warning) {
@@ -1156,7 +1156,7 @@ export default function RunAnalysisTab({ project }) {
                 } else {
                     toast('Analysis complete with warnings', { description: `${finalTotal - totalProcessed} employee(s) may have been skipped. Please review attendance records for missing data.`, icon: '⚠️', duration: 8000 });
                 }
-                
+
                 setProgress({
                     current: totalProcessed,
                     total: finalTotal,
@@ -1358,8 +1358,8 @@ export default function RunAnalysisTab({ project }) {
                                     <div
                                         key={idx}
                                         className={`flex items-start gap-3 p-4 rounded-lg border ${issue.type === 'error' ? 'bg-red-50 border-red-200' :
-                                                issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
-                                                    'bg-blue-50 border-blue-200'
+                                            issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                                                'bg-blue-50 border-blue-200'
                                             }`}
                                     >
                                         {issue.type === 'error' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
@@ -1367,18 +1367,18 @@ export default function RunAnalysisTab({ project }) {
                                         {issue.type === 'info' && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
                                         <div className="flex-1">
                                             <p className={`font-medium ${issue.type === 'error' ? 'text-red-900' :
-                                                    issue.type === 'warning' ? 'text-amber-900' :
-                                                        'text-blue-900'
+                                                issue.type === 'warning' ? 'text-amber-900' :
+                                                    'text-blue-900'
                                                 }`}>
                                                 {issue.title}
                                             </p>
                                             <p className={`text-sm mt-1 ${issue.type === 'error' ? 'text-red-700' :
-                                                    issue.type === 'warning' ? 'text-amber-700' :
-                                                        'text-blue-700'
+                                                issue.type === 'warning' ? 'text-amber-700' :
+                                                    'text-blue-700'
                                                 }`}>
                                                 {issue.details}
                                             </p>
-                                            
+
                                             {issue.affectedList && (
                                                 <div className="mt-3 bg-white/50 rounded-md p-2 border border-amber-200/50 max-h-40 overflow-y-auto">
                                                     <p className="text-xs font-semibold text-amber-800 mb-1">Affected Employees & Dates:</p>

@@ -128,7 +128,8 @@ export default function ReportDetailView({ reportRun, project, isDepartmentHead 
         queryKey: ['currentUser'],
         queryFn: () => base44.auth.me(),
         staleTime: 30 * 60 * 1000,
-        gcTime: 60 * 60 * 1000
+        gcTime: 60 * 60 * 1000,
+        refetchOnWindowFocus: false
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';

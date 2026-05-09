@@ -21,14 +21,14 @@ const normalizeApplicableDaysToArray = (value) => {
     try {
         const parsed = JSON.parse(value);
         if (Array.isArray(parsed)) return parsed;
-    } catch {}
+    } catch { }
     if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
     const str = value.trim().toLowerCase();
     if (str === 'friday') return ['Friday'];
-    if (str === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
-    if (str === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    if (str === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-    if (str === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
+    if (str === 'monday to thursday and saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
+    if (str === 'monday to saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    if (str === 'monday to friday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    if (str === 'sunday to thursday') return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
     return [value.trim()];
 };
 
@@ -44,7 +44,7 @@ const resolveShift = (dateStr, currentDay, employeeShifts, employeeExceptions) =
     for (const s of applicableShifts) {
         if (s.applicable_days) {
             const appDaysArray = normalizeApplicableDaysToArray(s.applicable_days);
-            if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
+            if (Array.isArray(appDaysArray) && appDaysArray.some(day =>
                 day.toLowerCase().trim() === currentDayName.toLowerCase()
             )) {
                 return s;
