@@ -12,6 +12,7 @@ import { Search, Plus, Edit, Trash2, Upload, Download, AlertTriangle, RefreshCw 
 import AEDIcon from '../components/ui/AEDIcon';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import Breadcrumb from '../components/ui/Breadcrumb';
 import SortableTableHead from '../components/ui/SortableTableHead';
 import PINLock from '../components/ui/PINLock';
@@ -309,25 +310,26 @@ export default function Salaries() {
         return !hasExistingSalary;
     });
 
+    const normalizeName = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+    const parseNumber = (value, fallback = 0) => {
+        if (value === undefined || value === null || value === '') return fallback;
+        const cleaned = String(value).replace(/,/g, '').trim();
+        const parsed = parseFloat(cleaned);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
     const handleFileUpload = async (event) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         try {
-            toast.error('Excel upload feature requires xlsx package. Please contact administrator.');
-            setUploadProgress(null);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-            return;
-
-            /* DISABLED - xlsx package not available
             setUploadProgress({ status: 'Reading file...', current: 0, total: 100 });
 
             const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data);
+            const workbook = XLSX.read(data, { type: 'array' });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
             if (jsonData.length === 0) {
                 toast.error('No data found in file');
@@ -339,45 +341,49 @@ export default function Salaries() {
 
             const validRecords = [];
             const errorRecords = [];
+            const employeesByName = employees.reduce((map, employee) => {
+                const key = normalizeName(employee.name);
+                if (!key) return map;
+                if (!map[key]) map[key] = [];
+                map[key].push(employee);
+                return map;
+            }, {});
 
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
-                
-                const hrmsId = String(row['EMPLOYEE ID'] || row['employee_id'] || '').trim();
-                const name = String(row['EMPLOYEE NAME'] || row['name'] || '').trim();
-                const workingHoursRaw = row['ACTUAL WORKING HOURS'] || row['working_hours'];
-                const workingHours = workingHoursRaw !== undefined && workingHoursRaw !== null && workingHoursRaw !== '' 
-                    ? parseFloat(workingHoursRaw) 
-                    : 9;
-                const basicSalary = parseFloat(row['BASIC'] || row['basic_salary']) || 0;
-                const allowances = parseFloat(row['ALLOWANCES'] || row['allowance']) || 0;
-                const bonus = parseFloat(row['BONUS'] || row['bonus']) || 0;
-                const total = parseFloat(row['TOTAL'] || row['total']) || (basicSalary + allowances + bonus);
+                const name = String(row['EMPLOYEE NAME'] || row['Employee Name'] || row['name'] || '').trim();
+                const workingHours = parseNumber(row['ACTUAL WORKING HOURS'] || row['Working Hours'] || row['working_hours'], 9);
+                const basicSalary = parseNumber(row['BASIC'] || row['Basic Salary'] || row['basic_salary']);
+                const allowances = parseNumber(row['ALLOWANCES'] || row['Allowances'] || row['allowances']);
+                const bonus = parseNumber(row['ALLOWANCES WITH BONUS'] || row['BONUS'] || row['Allowances With Bonus'] || row['allowances_with_bonus']);
+                const total = parseNumber(row['TOTAL'] || row['Total'] || row['total'], basicSalary + allowances + bonus);
 
                 let error = null;
                 let employee = null;
                 let existingSalary = null;
+                const nameMatches = employeesByName[normalizeName(name)] || [];
 
-                if (!hrmsId || !name) {
-                    error = 'Missing EMPLOYEE ID or EMPLOYEE NAME';
+                if (!name) {
+                    error = 'Missing EMPLOYEE NAME';
+                } else if (nameMatches.length === 0) {
+                    error = 'Employee name not found in master data for the selected company';
+                } else if (nameMatches.length > 1) {
+                    error = 'Duplicate employee name found in master data; please make the employee name unique before importing';
+                } else if (workingHours <= 0) {
+                    error = 'Working hours must be greater than 0';
+                } else if (basicSalary < 0 || allowances < 0 || bonus < 0 || total < 0) {
+                    error = 'Salary values cannot be negative';
                 } else {
-                    employee = employees.find(e => String(e.hrms_id) === hrmsId);
-
-                    if (!employee) {
-                        error = 'Employee not found in master data (check HRMS ID)';
-                    } else {
-                        existingSalary = salaries.find(s => 
-                            s.employee_id === employee.hrms_id && s.active
-                        );
-                    }
+                    employee = nameMatches[0];
+                    existingSalary = salaries.find(s => String(s.employee_id) === String(employee.hrms_id) && s.active);
                 }
 
                 const record = {
                     rowNumber: i + 2,
-                    hrmsId,
+                    hrmsId: employee?.hrms_id || '',
                     attendanceId: employee?.attendance_id || '',
                     name,
-                    company: employee?.company || '',
+                    company: employee?.company || companyFilter || '',
                     workingHours,
                     basicSalary,
                     allowances,
@@ -403,24 +409,12 @@ export default function Salaries() {
             }
 
             setUploadProgress(null);
-            
-            const unmatchedHrmsRecords = errorRecords.filter(r => r.error === 'Employee not found in master data (check HRMS ID)');
-            const otherErrors = errorRecords.filter(r => r.error !== 'Employee not found in master data (check HRMS ID)');
-            
-            if (unmatchedHrmsRecords.length > 0) {
-                setUnmatchedRecords(unmatchedHrmsRecords.map(r => ({ ...r, correctedHrmsId: r.hrmsId })));
-                setPendingValidRecords(validRecords);
-                setPreviewData({ valid: validRecords, errors: otherErrors });
-                setShowUnmatchedDialog(true);
-            } else {
-                setPreviewData({ valid: validRecords, errors: otherErrors });
-                setShowPreview(true);
-            }
+            setPreviewData({ valid: validRecords, errors: errorRecords });
+            setShowPreview(true);
 
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
-            */
         } catch (error) {
             toast.error('Failed to process file: ' + error.message);
             setUploadProgress(null);
@@ -551,27 +545,30 @@ export default function Salaries() {
     };
 
     const downloadTemplate = () => {
-        toast.error('Template download requires xlsx package. Please contact administrator.');
-        
-        /* DISABLED - xlsx package not available
         const template = [
             {
-                'EMPLOYEE ID': '10001',
                 'EMPLOYEE NAME': 'John Doe',
                 'ACTUAL WORKING HOURS': 9,
                 'BASIC': 5000,
                 'ALLOWANCES': 2000,
-                'BONUS': 500,
+                'ALLOWANCES WITH BONUS': 500,
                 'TOTAL': 7500
             }
         ];
 
         const ws = XLSX.utils.json_to_sheet(template);
+        ws['!cols'] = [
+            { wch: 28 },
+            { wch: 22 },
+            { wch: 14 },
+            { wch: 14 },
+            { wch: 24 },
+            { wch: 14 }
+        ];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Salary Template');
         XLSX.writeFile(wb, 'salary_upload_template.xlsx');
         toast.success('Template downloaded');
-        */
     };
 
     return (
