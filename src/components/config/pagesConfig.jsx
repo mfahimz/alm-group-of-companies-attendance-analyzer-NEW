@@ -13,7 +13,8 @@ import {
     BarChart3,
     Palette,
     Code,
-    ScanLine
+    ScanLine,
+    Calculator
 } from 'lucide-react';
 
 /**
@@ -315,8 +316,16 @@ export const PAGES_CONFIG = {
         availableToAll: false,
         defaultRoles: ['admin', 'supervisor']
     },
-
-
+    CompensationPlanning: {
+        name: 'CompensationPlanning',
+        title: 'Compensation Planning',
+        icon: Calculator,
+        category: 'HRManagement',
+        showInNav: true,
+        requiresAuth: true,
+        availableToAll: false,
+        defaultRoles: ['admin', 'ceo', 'supervisor', 'hr_manager', 'senior_accountant']
+    },
 };
 
 /**

@@ -38,6 +38,7 @@ import DepartmentHeadDashboard from './pages/DepartmentHeadDashboard';
 import DepartmentHeadSettings from './pages/DepartmentHeadSettings';
 import MaintenanceSettings from './pages/MaintenanceSettings';
 import Maintenance from './pages/Maintenance';
+import CompensationPlanning from './pages/CompensationPlanning';
 
 import ResumeScanner from './pages/ResumeScanner';
 import AttendanceAnalytics from './pages/AttendanceAnalytics';
@@ -88,6 +89,7 @@ function App() {
 
             <Route path="/workingdayscalendar" element={<W name="WorkingDaysCalendar"><WorkingDaysCalendar /></W>} />
             <Route path="/projectschedules" element={<W name="ProjectSchedules"><ProjectSchedules /></W>} />
+            <Route path="/compensationplanning" element={<W name="CompensationPlanning"><CompensationPlanning /></W>} />
             <Route path="*" element={<PageNotFound />} />
           </Routes>
           <Toaster />
