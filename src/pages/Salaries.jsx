@@ -351,6 +351,7 @@ export default function Salaries() {
 
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
+                const hrmsId = String(row['EMPLOYEE ID'] || row['HRMS ID'] || row['Employee ID'] || row['employee_id'] || '').trim();
                 const name = String(row['EMPLOYEE NAME'] || row['Employee Name'] || row['name'] || '').trim();
                 const workingHours = parseNumber(row['ACTUAL WORKING HOURS'] || row['Working Hours'] || row['working_hours'], 9);
                 const basicSalary = parseNumber(row['BASIC'] || row['Basic Salary'] || row['basic_salary']);
@@ -362,25 +363,37 @@ export default function Salaries() {
                 let employee = null;
                 let existingSalary = null;
                 const nameMatches = employeesByName[normalizeName(name)] || [];
+                const hrmsMatch = hrmsId ? employees.find(e => String(e.hrms_id).trim() === hrmsId) : null;
 
-                if (!name) {
-                    error = 'Missing EMPLOYEE NAME';
+                if (!hrmsId && !name) {
+                    error = 'Missing EMPLOYEE ID or EMPLOYEE NAME';
+                } else if (hrmsMatch && nameMatches.length === 1 && String(hrmsMatch.hrms_id) !== String(nameMatches[0].hrms_id)) {
+                    error = 'EMPLOYEE ID and EMPLOYEE NAME point to different employees';
+                } else if (hrmsMatch) {
+                    employee = hrmsMatch;
+                } else if (nameMatches.length === 1) {
+                    employee = nameMatches[0];
+                } else if (hrmsId) {
+                    error = 'Employee ID not found in master data for the selected company';
                 } else if (nameMatches.length === 0) {
                     error = 'Employee name not found in master data for the selected company';
                 } else if (nameMatches.length > 1) {
-                    error = 'Duplicate employee name found in master data; please make the employee name unique before importing';
-                } else if (workingHours <= 0) {
+                    error = 'Duplicate employee name found in master data; use EMPLOYEE ID to import this row';
+                }
+
+                if (!error && workingHours <= 0) {
                     error = 'Working hours must be greater than 0';
-                } else if (basicSalary < 0 || allowances < 0 || bonus < 0 || total < 0) {
+                } else if (!error && (basicSalary < 0 || allowances < 0 || bonus < 0 || total < 0)) {
                     error = 'Salary values cannot be negative';
-                } else {
-                    employee = nameMatches[0];
+                }
+
+                if (!error && employee) {
                     existingSalary = salaries.find(s => String(s.employee_id) === String(employee.hrms_id) && s.active);
                 }
 
                 const record = {
                     rowNumber: i + 2,
-                    hrmsId: employee?.hrms_id || '',
+                    hrmsId: employee?.hrms_id || hrmsId,
                     attendanceId: employee?.attendance_id || '',
                     name,
                     company: employee?.company || companyFilter || '',
@@ -547,6 +560,7 @@ export default function Salaries() {
     const downloadTemplate = () => {
         const template = [
             {
+                'EMPLOYEE ID': '10001',
                 'EMPLOYEE NAME': 'John Doe',
                 'ACTUAL WORKING HOURS': 9,
                 'BASIC': 5000,
@@ -558,6 +572,7 @@ export default function Salaries() {
 
         const ws = XLSX.utils.json_to_sheet(template);
         ws['!cols'] = [
+            { wch: 14 },
             { wch: 28 },
             { wch: 22 },
             { wch: 14 },
