@@ -33,11 +33,9 @@ export default function GraceMinutesManagement() {
     const { data: employees = [], isLoading: employeesLoading } = useQuery({
         queryKey: ['employees', companyFilter],
         queryFn: async () => {
-            if (companyFilter) {
-                return base44.entities.Employee.filter({ active: true, company: companyFilter }, null, 5000);
-            }
-            return base44.entities.Employee.filter({ active: true }, null, 5000);
-        }
+            return base44.entities.Employee.filter({ active: true, company: companyFilter }, null, 5000);
+        },
+        enabled: !!companyFilter
     });
 
     const updateGraceMutation = useMutation({

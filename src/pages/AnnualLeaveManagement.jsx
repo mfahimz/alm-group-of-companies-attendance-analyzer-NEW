@@ -118,21 +118,17 @@ export default function AnnualLeaveManagement() {
     const { data: leaves = [] } = useQuery({
         queryKey: ['annualLeaves', filterCompany],
         queryFn: async () => {
-            if (filterCompany) {
-                return base44.entities.AnnualLeave.filter({ company: filterCompany }, '-created_date');
-            }
-            return base44.entities.AnnualLeave.list('-created_date');
-        }
+            return base44.entities.AnnualLeave.filter({ company: filterCompany }, '-created_date');
+        },
+        enabled: !!filterCompany
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', filterCompany],
         queryFn: async () => {
-            if (filterCompany) {
-                return base44.entities.Employee.filter({ active: true, company: filterCompany });
-            }
-            return base44.entities.Employee.filter({ active: true });
-        }
+            return base44.entities.Employee.filter({ active: true, company: filterCompany });
+        },
+        enabled: !!filterCompany
     });
 
     const { data: companies = [] } = useQuery({

@@ -36,21 +36,17 @@ export default function HalfYearlyMinutesManagement() {
     const { data: employees = [], isLoading: employeesLoading } = useQuery({
         queryKey: ['employees', companyFilter],
         queryFn: async () => {
-            if (companyFilter) {
-                return base44.entities.Employee.filter({ company: companyFilter });
-            }
-            return base44.entities.Employee.list();
-        }
+            return base44.entities.Employee.filter({ company: companyFilter });
+        },
+        enabled: !!companyFilter
     });
 
     const { data: quarterlyMinutes = [], isLoading: minutesLoading } = useQuery({
         queryKey: ['quarterlyMinutes', companyFilter],
         queryFn: async () => {
-            if (companyFilter) {
-                return base44.entities.EmployeeQuarterlyMinutes.filter({ company: companyFilter });
-            }
-            return base44.entities.EmployeeQuarterlyMinutes.list();
-        }
+            return base44.entities.EmployeeQuarterlyMinutes.filter({ company: companyFilter });
+        },
+        enabled: !!companyFilter
     });
 
     const { data: projects = [] } = useQuery({

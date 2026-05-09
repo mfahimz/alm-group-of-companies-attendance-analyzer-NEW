@@ -102,10 +102,7 @@ export default function Employees() {
 
             // Admin, Supervisor, CEO, HR Manager can see all employees OR filtered by selected company
             if (isAdmin || isSupervisor || isCEO || isHRManager) {
-                if (selectedCompany) {
-                    return await base44.entities.Employee.filter({ company: selectedCompany }, 'name', 1000);
-                }
-                return await base44.entities.Employee.list('name', 1000);
+                return await base44.entities.Employee.filter({ company: selectedCompany }, 'name', 1000);
             }
             
             // Department heads see only their department
@@ -122,7 +119,7 @@ export default function Employees() {
                 company: currentUser.company
             });
         },
-        enabled: !!currentUser,
+        enabled: !!currentUser && !!selectedCompany,
         staleTime: 2 * 60 * 1000
     });
 

@@ -65,21 +65,17 @@ export default function Salaries() {
     const { data: salaries = [] } = useQuery({
         queryKey: ['salaries', companyFilter],
         queryFn: async () => {
-            if (companyFilter) {
-                return base44.entities.EmployeeSalary.filter({ company: companyFilter }, '-created_date');
-            }
-            return base44.entities.EmployeeSalary.list('-created_date');
-        }
+            return base44.entities.EmployeeSalary.filter({ company: companyFilter }, '-created_date');
+        },
+        enabled: !!companyFilter
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', companyFilter],
         queryFn: async () => {
-            if (companyFilter) {
-                return base44.entities.Employee.filter({ company: companyFilter });
-            }
-            return base44.entities.Employee.list();
-        }
+            return base44.entities.Employee.filter({ company: companyFilter });
+        },
+        enabled: !!companyFilter
     });
 
     const { data: companies = [] } = useQuery({

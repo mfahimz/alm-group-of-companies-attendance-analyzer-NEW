@@ -26,18 +26,32 @@ export const CompanyFilterProvider = ({ children }) => {
         queryFn: () => base44.auth.me()
     });
 
-    // Get selected company from localStorage or user's company
+    // Get selected company from localStorage only
     const [selectedCompany, setSelectedCompanyState] = useState(() => {
-        const stored = localStorage.getItem('selectedCompany');
-        return stored || currentUser?.company || null;
+        return localStorage.getItem('selectedCompany');
     });
 
-    // Update when user data loads
+    // Use extended_role for accurate role checks
+    const userRole = currentUser?.extended_role || currentUser?.role;
+
+    // HR Manager, admin, ceo, supervisor can access all companies (switch freely)
+    const canSwitchCompany = userRole === 'admin' || 
+                            userRole === 'ceo' || 
+                            userRole === 'supervisor' ||
+                            userRole === 'hr_manager';
+
+    // Update when user data loads or role changes
     useEffect(() => {
-        if (currentUser?.company && !selectedCompany) {
+        if (!currentUser) return;
+
+        if (!selectedCompany) {
             setSelectedCompanyState(currentUser.company);
         }
-    }, [currentUser?.company, selectedCompany]);
+
+        if (!canSwitchCompany && selectedCompany !== currentUser.company) {
+            setSelectedCompanyState(currentUser.company);
+        }
+    }, [currentUser, selectedCompany, userRole]);
 
     const setSelectedCompany = (company) => {
         setSelectedCompanyState(company);
@@ -53,17 +67,8 @@ export const CompanyFilterProvider = ({ children }) => {
         localStorage.removeItem('selectedCompany');
     };
 
-    // Use extended_role for accurate role checks
-    const userRole = currentUser?.extended_role || currentUser?.role;
-
-    // HR Manager, admin, ceo, supervisor can access all companies (switch freely)
-    const canSwitchCompany = userRole === 'admin' || 
-                            userRole === 'ceo' || 
-                            userRole === 'supervisor' ||
-                            userRole === 'hr_manager';
-
     // Effective company for filtering (for non-privileged users, always use their assigned company)
-    const effectiveCompany = canSwitchCompany ? selectedCompany : currentUser?.company;
+    const effectiveCompany = canSwitchCompany ? (selectedCompany || currentUser?.company || null) : currentUser?.company;
 
     const value = {
         selectedCompany: effectiveCompany,
