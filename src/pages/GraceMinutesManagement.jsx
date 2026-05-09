@@ -23,8 +23,7 @@ export default function GraceMinutesManagement() {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me(),
-        refetchOnWindowFocus: false
+        queryFn: () => base44.auth.me()
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
@@ -36,8 +35,7 @@ export default function GraceMinutesManagement() {
         queryFn: async () => {
             return base44.entities.Employee.filter({ active: true, company: companyFilter }, null, 5000);
         },
-        enabled: !!companyFilter,
-        refetchOnWindowFocus: false
+        enabled: !!companyFilter
     });
 
     const updateGraceMutation = useMutation({

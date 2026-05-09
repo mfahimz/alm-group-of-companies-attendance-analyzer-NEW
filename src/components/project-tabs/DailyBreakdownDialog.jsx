@@ -22,16 +22,16 @@ const normalizeApplicableDaysToArray = (value) => {
     try {
         const parsed = JSON.parse(value);
         if (Array.isArray(parsed)) return parsed;
-    } catch { }
+    } catch {}
     // Handle comma-separated
     if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
     // Handle known phrases
     const str = value.trim().toLowerCase();
     if (str === 'friday') return ['Friday'];
-    if (str === 'monday to thursday and saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
-    if (str === 'monday to saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    if (str === 'monday to friday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    if (str === 'sunday to thursday') return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+    if (str === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
+    if (str === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    if (str === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    if (str === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
     // Single day name fallback
     return [value.trim()];
 };
@@ -195,7 +195,7 @@ export default function DailyBreakdownDialog({
             queryClient.invalidateQueries({ queryKey: ['results', reportRun.id, project.id], refetchType: 'active' });
             queryClient.invalidateQueries({ queryKey: ['reportRun', reportRun.id] });
             queryClient.invalidateQueries({ queryKey: ['employeeExceptions', project.id, attendanceIdStr] });
-
+            
             toast.success(`Successfully applied changes to ${selectedDays.size} days`);
             setSelectedDays(new Set());
             setShowBulkPanel(false);
@@ -389,7 +389,7 @@ export default function DailyBreakdownDialog({
                     for (const sh of applicableShifts) {
                         if (sh.applicable_days) {
                             const appDaysArray = normalizeApplicableDaysToArray(sh.applicable_days);
-                            if (Array.isArray(appDaysArray) && appDaysArray.some(day =>
+                            if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
                                 day.toLowerCase().trim() === dayName.toLowerCase()
                             )) {
                                 s = sh; break;
@@ -558,7 +558,7 @@ export default function DailyBreakdownDialog({
                 for (const s of applicableShifts) {
                     if (s.applicable_days) {
                         const appDaysArray = normalizeApplicableDaysToArray(s.applicable_days);
-                        if (Array.isArray(appDaysArray) && appDaysArray.some(day =>
+                        if (Array.isArray(appDaysArray) && appDaysArray.some(day => 
                             day.toLowerCase().trim() === currentDayName.toLowerCase()
                         )) {
                             shift = s; break;
@@ -762,7 +762,7 @@ export default function DailyBreakdownDialog({
                 'SICK_LEAVE', 'ANNUAL_LEAVE', 'PUBLIC_HOLIDAY', 'OFF', 'MANUAL_ABSENT'
             ].includes(dateException.type);
             const hasActiveSkipPunch = skipPunchEx && !isLeaveOrHoliday && skipPunchEx.punch_to_skip;
-
+            
             if (dateException) {
                 if (dateException.type === 'OFF') status = 'Off';
                 else if (dateException.type === 'PUBLIC_HOLIDAY') status = 'Public Holiday';
@@ -799,7 +799,7 @@ export default function DailyBreakdownDialog({
                     status = dayPunches.length >= 3 ? 'Present' : 'Half Day';
                 }
             }
-
+            
             // SKIP_PUNCH status override: if skip applied and would have been absent or half day due to missing forgiven punch
             if (hasActiveSkipPunch) {
                 if (dayPunches.length === 0) {
@@ -832,7 +832,7 @@ export default function DailyBreakdownDialog({
                         punchMatches = matchPunchesToShiftPoints(dayPunches, shift);
                         hasUnmatchedPunch = punchMatches.some(m => m.matchedTo === null);
                         lateInfo = ''; lateMinutesTotal = 0; earlyCheckoutInfo = '';
-
+                        
                         let overLate = 0;
                         let overEarly = 0;
 
@@ -963,9 +963,9 @@ export default function DailyBreakdownDialog({
 
         // Map punch_to_skip value to which shift point type to exclude
         const skipTypeMap = {
-            'AM_PUNCH_IN': 'AM_START',
+            'AM_PUNCH_IN':  'AM_START',
             'AM_PUNCH_OUT': 'AM_END',
-            'PM_PUNCH_IN': 'PM_START',
+            'PM_PUNCH_IN':  'PM_START',
             'PM_PUNCH_OUT': 'PM_END',
         };
         const skippedShiftPointType = skipPunchValue === 'FULL_SKIP' ? 'ALL' : (skipTypeMap[skipPunchValue] || null);
@@ -976,7 +976,7 @@ export default function DailyBreakdownDialog({
             { type: 'PM_START', time: parseTime(shift.pm_start), label: shift.pm_start },
             { type: 'PM_END', time: adjustedPmEnd, label: shift.pm_end }
         ].filter(sp => sp.time)
-            .filter(sp => skippedShiftPointType !== 'ALL' && sp.type !== skippedShiftPointType);
+         .filter(sp => skippedShiftPointType !== 'ALL' && sp.type !== skippedShiftPointType);
 
         const matches = [];
         const usedShiftPoints = new Set();
@@ -1044,7 +1044,7 @@ export default function DailyBreakdownDialog({
                         <DialogTitle>
                             Daily Breakdown: {selectedEmployee?.attendance_id} - {selectedEmployee?.name}
                         </DialogTitle>
-
+                        
                         {!isFinalized && selectedDays.size >= 2 && (
                             <div className="flex items-center gap-2 mt-2 px-1">
                                 <span className="text-xs text-slate-500">{selectedDays.size} days selected</span>
@@ -1064,7 +1064,7 @@ export default function DailyBreakdownDialog({
                         {showBulkPanel && !isFinalized && (
                             <div className="mt-3 p-3 border border-indigo-200 rounded-lg bg-indigo-50/50 space-y-3">
                                 <p className="text-xs font-semibold text-indigo-700">Bulk Edit — {selectedDays.size} days</p>
-
+                                
                                 <div className="flex flex-wrap gap-3 items-end">
                                     <div className="space-y-1">
                                         <label className="text-xs text-slate-600">Status Override</label>
@@ -1209,126 +1209,126 @@ export default function DailyBreakdownDialog({
                                 <span>Loading attendance data...</span>
                             </div>
                         ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-8 px-2">
-                                            {!isFinalized && (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-8 px-2">
+                                        {!isFinalized && (
+                                            <input type="checkbox"
+                                                className="rounded border-slate-300"
+                                                checked={selectedDays.size > 0 && selectedDays.size === getDailyBreakdown.filter(d => d.status !== 'Weekly Off' && d.status !== 'Weekly Off (LOP)').length}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedDays(new Set(getDailyBreakdown.filter(d => d.status !== 'Weekly Off' && d.status !== 'Weekly Off (LOP)').map(d => d.dateStr)));
+                                                    } else {
+                                                        setSelectedDays(new Set());
+                                                    }
+                                                }}
+                                            />
+                                        )}
+                                    </TableHead>
+                                    <TableHead>Date</TableHead>
+
+                                    <TableHead>Punches</TableHead>
+                                    <TableHead>Punch Times</TableHead>
+                                    <TableHead>Shift</TableHead>
+                                    <TableHead>Exception</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Late Min</TableHead>
+                                    <TableHead>Early Min</TableHead>
+                                    <TableHead>Other Min</TableHead>
+                                    {/* Allowed Minutes column — shown for Al Maraghi Motors projects only */}
+                                    {project?.company === 'Al Maraghi Motors' && (
+                                        <TableHead>Allowed Min</TableHead>
+                                    )}
+                                    <TableHead>Abnormal</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {getDailyBreakdown.map((day, idx) => (
+                                    <TableRow key={idx} className={`${(day.isLopAdjacent && project.company === 'Al Maraghi Motors') ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacent ? 'border-l-4 border-l-indigo-400' : ''}`}>
+                                        <TableCell className="w-8 px-2">
+                                            {!isFinalized && day.status !== 'Weekly Off' && day.status !== 'Weekly Off (LOP)' && (
                                                 <input type="checkbox"
                                                     className="rounded border-slate-300"
-                                                    checked={selectedDays.size > 0 && selectedDays.size === getDailyBreakdown.filter(d => d.status !== 'Weekly Off' && d.status !== 'Weekly Off (LOP)').length}
+                                                    checked={selectedDays.has(day.dateStr)}
                                                     onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedDays(new Set(getDailyBreakdown.filter(d => d.status !== 'Weekly Off' && d.status !== 'Weekly Off (LOP)').map(d => d.dateStr)));
-                                                        } else {
-                                                            setSelectedDays(new Set());
-                                                        }
+                                                        const next = new Set(selectedDays);
+                                                        if (e.target.checked) next.add(day.dateStr);
+                                                        else next.delete(day.dateStr);
+                                                        setSelectedDays(next);
                                                     }}
                                                 />
                                             )}
-                                        </TableHead>
-                                        <TableHead>Date</TableHead>
+                                        </TableCell>
+                                        <TableCell className="font-medium">
 
-                                        <TableHead>Punches</TableHead>
-                                        <TableHead>Punch Times</TableHead>
-                                        <TableHead>Shift</TableHead>
-                                        <TableHead>Exception</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Late Min</TableHead>
-                                        <TableHead>Early Min</TableHead>
-                                        <TableHead>Other Min</TableHead>
-                                        {/* Allowed Minutes column — shown for Al Maraghi Motors projects only */}
-                                        {project?.company === 'Al Maraghi Motors' && (
-                                            <TableHead>Allowed Min</TableHead>
-                                        )}
-                                        <TableHead>Abnormal</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {getDailyBreakdown.map((day, idx) => (
-                                        <TableRow key={idx} className={`${(day.isLopAdjacent && project.company === 'Al Maraghi Motors') ? 'bg-rose-100 border-l-4 border-l-rose-500' : day.isCriticalAbnormal ? 'bg-red-50' : day.abnormal ? 'bg-amber-50' : ''} ${day.hasOverride && !day.isLopAdjacent ? 'border-l-4 border-l-indigo-400' : ''}`}>
-                                            <TableCell className="w-8 px-2">
-                                                {!isFinalized && day.status !== 'Weekly Off' && day.status !== 'Weekly Off (LOP)' && (
-                                                    <input type="checkbox"
-                                                        className="rounded border-slate-300"
-                                                        checked={selectedDays.has(day.dateStr)}
-                                                        onChange={(e) => {
-                                                            const next = new Set(selectedDays);
-                                                            if (e.target.checked) next.add(day.dateStr);
-                                                            else next.delete(day.dateStr);
-                                                            setSelectedDays(next);
-                                                        }}
-                                                    />
+                                            <div className="flex items-center gap-1.5">
+                                                <span>{day.date}</span>
+                                                {day.isLopAdjacent && project.company === 'Al Maraghi Motors' && (
+                                                    <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[9px] font-bold rounded uppercase tracking-wide">
+                                                        Double Deduction
+                                                    </span>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-
-                                                <div className="flex items-center gap-1.5">
-                                                    <span>{day.date}</span>
-                                                    {day.isLopAdjacent && project.company === 'Al Maraghi Motors' && (
-                                                        <span className="px-1.5 py-0.5 bg-rose-600 text-white text-[9px] font-bold rounded uppercase tracking-wide">
-                                                            Double Deduction
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1">
-                                                    <span>{day.punches}</span>
-                                                    {day.crossoverPunches > 0 && (
-                                                        <span className="text-[9px] text-indigo-600 font-medium" title={`+${day.crossoverPunches} punch(es) from next day (midnight crossover)`}>
-                                                            +{day.crossoverPunches}🌙
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs max-w-xs">
-                                                <div title={day.allPunchTimes || day.punchTimes}>
-                                                    {day.punchMatches && day.punchMatches.length > 0 ? (
-                                                        <div className="space-y-0.5">
-                                                            {day.punchMatches.map((match, matchIdx) => {
-                                                                const isNextDayPunch = match.punch._isNextDayPunch;
-                                                                return (
-                                                                    <div key={matchIdx} className="flex items-center gap-1">
-                                                                        {isNextDayPunch && (
-                                                                            <span className="text-[8px] text-indigo-500 font-semibold" title="This punch is from the next calendar day (midnight crossover)">🌙</span>
-                                                                        )}
-                                                                        <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : isNextDayPunch ? 'text-indigo-600 font-medium' : '') : 'text-red-600 font-bold'}>
-                                                                            {extractTime(match.punch.timestamp_raw)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-1">
+                                                <span>{day.punches}</span>
+                                                {day.crossoverPunches > 0 && (
+                                                    <span className="text-[9px] text-indigo-600 font-medium" title={`+${day.crossoverPunches} punch(es) from next day (midnight crossover)`}>
+                                                        +{day.crossoverPunches}🌙
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs max-w-xs">
+                                            <div title={day.allPunchTimes || day.punchTimes}>
+                                                {day.punchMatches && day.punchMatches.length > 0 ? (
+                                                    <div className="space-y-0.5">
+                                                        {day.punchMatches.map((match, matchIdx) => {
+                                                            const isNextDayPunch = match.punch._isNextDayPunch;
+                                                            return (
+                                                                <div key={matchIdx} className="flex items-center gap-1">
+                                                                    {isNextDayPunch && (
+                                                                        <span className="text-[8px] text-indigo-500 font-semibold" title="This punch is from the next calendar day (midnight crossover)">🌙</span>
+                                                                    )}
+                                                                    <span className={match.matchedTo ? (match.isFarExtendedMatch ? 'text-red-600 font-bold' : match.isExtendedMatch ? 'text-amber-600 font-semibold' : isNextDayPunch ? 'text-indigo-600 font-medium' : '') : 'text-red-600 font-bold'}>
+                                                                        {extractTime(match.punch.timestamp_raw)}
+                                                                    </span>
+                                                                    {match.matchedTo && (
+                                                                        <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : isNextDayPunch ? 'text-indigo-500' : 'text-slate-500'}`}>
+                                                                            →{match.matchedTo.replace(/_/g, ' ')}
+                                                                            {isNextDayPunch && ''}
+                                                                            {match.isFarExtendedMatch && ' 🔴'}
+                                                                            {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
                                                                         </span>
-                                                                        {match.matchedTo && (
-                                                                            <span className={`text-[9px] ${match.isFarExtendedMatch ? 'text-red-600' : match.isExtendedMatch ? 'text-amber-600' : isNextDayPunch ? 'text-indigo-500' : 'text-slate-500'}`}>
-                                                                                →{match.matchedTo.replace(/_/g, ' ')}
-                                                                                {isNextDayPunch && ''}
-                                                                                {match.isFarExtendedMatch && ' 🔴'}
-                                                                                {match.isExtendedMatch && !match.isFarExtendedMatch && ' ⚠️'}
-                                                                            </span>
-                                                                        )}
-                                                                        {!match.matchedTo && (
-                                                                            <span className="text-[9px] text-red-600 font-bold">🔴 NO MATCH</span>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    ) : (
-                                                        <>{day.punchTimesShort || '-'}</>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs">
-                                                <div className="flex items-center gap-1">
-                                                    <span>{day.shift}</span>
-                                                    {day.shiftEndsNearMidnight && (
-                                                        <span className="text-[8px] text-indigo-500" title="Shift ends near midnight - punches after 12AM are pulled into this day">🌙</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs">{day.exception}</TableCell>
-                                            <TableCell>
-                                                <div>
-                                                    <span className={`px-2 py-1 rounded text-xs font-medium
+                                                                    )}
+                                                                    {!match.matchedTo && (
+                                                                        <span className="text-[9px] text-red-600 font-bold">🔴 NO MATCH</span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <>{day.punchTimesShort || '-'}</>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            <div className="flex items-center gap-1">
+                                                <span>{day.shift}</span>
+                                                {day.shiftEndsNearMidnight && (
+                                                    <span className="text-[8px] text-indigo-500" title="Shift ends near midnight - punches after 12AM are pulled into this day">🌙</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">{day.exception}</TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <span className={`px-2 py-1 rounded text-xs font-medium
                                                     ${day.isLopAdjacent ? 'bg-rose-600 text-white' : ''}
                                                     ${!day.isLopAdjacent && day.status.includes('Present') && !day.status.includes('Half') && !day.status.includes('Skip Punch') ? 'bg-green-100 text-green-700' : ''}
                                                     ${!day.isLopAdjacent && day.status.includes('Skip Punch') ? 'bg-cyan-100 text-cyan-700' : ''}
@@ -1336,88 +1336,88 @@ export default function DailyBreakdownDialog({
                                                     ${!day.isLopAdjacent && day.status.includes('Half') ? 'bg-amber-100 text-amber-700' : ''}
                                                     ${!day.isLopAdjacent && (day.status.includes('Off') || day.status.includes('Public Holiday')) && !day.status.includes('LOP') ? 'bg-slate-100 text-slate-700' : ''}
                                                 `}>
-                                                        {day.status}
-                                                    </span>
-                                                    {day.partialDayReason && (
-                                                        <span className="text-amber-600 block text-[10px] mt-1">{day.partialDayReason}</span>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs">
-                                                {day.lateMinutesTotal > 0 ? (
-                                                    <span className="text-orange-600 font-medium">{Math.max(0, day.lateMinutesTotal)} min</span>
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
+                                                    {day.status}
+                                                </span>
+                                                {day.partialDayReason && (
+                                                    <span className="text-amber-600 block text-[10px] mt-1">{day.partialDayReason}</span>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="text-xs">
-                                                {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
-                                                    <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-xs">
-                                                {day.otherMinutes > 0 ? (
-                                                    <span className="text-purple-600 font-medium">{Math.max(0, day.otherMinutes)} min</span>
-                                                ) : (
-                                                    <span className="text-slate-400">-</span>
-                                                )}
-                                            </TableCell>
-                                            {/* Allowed Minutes cell — shown for Al Maraghi Motors projects only, only renders value when greater than zero */}
-                                            {project?.company === 'Al Maraghi Motors' && (
-                                                <TableCell className="text-xs">
-                                                    {day.allowedMinutes > 0 ? (
-                                                        <span className="text-teal-600 font-medium">{day.allowedMinutes} min ✓</span>
-                                                    ) : (
-                                                        <span className="text-slate-400">-</span>
-                                                    )}
-                                                </TableCell>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.lateMinutesTotal > 0 ? (
+                                                <span className="text-orange-600 font-medium">{Math.max(0, day.lateMinutesTotal)} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
                                             )}
-                                            <TableCell className="text-xs">
-                                                {day.abnormal && <span className="text-amber-600 font-medium">Yes</span>}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                {!isFinalized && (
-                                                    <Button size="sm" variant="ghost" onClick={() => setEditingDay(day)} disabled={isEditLocked}>
-                                                        <Edit className="w-4 h-4 text-indigo-600" />
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                <TableFooter className="bg-slate-50/80 sticky bottom-0 z-10 border-t-2 invisible">
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-right font-bold text-slate-700">Authoritative Summary (from Report):</TableCell>
-                                        <TableCell className="font-bold text-orange-700">
-                                            {selectedEmployee?.late_minutes || 0} min
                                         </TableCell>
-                                        <TableCell className="font-bold text-blue-700">
-                                            {selectedEmployee?.early_checkout_minutes || 0} min
+                                        <TableCell className="text-xs">
+                                            {day.earlyCheckoutInfo && day.earlyCheckoutInfo !== '-' ? (
+                                                <span className="text-blue-600 font-medium">{day.earlyCheckoutInfo}</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
                                         </TableCell>
-                                        <TableCell className="font-bold text-purple-700">
-                                            {selectedEmployee?.other_minutes || 0} min
+                                        <TableCell className="text-xs">
+                                            {day.otherMinutes > 0 ? (
+                                                <span className="text-purple-600 font-medium">{Math.max(0, day.otherMinutes)} min</span>
+                                            ) : (
+                                                <span className="text-slate-400">-</span>
+                                            )}
                                         </TableCell>
+                                        {/* Allowed Minutes cell — shown for Al Maraghi Motors projects only, only renders value when greater than zero */}
                                         {project?.company === 'Al Maraghi Motors' && (
-                                            <TableCell className="font-bold text-teal-600 invisible">
-                                                {selectedEmployee?.approved_minutes || 0} min
+                                            <TableCell className="text-xs">
+                                                {day.allowedMinutes > 0 ? (
+                                                    <span className="text-teal-600 font-medium">{day.allowedMinutes} min ✓</span>
+                                                ) : (
+                                                    <span className="text-slate-400">-</span>
+                                                )}
                                             </TableCell>
                                         )}
-                                        <TableCell colSpan={2}></TableCell>
+                                        <TableCell className="text-xs">
+                                            {day.abnormal && <span className="text-amber-600 font-medium">Yes</span>}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {!isFinalized && (
+                                                <Button size="sm" variant="ghost" onClick={() => setEditingDay(day)} disabled={isEditLocked}>
+                                                    <Edit className="w-4 h-4 text-indigo-600" />
+                                                </Button>
+                                            )}
+                                        </TableCell>
+
                                     </TableRow>
-                                </TableFooter>
-                            </Table>
+                                ))}
+                            </TableBody>
+                            <TableFooter className="bg-slate-50/80 sticky bottom-0 z-10 border-t-2 invisible">
+                                <TableRow>
+                                    <TableCell colSpan={7} className="text-right font-bold text-slate-700">Authoritative Summary (from Report):</TableCell>
+                                    <TableCell className="font-bold text-orange-700">
+                                        {selectedEmployee?.late_minutes || 0} min
+                                    </TableCell>
+                                    <TableCell className="font-bold text-blue-700">
+                                        {selectedEmployee?.early_checkout_minutes || 0} min
+                                    </TableCell>
+                                    <TableCell className="font-bold text-purple-700">
+                                        {selectedEmployee?.other_minutes || 0} min
+                                    </TableCell>
+                                    {project?.company === 'Al Maraghi Motors' && (
+                                    <TableCell className="font-bold text-teal-600 invisible">
+                                        {selectedEmployee?.approved_minutes || 0} min
+                                    </TableCell>
+                                    )}
+                                    <TableCell colSpan={2}></TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
                         )}
-                    </div>
+                        </div>
 
 
 
-                </DialogContent>
-                <DialogFooter className="bg-slate-50/50 p-4 border-t">
-                    <Button variant="outline" onClick={() => safeOnOpenChange(false)} disabled={isBulkSaving}>Close Breakdown</Button>
-                </DialogFooter>
+                        </DialogContent>
+                        <DialogFooter className="bg-slate-50/50 p-4 border-t">
+                            <Button variant="outline" onClick={() => safeOnOpenChange(false)} disabled={isBulkSaving}>Close Breakdown</Button>
+                        </DialogFooter>
             </Dialog>
 
             <EditDayRecordDialog

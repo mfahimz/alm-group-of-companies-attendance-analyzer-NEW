@@ -51,8 +51,7 @@ export default function Salaries() {
 
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me(),
-        refetchOnWindowFocus: false
+        queryFn: () => base44.auth.me()
     });
 
     const userRole = currentUser?.extended_role || currentUser?.role || 'user';
@@ -66,19 +65,17 @@ export default function Salaries() {
     const { data: salaries = [] } = useQuery({
         queryKey: ['salaries', companyFilter],
         queryFn: async () => {
-            return base44.entities.EmployeeSalary.filter({ company: companyFilter }, '-created_date', 1000);
+            return base44.entities.EmployeeSalary.filter({ company: companyFilter }, '-created_date');
         },
-        enabled: !!companyFilter,
-        refetchOnWindowFocus: false
+        enabled: !!companyFilter
     });
 
     const { data: employees = [] } = useQuery({
         queryKey: ['employees', companyFilter],
         queryFn: async () => {
-            return base44.entities.Employee.filter({ company: companyFilter }, null, 1000);
+            return base44.entities.Employee.filter({ company: companyFilter });
         },
-        enabled: !!companyFilter,
-        refetchOnWindowFocus: false
+        enabled: !!companyFilter
     });
 
     const { data: companies = [] } = useQuery({
@@ -86,8 +83,7 @@ export default function Salaries() {
         queryFn: async () => {
             const settings = await base44.entities.CompanySettings.list();
             return settings.map(s => s.company);
-        },
-        refetchOnWindowFocus: false
+        }
     });
 
     const createSalaryMutation = useMutation({
@@ -121,7 +117,7 @@ export default function Salaries() {
             });
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['salaries'] });
+            queryClient.invalidateQueries(['salaries']);
             toast.success('Salary record created');
             setShowDialog(false);
             resetForm();
@@ -155,7 +151,7 @@ export default function Salaries() {
             return base44.entities.EmployeeSalary.update(id, updatePayload);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['salaries'] });
+            queryClient.invalidateQueries(['salaries']);
             toast.success('Salary record updated');
             setShowDialog(false);
             resetForm();
@@ -168,7 +164,7 @@ export default function Salaries() {
     const deleteSalaryMutation = useMutation({
         mutationFn: (id) => base44.entities.EmployeeSalary.delete(id),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['salaries'] });
+            queryClient.invalidateQueries(['salaries']);
             toast.success('Salary record deleted');
         },
         onError: () => {
@@ -182,7 +178,7 @@ export default function Salaries() {
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['salaries'] });
+            queryClient.invalidateQueries(['salaries']);
             if (data.success) {
                 toast.success(data.message, {
                     description: `Synced: ${data.synced}, Skipped: ${data.skipped}, Errors: ${data.errors.length}`
@@ -199,14 +195,14 @@ export default function Salaries() {
     const syncAllEmployeesMutation = useMutation({
         mutationFn: async () => {
             // First invalidate employees to get the latest master data
-            await queryClient.invalidateQueries({ queryKey: ['employees'] });
+            await queryClient.invalidateQueries(['employees']);
             
             const response = await base44.functions.invoke('syncAllEmployeesToSalary', {});
             return response.data;
         },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['salaries'] });
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries(['salaries']);
+            queryClient.invalidateQueries(['employees']);
             if (data.success) {
                 toast.success(data.message, {
                     description: `Updated: ${data.updated_count}, Skipped: ${data.skipped_count}, Errors: ${data.error_count}`
@@ -480,7 +476,7 @@ export default function Salaries() {
                 });
             }
 
-            queryClient.invalidateQueries({ queryKey: ['salaries'] });
+            queryClient.invalidateQueries(['salaries']);
             setUploadProgress(null);
             setShowPreview(false);
             setPreviewData(null);

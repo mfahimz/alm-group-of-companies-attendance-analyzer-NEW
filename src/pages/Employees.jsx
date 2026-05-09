@@ -63,15 +63,13 @@ export default function Employees() {
     // Check page access
     const { data: currentUser } = useQuery({
         queryKey: ['currentUser'],
-        queryFn: () => base44.auth.me(),
-        refetchOnWindowFocus: false
+        queryFn: () => base44.auth.me()
     });
 
     const { data: permissions = [] } = useQuery({
         queryKey: ['pagePermissions'],
         queryFn: () => base44.entities.PagePermission.list(),
-        enabled: !!currentUser,
-        refetchOnWindowFocus: false
+        enabled: !!currentUser
     });
 
     useEffect(() => {
@@ -100,6 +98,7 @@ export default function Employees() {
     const { data: employees = [], isLoading } = useQuery({
         queryKey: ['employees', selectedCompany, currentUser?.company, currentUser?.department, userRole],
         queryFn: async () => {
+            if (!currentUser) return [];
 
             // Admin, Supervisor, CEO, HR Manager can see all employees OR filtered by selected company
             if (isAdmin || isSupervisor || isCEO || isHRManager) {
@@ -112,17 +111,16 @@ export default function Employees() {
                     company: currentUser.company,
                     department: currentUser.department,
                     active: true
-                }, null, 1000);
+                });
             }
             
             // Regular users see only their company
             return await base44.entities.Employee.filter({
                 company: currentUser.company
-            }, null, 1000);
+            });
         },
         enabled: !!currentUser && !!selectedCompany,
-        staleTime: 2 * 60 * 1000,
-        refetchOnWindowFocus: false
+        staleTime: 2 * 60 * 1000
     });
 
     const deleteMutation = useMutation({
@@ -136,7 +134,7 @@ export default function Employees() {
             await base44.entities.Employee.delete(id);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries(['employees']);
             toast.success('Employee deleted successfully');
         },
         onError: (error) => {
@@ -172,7 +170,7 @@ export default function Employees() {
             return results;
         },
         onSuccess: (results) => {
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries(['employees']);
             setSelectedEmployeeIds([]);
             toast.success(`${results.length} employee${results.length > 1 ? 's' : ''} deleted successfully`);
             setImportProgress(null);
@@ -204,7 +202,7 @@ export default function Employees() {
             return results;
         },
         onSuccess: (results) => {
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries(['employees']);
             setSelectedEmployeeIds([]);
             setShowBulkEditDialog(false);
             toast.success(`${results.length} employees updated successfully`);
@@ -333,7 +331,7 @@ export default function Employees() {
             return results;
         },
         onSuccess: (results) => {
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries(['employees']);
             toast.success(`${results.length} employees imported successfully`);
             setImportFile(null);
             setImportProgress(null);
@@ -374,7 +372,7 @@ export default function Employees() {
             return { matched, notMatched };
         },
         onSuccess: ({ matched, notMatched }) => {
-            queryClient.invalidateQueries({ queryKey: ['employees'] });
+            queryClient.invalidateQueries(['employees']);
             if (notMatched > 0) {
                 toast.success(`${matched} HRMS IDs updated. ${notMatched} attendance IDs not found.`);
             } else {

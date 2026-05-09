@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ReportTab({ project, isDepartmentHead = false }) {
 
-
+    
     const queryClient = useQueryClient();
     const [progressDialog, setProgressDialog] = React.useState({
         open: false,
@@ -36,7 +36,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const [reportName, setReportName] = React.useState('');
     const [dataQualityIssues, setDataQualityIssues] = React.useState([]);
     const [showQualityCheck, setShowQualityCheck] = React.useState(false);
-
+    
     // Selection state for bulk actions
     const [selectedIds, setSelectedIds] = React.useState([]);
 
@@ -127,14 +127,14 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
     const normalizeApplicableDays = (value) => {
         if (!value) return [];
-        try { const p = JSON.parse(value); if (Array.isArray(p)) return p; } catch { }
+        try { const p = JSON.parse(value); if (Array.isArray(p)) return p; } catch {}
         if (value.includes(',')) return value.split(',').map(s => s.trim()).filter(Boolean);
         const s = value.trim().toLowerCase();
         if (s === 'friday') return ['Friday'];
-        if (s === 'monday to thursday and saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'];
-        if (s === 'monday to saturday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        if (s === 'monday to friday') return ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-        if (s === 'sunday to thursday') return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+        if (s === 'monday to thursday and saturday') return ['Monday','Tuesday','Wednesday','Thursday','Saturday'];
+        if (s === 'monday to saturday') return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+        if (s === 'monday to friday') return ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+        if (s === 'sunday to thursday') return ['Sunday','Monday','Tuesday','Wednesday','Thursday'];
         return [value.trim()];
     };
 
@@ -236,8 +236,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
             // ── 8. Employees with punches but no shifts ──────────────────────
             if (allPunches.length > 0 && allShifts.length > 0) {
-                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                const dayNameToNum = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+                const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+                const dayNameToNum = { Sunday:0, Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6 };
                 const missingShiftCases = [];
 
                 punchAttIds.forEach(attId => {
@@ -340,7 +340,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                     const prev = new Date(sortedPunchDates[i - 1]);
                     const curr = new Date(sortedPunchDates[i]);
                     const diffDays = (curr - prev) / (1000 * 60 * 60 * 24);
-                    if (diffDays > 3) gaps.push(`${sortedPunchDates[i - 1]} → ${sortedPunchDates[i]} (${Math.floor(diffDays)} days gap)`);
+                    if (diffDays > 3) gaps.push(`${sortedPunchDates[i-1]} → ${sortedPunchDates[i]} (${Math.floor(diffDays)} days gap)`);
                 }
                 if (gaps.length > 0) {
                     issues.push({
@@ -363,7 +363,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 if (dayPunches.length <= 1) return;
                 const withTime = dayPunches.map(p => ({ ...p, t: parseTimeForCheck(p.timestamp_raw) })).filter(p => p.t).sort((a, b) => a.t - b.t);
                 for (let i = 1; i < withTime.length; i++) {
-                    if (Math.abs(withTime[i].t - withTime[i - 1].t) / 60000 < 10) dupPunchCount++;
+                    if (Math.abs(withTime[i].t - withTime[i-1].t) / 60000 < 10) dupPunchCount++;
                 }
             });
             if (dupPunchCount > 0) {
@@ -406,15 +406,15 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             toast.error('Please select date range');
             return;
         }
-
+        
         const issues = await performDataQualityCheck();
         const hasErrors = issues.some(i => i.type === 'error');
-
+        
         if (hasErrors) {
             setShowQualityCheck(true);
             return;
         }
-
+        
         await runAnalysis();
     };
 
@@ -435,9 +435,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
         }
 
         setIsAnalyzing(true);
-        setAnalysisProgress({
-            current: 0,
-            total: 100,
+        setAnalysisProgress({ 
+            current: 0, 
+            total: 100, 
             status: 'Preparing analysis...',
             step: 'Initializing',
             subStatus: 'Loading employee data and configurations'
@@ -445,9 +445,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
         try {
             // Step 1: Preparing
-            setAnalysisProgress({
-                current: 10,
-                total: 100,
+            setAnalysisProgress({ 
+                current: 10, 
+                total: 100, 
                 status: 'Preparing analysis...',
                 step: 'Loading Data',
                 subStatus: 'Fetching employee records and shift schedules'
@@ -456,9 +456,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // Step 2: Processing attendance
-            setAnalysisProgress({
-                current: 25,
-                total: 100,
+            setAnalysisProgress({ 
+                current: 25, 
+                total: 100, 
                 status: 'Analyzing attendance records...',
                 step: 'Processing Attendance',
                 subStatus: `Processing employees across ${Math.ceil((new Date(dateTo) - new Date(dateFrom)) / (1000 * 60 * 60 * 24))} days`
@@ -480,9 +480,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             const totalProcessed = response.data.processed_count;
 
             // Step 4: Complete
-            setAnalysisProgress({
-                current: 100,
-                total: 100,
+            setAnalysisProgress({ 
+                current: 100, 
+                total: 100, 
                 status: 'Analysis complete!',
                 step: 'Done',
                 subStatus: `Successfully analyzed ${totalProcessed} employees`
@@ -496,9 +496,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             queryClient.invalidateQueries(['projects']);
             toast.success(`✅ Analysis complete`);
         } catch (error) {
-            setAnalysisProgress({
-                current: 0,
-                total: 100,
+            setAnalysisProgress({ 
+                current: 0, 
+                total: 100, 
                 status: 'Analysis failed',
                 step: 'Error',
                 subStatus: error.message
@@ -576,18 +576,18 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
                 return [];
             }
-
-            const managedIds = deptHeadVerification.assignment.managed_employee_ids
+            
+            const managedIds = deptHeadVerification.assignment.managed_employee_ids 
                 ? deptHeadVerification.assignment.managed_employee_ids.split(',').map(id => String(id.trim()))
                 : [];
+            
 
-
-
+            
             if (managedIds.length === 0) {
-
+    
                 return [];
             }
-
+            
             // Fetch all employees for the company
             const allEmployees = await base44.entities.Employee.filter({
                 company: deptHeadVerification.assignment.company,
@@ -598,8 +598,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
 
             // Filter to only managed subordinates using Employee IDs (not HRMS IDs)
             // CRITICAL: Exclude department head from the list
-            const filtered = allEmployees.filter(emp =>
-                managedIds.includes(String(emp.id)) &&
+            const filtered = allEmployees.filter(emp => 
+                managedIds.includes(String(emp.id)) && 
                 String(emp.id) !== String(deptHeadVerification.assignment.employee_id)
             );
 
@@ -618,24 +618,24 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     const deleteReportsMutation = useMutation({
         mutationFn: async (ids) => {
             const reportRunIds = Array.isArray(ids) ? ids : [ids];
-
+            
             for (const reportRunId of reportRunIds) {
                 // Fetch all associated data for this report - use paginated fetch
                 const [resultsToDelete, snapshotsToDelete] = await Promise.all([
-                    fetchAllRecords(base44.entities.AnalysisResult, {
-                        project_id: project.id,
-                        report_run_id: reportRunId
+                    fetchAllRecords(base44.entities.AnalysisResult, { 
+                        project_id: project.id, 
+                        report_run_id: reportRunId 
                     }),
                     fetchAllRecords(base44.entities.SalarySnapshot, {
                         project_id: project.id,
                         report_run_id: reportRunId
                     })
                 ]);
-
+                
                 // Delete in batches of 5 with delays to avoid rate limiting
                 const BATCH_SIZE = 5;
                 const DELAY_MS = 200;
-
+                
                 const deleteInBatches = async (items, deleteFunc) => {
                     for (let i = 0; i < items.length; i += BATCH_SIZE) {
                         const batch = items.slice(i, i + BATCH_SIZE);
@@ -645,32 +645,32 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         }
                     }
                 };
-
+                
                 // Step 2: GIFT_MINUTES exception cleanup logic.
                 // These exceptions are created during the gift minutes batch save and are tied to attendance_ids
                 // within a report run. They must be cleaned up when a report is deleted to avoid "orphaned"
                 // exceptions interfering with future report generation or showing up in other reports.
                 const attendanceIds = [...new Set(resultsToDelete.map(r => String(r.attendance_id)).filter(Boolean))];
-
+                
                 if (attendanceIds.length > 0) {
 
-
+                    
                     // Fetch all GIFT_MINUTES exceptions for this project
                     const allGiftExceptions = await fetchAllRecords(base44.entities.Exception, {
                         project_id: project.id,
                         type: 'GIFT_MINUTES'
                     });
-
+                    
                     // Filter exceptions that belong to the employees in the report being deleted
-                    const exceptionsToDelete = allGiftExceptions.filter(ex =>
+                    const exceptionsToDelete = allGiftExceptions.filter(ex => 
                         attendanceIds.includes(String(ex.attendance_id))
                     );
-
+                    
                     if (exceptionsToDelete.length > 0) {
                         const EXCEPTION_BATCH_SIZE = 8;
                         const EXCEPTION_BATCH_DELAY = 1500;
                         const RETRY_DELAYS = [1000, 2000, 4000];
-
+                        
                         // Recursive delete function with exponential backoff for 429 rate limits
                         const deleteExceptionWithRetry = async (id, attempt = 0) => {
                             try {
@@ -687,7 +687,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 throw error;
                             }
                         };
-
+                        
                         // Process deletions in batches of 8 with inter-batch delays
                         for (let j = 0; j < exceptionsToDelete.length; j += EXCEPTION_BATCH_SIZE) {
                             const batch = exceptionsToDelete.slice(j, j + EXCEPTION_BATCH_SIZE);
@@ -704,12 +704,12 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                 if (resultsToDelete.length > 0) {
                     await deleteInBatches(resultsToDelete, (id) => base44.entities.AnalysisResult.delete(id));
                 }
-
+                
                 // Then delete snapshots
                 if (snapshotsToDelete.length > 0) {
                     await deleteInBatches(snapshotsToDelete, (id) => base44.entities.SalarySnapshot.delete(id));
                 }
-
+                
                 // Finally, delete the report run itself
                 await base44.entities.ReportRun.delete(reportRunId);
             }
@@ -755,7 +755,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
     };
 
     const toggleSelection = (id) => {
-        setSelectedIds(prev =>
+        setSelectedIds(prev => 
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );
     };
@@ -892,7 +892,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         </div>
 
                         <div className="flex gap-2">
-                            <Button
+                            <Button 
                                 onClick={async () => {
                                     await performDataQualityCheck();
                                     setShowQualityCheck(true);
@@ -950,30 +950,33 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                         ) : (
                             <div className="space-y-3">
                                 {dataQualityIssues.map((issue, idx) => (
-                                    <div
+                                    <div 
                                         key={idx}
-                                        className={`flex items-start gap-3 p-4 rounded-lg border ${issue.type === 'error' ? 'bg-red-50 border-red-200' :
-                                                issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
-                                                    'bg-blue-50 border-blue-200'
-                                            }`}
+                                        className={`flex items-start gap-3 p-4 rounded-lg border ${
+                                            issue.type === 'error' ? 'bg-red-50 border-red-200' :
+                                            issue.type === 'warning' ? 'bg-amber-50 border-amber-200' :
+                                            'bg-blue-50 border-blue-200'
+                                        }`}
                                     >
                                         {issue.type === 'error' && <XCircle className="w-5 h-5 text-red-600 mt-0.5" />}
                                         {issue.type === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />}
                                         {issue.type === 'info' && <Info className="w-5 h-5 text-blue-600 mt-0.5" />}
                                         <div className="flex-1">
-                                            <p className={`font-medium ${issue.type === 'error' ? 'text-red-900' :
-                                                    issue.type === 'warning' ? 'text-amber-900' :
-                                                        'text-blue-900'
-                                                }`}>
+                                            <p className={`font-medium ${
+                                                issue.type === 'error' ? 'text-red-900' :
+                                                issue.type === 'warning' ? 'text-amber-900' :
+                                                'text-blue-900'
+                                            }`}>
                                                 {issue.title}
                                             </p>
-                                            <p className={`text-sm mt-1 ${issue.type === 'error' ? 'text-red-700' :
-                                                    issue.type === 'warning' ? 'text-amber-700' :
-                                                        'text-blue-700'
-                                                }`}>
+                                            <p className={`text-sm mt-1 ${
+                                                issue.type === 'error' ? 'text-red-700' :
+                                                issue.type === 'warning' ? 'text-amber-700' :
+                                                'text-blue-700'
+                                            }`}>
                                                 {issue.details}
                                             </p>
-
+                                            
                                             {issue.affectedList && (
                                                 <div className="mt-3 bg-white/50 rounded-md p-2 border border-amber-200/50 max-h-40 overflow-y-auto">
                                                     <p className="text-xs font-semibold text-amber-800 mb-1">Affected Employees & Dates:</p>
@@ -1018,7 +1021,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             Close
                         </Button>
                         {!dataQualityIssues.some(i => i.type === 'error') && (
-                            <Button
+                            <Button 
                                 onClick={() => {
                                     setShowQualityCheck(false);
                                     runAnalysis();
@@ -1029,7 +1032,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             </Button>
                         )}
                         {dataQualityIssues.some(i => i.type === 'error') && isAdmin && (
-                            <Button
+                            <Button 
                                 onClick={() => {
                                     setShowQualityCheck(false);
                                     runAnalysis();
@@ -1044,10 +1047,10 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
             </Dialog>
 
             {/* Progress Dialog - Cannot be closed until complete */}
-            <Dialog open={progressDialog.open} onOpenChange={() => { }}>
-                <DialogContent
-                    className="sm:max-w-md"
-                    onPointerDownOutside={(e) => e.preventDefault()}
+            <Dialog open={progressDialog.open} onOpenChange={() => {}}>
+                <DialogContent 
+                    className="sm:max-w-md" 
+                    onPointerDownOutside={(e) => e.preventDefault()} 
                     onEscapeKeyDown={(e) => e.preventDefault()}
                     onInteractOutside={(e) => e.preventDefault()}
                 >
@@ -1060,8 +1063,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 <span>Progress</span>
                                 <span className="font-medium">{progressDialog.current} / {progressDialog.total}</span>
                             </div>
-                            <Progress
-                                value={progressDialog.total > 0 ? (progressDialog.current / progressDialog.total) * 100 : 0}
+                            <Progress 
+                                value={progressDialog.total > 0 ? (progressDialog.current / progressDialog.total) * 100 : 0} 
                                 className="h-2"
                             />
                         </div>
@@ -1111,7 +1114,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                             variant="outline"
                             onClick={async () => {
                                 if (!confirm('Run data integrity repair? This will:\n1. Audit finalized report data\n2. Fix any mismatches between AnalysisResult → SalarySnapshot → SalaryReport\n3. Show final verification')) return;
-
+                                
                                 try {
                                     const { data } = await base44.functions.invoke('repairSalaryReportFromSnapshots', {
                                         report_run_id: finalizedReport.id
@@ -1150,7 +1153,7 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 <TableHeader className="bg-slate-50/80 backdrop-blur-md sticky top-0 z-10 border-b border-slate-200">
                                     <TableRow className="hover:bg-transparent">
                                         <TableHead className="w-[50px]">
-                                            <Checkbox
+                                            <Checkbox 
                                                 checked={selectedIds.length === reportRuns.length && reportRuns.length > 0}
                                                 onCheckedChange={toggleAllSelection}
                                             />
@@ -1166,11 +1169,11 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                 <TableBody>
                                     {reportRuns.map((run) => {
                                         const verifiedCount = run.verified_employees ? run.verified_employees.split(',').filter(Boolean).length : 0;
-
+                                        
                                         return (
                                             <TableRow key={run.id} className={`${selectedIds.includes(run.id) ? 'bg-slate-50' : ''} group hover:bg-slate-50/80 transition-colors duration-200`}>
                                                 <TableCell>
-                                                    <Checkbox
+                                                    <Checkbox 
                                                         checked={selectedIds.includes(run.id)}
                                                         onCheckedChange={() => toggleSelection(run.id)}
                                                     />
@@ -1179,9 +1182,9 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                     <div className="flex items-center gap-2">
                                                         {run.report_name || 'Unnamed Report'}
                                                         {!isDepartmentHead && canModifyAttendance && (
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
                                                                 className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                                                 onClick={() => handleRenameReport(run.id, run.report_name)}
                                                             >
@@ -1197,16 +1200,16 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                     {isDepartmentHead ? departmentEmployees.length : run.employee_count}
                                                 </TableCell>
                                                 {!isDepartmentHead && (
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600'}>
-                                                                {verifiedCount} / {run.employee_count}
-                                                            </span>
-                                                            {verifiedCount === run.employee_count && (
-                                                                <CheckCircle className="w-4 h-4 text-green-600" />
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={verifiedCount === run.employee_count ? 'text-green-600' : 'text-slate-600'}>
+                                                            {verifiedCount} / {run.employee_count}
+                                                        </span>
+                                                        {verifiedCount === run.employee_count && (
+                                                            <CheckCircle className="w-4 h-4 text-green-600" />
+                                                        )}
+                                                    </div>
+                                                </TableCell>
                                                 )}
                                                 <TableCell>
                                                     <div className="flex flex-wrap gap-1">
@@ -1238,8 +1241,8 @@ export default function ReportTab({ project, isDepartmentHead = false }) {
                                                             </Button>
                                                         </Link>
                                                         {!isDepartmentHead && canDeleteReports && (
-                                                            <Button
-                                                                size="sm"
+                                                            <Button 
+                                                                size="sm" 
                                                                 variant="ghost"
                                                                 onClick={() => {
                                                                     if (window.confirm('Delete this report? This will permanently remove all analysis results from this run.')) {
