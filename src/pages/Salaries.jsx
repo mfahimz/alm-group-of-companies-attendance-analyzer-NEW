@@ -499,6 +499,31 @@ export default function Salaries() {
         }
     };
 
+    const handleErrorEmployeeReplacement = (errorIndex, employeeId) => {
+        const employee = employees.find(e => e.id === employeeId);
+        const record = previewData?.errors?.[errorIndex];
+        if (!employee || !record) return;
+
+        const existingSalary = salaries.find(s => String(s.employee_id) === String(employee.hrms_id) && s.active);
+        const correctedRecord = {
+            ...record,
+            hrmsId: String(employee.hrms_id || ''),
+            attendanceId: String(employee.attendance_id || ''),
+            name: employee.name,
+            company: employee.company,
+            employee,
+            existingSalary,
+            action: existingSalary ? 'Update' : 'Create',
+            error: null
+        };
+
+        setPreviewData(prev => ({
+            valid: [...(prev?.valid || []), correctedRecord],
+            errors: (prev?.errors || []).filter((_, idx) => idx !== errorIndex)
+        }));
+        toast.success(`Row ${record.rowNumber} matched to ${employee.name}`);
+    };
+
     const handleUnmatchedCorrection = () => {
         const correctedRecords = [];
         const stillUnmatched = [];
@@ -1027,6 +1052,7 @@ export default function Salaries() {
                             {previewData.errors.length > 0 && (
                                 <div>
                                     <h3 className="font-semibold mb-2 text-red-900">Error Records ({previewData.errors.length})</h3>
+                                    <p className="text-sm text-slate-600 mb-2">For unmatched names, use the search box in each row to choose the correct employee.</p>
                                     <div className="border border-red-200 rounded-lg overflow-hidden">
                                         <Table>
                                             <TableHeader>
@@ -1034,7 +1060,7 @@ export default function Salaries() {
                                                     <TableHead>Row</TableHead>
                                                     <TableHead>HRMS ID</TableHead>
                                                     <TableHead>Name</TableHead>
-                                                    <TableHead>Error</TableHead>
+                                                    <TableHead>Error / Replacement Employee</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -1043,7 +1069,23 @@ export default function Salaries() {
                                                         <TableCell>{record.rowNumber}</TableCell>
                                                         <TableCell>{record.hrmsId || '-'}</TableCell>
                                                         <TableCell>{record.name || '-'}</TableCell>
-                                                        <TableCell className="text-red-600">{record.error}</TableCell>
+                                                        <TableCell className="min-w-[340px]">
+                                                            <div className="space-y-2">
+                                                                <div className="text-red-600 text-sm">{record.error}</div>
+                                                                <Select onValueChange={(employeeId) => handleErrorEmployeeReplacement(idx, employeeId)}>
+                                                                    <SelectTrigger className="bg-white border-indigo-300">
+                                                                        <SelectValue placeholder="Search/select replacement employee..." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent filter={true} className="z-[100]">
+                                                                        {employees.map(emp => (
+                                                                            <SelectItem key={emp.id} value={emp.id}>
+                                                                                {emp.name} ({emp.attendance_id || 'No Attendance ID'}) - HRMS: {emp.hrms_id}
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        </TableCell>
                                                     </TableRow>
                                                 ))}
                                             </TableBody>
