@@ -409,6 +409,45 @@ Deno.serve(async (req) => {
             if (dayOverride.otherMinutes !== undefined) totalOtherMinutes += dayOverride.otherMinutes;
         }
 
+        // ================================================================
+        // EARLY VS OTHER MINUTES SUPPRESSION
+        // ================================================================
+        const hasExplicitEarlyOverride = (() => {
+            if (dayOverride) {
+                return dayOverride.earlyCheckoutMinutes !== undefined && dayOverride.earlyCheckoutMinutes !== null;
+            }
+            if (matchingExceptions.some(ex => ex.type === 'MANUAL_EARLY_CHECKOUT')) {
+                return true;
+            }
+            if (dateException && (
+                dateException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                (dateException.early_checkout_minutes !== undefined && dateException.early_checkout_minutes !== null && dateException.created_from_report)
+            )) {
+                return true;
+            }
+            return false;
+        })();
+
+        const hasOtherMinutesOverride = (() => {
+            if (dayOverride) {
+                return dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes !== null && dayOverride.otherMinutes > 0;
+            }
+            if (matchingExceptions.some(ex => ex.type === 'MANUAL_OTHER_MINUTES')) {
+                return true;
+            }
+            if (dateException && (
+                dateException.type === 'MANUAL_OTHER_MINUTES' ||
+                (dateException.other_minutes !== undefined && dateException.other_minutes !== null && dateException.other_minutes > 0)
+            )) {
+                return true;
+            }
+            return false;
+        })();
+
+        if (!hasExplicitEarlyOverride && hasOtherMinutesOverride) {
+            dayEarly = 0;
+        }
+
         // ALLOWED_MINUTES reduction
         const empAllowed = matchingExceptions
             .filter(ex => ex.type === 'ALLOWED_MINUTES' && String(ex.attendance_id) === attendanceIdStr)

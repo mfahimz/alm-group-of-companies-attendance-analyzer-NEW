@@ -711,6 +711,47 @@ export default function DailyBreakdownDialog({
                 }
             }
 
+            // ================================================================
+            // EARLY VS OTHER MINUTES SUPPRESSION
+            // ================================================================
+            const hasExplicitEarlyOverride = (() => {
+                const dayOverride = dayOverrides[dateStr];
+                if (dayOverride && (dayOverride.earlyCheckoutMinutes !== undefined && dayOverride.earlyCheckoutMinutes !== null)) {
+                    return true;
+                }
+                if (matchingExceptions.some(ex => ex.type === 'MANUAL_EARLY_CHECKOUT')) {
+                    return true;
+                }
+                if (reportGeneratedException && (
+                    reportGeneratedException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                    (reportGeneratedException.early_checkout_minutes !== undefined && reportGeneratedException.early_checkout_minutes !== null && reportGeneratedException.created_from_report)
+                )) {
+                    return true;
+                }
+                return false;
+            })();
+
+            const hasOtherMinutesOverride = (() => {
+                const dayOverride = dayOverrides[dateStr];
+                if (dayOverride && (dayOverride.otherMinutes !== undefined && dayOverride.otherMinutes !== null && dayOverride.otherMinutes > 0)) {
+                    return true;
+                }
+                if (matchingExceptions.some(ex => ex.type === 'MANUAL_OTHER_MINUTES')) {
+                    return true;
+                }
+                if (reportGeneratedException && (
+                    reportGeneratedException.type === 'MANUAL_OTHER_MINUTES' ||
+                    (reportGeneratedException.other_minutes !== undefined && reportGeneratedException.other_minutes !== null && reportGeneratedException.other_minutes > 0)
+                )) {
+                    return true;
+                }
+                return false;
+            })();
+
+            if (!hasExplicitEarlyOverride && hasOtherMinutesOverride) {
+                dayEarlyMinutes = 0;
+            }
+
             // Step 3: After both branches apply ALLOWED_MINUTES reduction independently
             // Find ALLOWED_MINUTES exception for this day (mirrors runAnalysis logic)
             let allowedMinutesForDay = 0;

@@ -1284,6 +1284,49 @@ Deno.serve(async (req: Request) => {
                 }
 
                 // ================================================================
+                // LAYER 2.7 — EARLY VS OTHER MINUTES SUPPRESSION LAYER
+                // If other minutes exist for this day (via manual or report overrides),
+                // raw/calculated early checkout minutes must be suppressed to 0,
+                // unless an explicit manual/report early override exists.
+                // ================================================================
+                const hasExplicitEarlyOverride = (() => {
+                    if (dayOverrideEntry) {
+                        return dayOverrideEntry.earlyCheckoutMinutes !== undefined && dayOverrideEntry.earlyCheckoutMinutes !== null;
+                    }
+                    if (matchingExceptions.some(ex => ex.type === 'MANUAL_EARLY_CHECKOUT')) {
+                        return true;
+                    }
+                    if (effectiveReportException && (
+                        effectiveReportException.type === 'MANUAL_EARLY_CHECKOUT' ||
+                        (effectiveReportException.early_checkout_minutes !== undefined && effectiveReportException.early_checkout_minutes !== null && effectiveReportException.created_from_report)
+                    )) {
+                        return true;
+                    }
+                    return false;
+                })();
+
+                const hasOtherMinutesOverride = (() => {
+                    if (dayOverrideEntry) {
+                        return dayOverrideEntry.otherMinutes !== undefined && dayOverrideEntry.otherMinutes !== null && dayOverrideEntry.otherMinutes > 0;
+                    }
+                    if (matchingExceptions.some(ex => ex.type === 'MANUAL_OTHER_MINUTES')) {
+                        return true;
+                    }
+                    if (effectiveReportException && (
+                        effectiveReportException.type === 'MANUAL_OTHER_MINUTES' ||
+                        (effectiveReportException.other_minutes !== undefined && effectiveReportException.other_minutes !== null && effectiveReportException.other_minutes > 0)
+                    )) {
+                        return true;
+                    }
+                    return false;
+                })();
+
+                if (!hasExplicitEarlyOverride && hasOtherMinutesOverride) {
+                    console.log(`[runAnalysis] SUPPRESSION: Employee ${attendanceIdStr}, Date ${dateStr}: Suppressing raw early checkout (was=${dayState.early}) to 0 due to other minutes exception.`);
+                    dayState.early = 0;
+                }
+
+                // ================================================================
                 // LAYER 3 — FORGIVENESS LAYER
                 // Zeros specific penalties without touching status.
                 // SKIP_PUNCH: forgives the specific shift point.
